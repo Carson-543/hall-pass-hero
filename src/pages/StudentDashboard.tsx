@@ -14,7 +14,8 @@ import { QuotaDisplay } from '@/components/QuotaDisplay';
 import { useCurrentPeriod } from '@/hooks/useCurrentPeriod';
 import { useWeeklyQuota } from '@/hooks/useWeeklyQuota';
 import { PassHistory } from '@/components/PassHistory';
-import { LogOut, Plus } from 'lucide-react';
+import { LogOut, Plus, Clock, BookOpen, Calendar } from 'lucide-react';
+import { format } from 'date-fns';
 
 const DESTINATIONS = ['Restroom', 'Locker', 'Office', 'Other'];
 
@@ -34,6 +35,15 @@ interface ActivePass {
   class_name: string;
 }
 
+interface Period {
+  id: string;
+  name: string;
+  period_order: number;
+  start_time: string;
+  end_time: string;
+  is_passing_period: boolean;
+}
+
 const StudentDashboard = () => {
   const { user, role, signOut, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -48,6 +58,7 @@ const StudentDashboard = () => {
   const [joinCode, setJoinCode] = useState('');
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [requestLoading, setRequestLoading] = useState(false);
+  const [todayPeriods, setTodayPeriods] = useState<Period[]>([]);
 
   const fetchEnrolledClasses = async () => {
     if (!user) return;
@@ -60,7 +71,8 @@ const StudentDashboard = () => {
           id,
           name,
           period_order,
-          teacher_id
+          teacher_id,
+          profiles:teacher_id (full_name)
         )
       `)
       .eq('student_id', user.id);
@@ -69,9 +81,10 @@ const StudentDashboard = () => {
       const classes = data.map((e: any) => ({
         id: e.classes.id,
         name: e.classes.name,
-        period_order: e.classes.period_order
+        period_order: e.classes.period_order,
+        teacher_name: e.classes.profiles?.full_name ?? 'Unknown Teacher'
       }));
-      setEnrolledClasses(classes);
+      setEnrolledClasses(classes.sort((a, b) => a.period_order - b.period_order));
 
       // Auto-select class for current period
       if (currentPeriod) {
@@ -106,8 +119,8 @@ const StudentDashboard = () => {
       setActivePass({
         id: data.id,
         destination: data.destination,
-        status: data.status,
-        requested_at: data.requested_at,
+        status: data.status ?? 'pending',
+        requested_at: data.requested_at ?? '',
         approved_at: data.approved_at,
         class_name: (data.classes as any)?.name ?? ''
       });
@@ -116,9 +129,33 @@ const StudentDashboard = () => {
     }
   };
 
+  const fetchTodaySchedule = async () => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    
+    // Get today's schedule assignment
+    const { data: assignment } = await supabase
+      .from('schedule_assignments')
+      .select('schedule_id')
+      .eq('date', today)
+      .maybeSingle();
+
+    if (assignment) {
+      const { data: periods } = await supabase
+        .from('periods')
+        .select('*')
+        .eq('schedule_id', assignment.schedule_id)
+        .order('period_order');
+
+      if (periods) {
+        setTodayPeriods(periods);
+      }
+    }
+  };
+
   useEffect(() => {
     fetchEnrolledClasses();
     fetchActivePass();
+    fetchTodaySchedule();
 
     // Subscribe to pass changes
     const channel = supabase
@@ -146,27 +183,40 @@ const StudentDashboard = () => {
   const handleJoinClass = async () => {
     if (!joinCode.trim()) return;
 
+    const normalizedCode = joinCode.toUpperCase().trim();
+
     const { data: classData, error: classError } = await supabase
       .from('classes')
-      .select('id, period_order')
-      .eq('join_code', joinCode.toUpperCase())
-      .single();
+      .select('id, period_order, name')
+      .eq('join_code', normalizedCode)
+      .maybeSingle();
 
     if (classError || !classData) {
       toast({
         title: 'Invalid Code',
-        description: 'No class found with that join code.',
+        description: 'No class found with that join code. Please check the code and try again.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Check if already enrolled in this class
+    const existingEnrollment = enrolledClasses.find(c => c.id === classData.id);
+    if (existingEnrollment) {
+      toast({
+        title: 'Already Enrolled',
+        description: `You're already enrolled in ${classData.name}.`,
         variant: 'destructive'
       });
       return;
     }
 
     // Check if already enrolled in a class for this period
-    const existingEnrollment = enrolledClasses.find(c => c.period_order === classData.period_order);
-    if (existingEnrollment) {
+    const existingPeriodEnrollment = enrolledClasses.find(c => c.period_order === classData.period_order);
+    if (existingPeriodEnrollment) {
       toast({
-        title: 'Already Enrolled',
-        description: `You're already enrolled in a class for period ${classData.period_order}.`,
+        title: 'Period Conflict',
+        description: `You're already enrolled in ${existingPeriodEnrollment.name} for period ${classData.period_order}.`,
         variant: 'destructive'
       });
       return;
@@ -182,13 +232,13 @@ const StudentDashboard = () => {
     if (error) {
       toast({
         title: 'Error',
-        description: 'Failed to join class.',
+        description: 'Failed to join class. Please try again.',
         variant: 'destructive'
       });
     } else {
       toast({
-        title: 'Success',
-        description: 'You have joined the class!'
+        title: 'Success!',
+        description: `You have joined ${classData.name}!`
       });
       setJoinCode('');
       setJoinDialogOpen(false);
@@ -270,6 +320,14 @@ const StudentDashboard = () => {
     }
   };
 
+  const formatTime = (time: string) => {
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
   if (authLoading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
@@ -281,7 +339,12 @@ const StudentDashboard = () => {
   return (
     <div className="min-h-screen bg-background p-4 max-w-4xl mx-auto">
       <header className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Student Dashboard</h1>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+            <span className="text-primary-foreground font-bold text-lg">S</span>
+          </div>
+          <h1 className="text-2xl font-bold">Student Dashboard</h1>
+        </div>
         <Button variant="outline" size="sm" onClick={signOut}>
           <LogOut className="h-4 w-4 mr-2" />
           Sign Out
@@ -294,27 +357,30 @@ const StudentDashboard = () => {
 
         {/* Active Pass Status */}
         {activePass && (
-          <Card className="border-primary">
+          <Card className="border-2 border-primary bg-primary/5 card-hover">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Active Pass</CardTitle>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse-gentle" />
+                Active Pass
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                <p className="font-semibold">{activePass.destination}</p>
+                <p className="font-semibold text-lg">{activePass.destination}</p>
                 <p className="text-sm text-muted-foreground">
                   From: {activePass.class_name}
                 </p>
                 <p className="text-sm">
-                  Status: <span className="font-medium capitalize">{activePass.status.replace('_', ' ')}</span>
+                  Status: <span className="font-medium capitalize bg-primary/10 text-primary px-2 py-0.5 rounded-full">{activePass.status.replace('_', ' ')}</span>
                 </p>
                 {activePass.status === 'approved' && (
-                  <Button onClick={handleCheckIn} className="w-full mt-2">
+                  <Button onClick={handleCheckIn} className="w-full mt-2 btn-bounce">
                     Check Back In
                   </Button>
                 )}
                 {activePass.status === 'pending_return' && (
-                  <p className="text-sm text-muted-foreground">
-                    Waiting for teacher to confirm your return.
+                  <p className="text-sm text-muted-foreground italic">
+                    Waiting for teacher to confirm your return...
                   </p>
                 )}
               </div>
@@ -324,7 +390,7 @@ const StudentDashboard = () => {
 
         {/* Request New Pass */}
         {!activePass && isSchoolDay && (
-          <Card>
+          <Card className="card-hover">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Request a Pass</CardTitle>
             </CardHeader>
@@ -350,7 +416,7 @@ const StudentDashboard = () => {
                   <Button
                     key={dest}
                     variant={selectedDestination === dest ? 'default' : 'outline'}
-                    className="h-16"
+                    className="h-16 btn-bounce"
                     onClick={() => setSelectedDestination(dest)}
                     disabled={dest === 'Restroom' && isQuotaExceeded}
                   >
@@ -371,7 +437,7 @@ const StudentDashboard = () => {
               )}
 
               <Button 
-                className="w-full" 
+                className="w-full btn-bounce" 
                 onClick={handleRequestPass}
                 disabled={requestLoading || !selectedClassId || !selectedDestination}
               >
@@ -381,10 +447,82 @@ const StudentDashboard = () => {
           </Card>
         )}
 
+        {/* My Classes */}
+        <Card className="card-hover">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              My Classes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {enrolledClasses.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">
+                No classes enrolled. Join a class using a code from your teacher.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {enrolledClasses.map(c => (
+                  <div key={c.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                    <div>
+                      <p className="font-medium">{c.name}</p>
+                      <p className="text-sm text-muted-foreground">{c.teacher_name}</p>
+                    </div>
+                    <span className="text-sm font-mono bg-primary/10 text-primary px-2 py-1 rounded">
+                      Period {c.period_order}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Today's Schedule */}
+        {todayPeriods.length > 0 && (
+          <Card className="card-hover">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Today's Schedule
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                {todayPeriods.map(period => {
+                  const isCurrentPeriod = currentPeriod?.id === period.id;
+                  return (
+                    <div
+                      key={period.id}
+                      className={`flex items-center justify-between p-2 rounded-lg transition-colors ${
+                        period.is_passing_period 
+                          ? 'bg-muted/30 text-muted-foreground text-sm' 
+                          : isCurrentPeriod 
+                            ? 'bg-primary/10 border border-primary' 
+                            : 'hover:bg-muted/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {isCurrentPeriod && <div className="w-2 h-2 rounded-full bg-primary animate-pulse-gentle" />}
+                        <span className={`font-medium ${period.is_passing_period ? 'text-muted-foreground' : ''}`}>
+                          {period.name}
+                        </span>
+                      </div>
+                      <span className="font-mono text-sm">
+                        {formatTime(period.start_time)} - {formatTime(period.end_time)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Join Class */}
         <Dialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" className="w-full">
+            <Button variant="outline" className="w-full btn-bounce">
               <Plus className="h-4 w-4 mr-2" />
               Join a Class
             </Button>
@@ -401,9 +539,10 @@ const StudentDashboard = () => {
                   value={joinCode}
                   onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                   maxLength={6}
+                  className="text-center text-lg font-mono tracking-widest"
                 />
               </div>
-              <Button onClick={handleJoinClass} className="w-full">
+              <Button onClick={handleJoinClass} className="w-full btn-bounce" disabled={joinCode.length !== 6}>
                 Join Class
               </Button>
             </div>
