@@ -6,12 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { PeriodDisplay } from '@/components/PeriodDisplay';
-import { LogOut, Plus, Users, AlertTriangle, Check, X } from 'lucide-react';
+import { LogOut, Plus, Users, AlertTriangle, Check, X, Copy, UserMinus, ClipboardList, Calendar, Filter } from 'lucide-react';
+import { format, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
 interface ClassInfo {
   id: string;
@@ -36,6 +37,14 @@ interface Student {
   email: string;
 }
 
+interface PassHistoryItem {
+  id: string;
+  destination: string;
+  status: string;
+  requested_at: string;
+  class_name: string;
+}
+
 const TeacherDashboard = () => {
   const { user, role, signOut, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -49,16 +58,35 @@ const TeacherDashboard = () => {
   const [newClassPeriod, setNewClassPeriod] = useState('');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
+  // Create pass for student
+  const [createPassDialogOpen, setCreatePassDialogOpen] = useState(false);
+  const [selectedStudentForPass, setSelectedStudentForPass] = useState('');
+  const [selectedDestination, setSelectedDestination] = useState('');
+  const [customDestination, setCustomDestination] = useState('');
+
+  // Student pass history
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [selectedStudentHistory, setSelectedStudentHistory] = useState<Student | null>(null);
+  const [studentPassHistory, setStudentPassHistory] = useState<PassHistoryItem[]>([]);
+  const [historyFilter, setHistoryFilter] = useState('this_week');
+  const [historyClassFilter, setHistoryClassFilter] = useState('all');
+
+  // Remove student
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [studentToRemove, setStudentToRemove] = useState<Student | null>(null);
+
   // Sub mode
   const [subMode, setSubMode] = useState(false);
   const [teachers, setTeachers] = useState<{ id: string; name: string }[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
   const [subClasses, setSubClasses] = useState<ClassInfo[]>([]);
 
+  const DESTINATIONS = ['Restroom', 'Locker', 'Office', 'Other'];
+
   const fetchClasses = async () => {
     if (!user) return;
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('classes')
       .select('*')
       .eq('teacher_id', user.id)
@@ -196,6 +224,61 @@ const TeacherDashboard = () => {
     }
   };
 
+  const fetchStudentPassHistory = async (studentId: string) => {
+    let startDate: Date;
+    let endDate = new Date();
+
+    switch (historyFilter) {
+      case 'this_week':
+        startDate = startOfWeek(new Date(), { weekStartsOn: 1 });
+        break;
+      case 'last_week':
+        startDate = startOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 1 });
+        endDate = endOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 1 });
+        break;
+      case 'this_month':
+        startDate = startOfMonth(new Date());
+        break;
+      case 'last_month':
+        startDate = startOfMonth(subMonths(new Date(), 1));
+        endDate = endOfMonth(subMonths(new Date(), 1));
+        break;
+      default:
+        startDate = startOfWeek(new Date(), { weekStartsOn: 1 });
+    }
+
+    let query = supabase
+      .from('passes')
+      .select(`
+        id,
+        destination,
+        status,
+        requested_at,
+        class_id,
+        classes (name)
+      `)
+      .eq('student_id', studentId)
+      .gte('requested_at', startDate.toISOString())
+      .lte('requested_at', endDate.toISOString())
+      .order('requested_at', { ascending: false });
+
+    if (historyClassFilter !== 'all') {
+      query = query.eq('class_id', historyClassFilter);
+    }
+
+    const { data } = await query;
+
+    if (data) {
+      setStudentPassHistory(data.map((p: any) => ({
+        id: p.id,
+        destination: p.destination,
+        status: p.status,
+        requested_at: p.requested_at,
+        class_name: p.classes?.name ?? 'Unknown'
+      })));
+    }
+  };
+
   useEffect(() => {
     fetchClasses();
     fetchTeachers();
@@ -206,7 +289,6 @@ const TeacherDashboard = () => {
       fetchPasses(selectedClassId);
       fetchStudents(selectedClassId);
 
-      // Subscribe to pass changes
       const channel = supabase
         .channel(`class-passes-${selectedClassId}`)
         .on(
@@ -235,6 +317,12 @@ const TeacherDashboard = () => {
     }
   }, [selectedTeacherId]);
 
+  useEffect(() => {
+    if (selectedStudentHistory) {
+      fetchStudentPassHistory(selectedStudentHistory.id);
+    }
+  }, [selectedStudentHistory, historyFilter, historyClassFilter]);
+
   const getWeekStart = () => {
     const now = new Date();
     const dayOfWeek = now.getDay();
@@ -248,7 +336,6 @@ const TeacherDashboard = () => {
   const handleCreateClass = async () => {
     if (!newClassName.trim() || !newClassPeriod) return;
 
-    // Generate join code
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let joinCode = '';
     for (let i = 0; i < 6; i++) {
@@ -279,6 +366,42 @@ const TeacherDashboard = () => {
       setNewClassPeriod('');
       setCreateDialogOpen(false);
       fetchClasses();
+    }
+  };
+
+  const handleCreatePassForStudent = async () => {
+    if (!selectedStudentForPass || !selectedDestination) return;
+
+    const destination = selectedDestination === 'Other' ? customDestination : selectedDestination;
+    if (selectedDestination === 'Other' && !customDestination.trim()) {
+      toast({
+        title: 'Missing Destination',
+        description: 'Please enter a custom destination.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const { error } = await supabase
+      .from('passes')
+      .insert({
+        student_id: selectedStudentForPass,
+        class_id: selectedClassId,
+        destination: destination,
+        status: 'approved',
+        approved_at: new Date().toISOString(),
+        approved_by: user!.id
+      });
+
+    if (error) {
+      toast({ title: 'Error', description: 'Failed to create pass.', variant: 'destructive' });
+    } else {
+      toast({ title: 'Pass Created', description: 'Student can now leave.' });
+      setCreatePassDialogOpen(false);
+      setSelectedStudentForPass('');
+      setSelectedDestination('');
+      setCustomDestination('');
+      fetchPasses(selectedClassId);
     }
   };
 
@@ -328,6 +451,30 @@ const TeacherDashboard = () => {
     }
   };
 
+  const handleRemoveStudent = async () => {
+    if (!studentToRemove || !selectedClassId) return;
+
+    const { error } = await supabase
+      .from('class_enrollments')
+      .delete()
+      .eq('class_id', selectedClassId)
+      .eq('student_id', studentToRemove.id);
+
+    if (error) {
+      toast({ title: 'Error', description: 'Failed to remove student.', variant: 'destructive' });
+    } else {
+      toast({ title: 'Student Removed' });
+      setRemoveDialogOpen(false);
+      setStudentToRemove(null);
+      fetchStudents(selectedClassId);
+    }
+  };
+
+  const copyJoinCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    toast({ title: 'Copied!', description: `Join code ${code} copied to clipboard.` });
+  };
+
   if (authLoading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
@@ -337,16 +484,23 @@ const TeacherDashboard = () => {
   }
 
   const currentClass = classes.find(c => c.id === selectedClassId);
+  const displayClasses = subMode ? subClasses : classes;
 
   return (
     <div className="min-h-screen bg-background p-4 max-w-6xl mx-auto">
       <header className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Teacher Dashboard</h1>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+            <span className="text-primary-foreground font-bold text-lg">S</span>
+          </div>
+          <h1 className="text-2xl font-bold">Teacher Dashboard</h1>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             variant={subMode ? 'default' : 'outline'}
             size="sm"
             onClick={() => setSubMode(!subMode)}
+            className="btn-bounce"
           >
             {subMode ? 'Exit Sub Mode' : 'Sub Mode'}
           </Button>
@@ -361,9 +515,9 @@ const TeacherDashboard = () => {
         <PeriodDisplay />
 
         {subMode && (
-          <Card className="border-primary">
+          <Card className="border-primary border-2 card-hover">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2 text-primary">
                 <Users className="h-4 w-4" />
                 Acting as Substitute
               </CardTitle>
@@ -413,40 +567,55 @@ const TeacherDashboard = () => {
               </SelectContent>
             </Select>
 
-            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+            {/* Create Pass for Student Button */}
+            <Dialog open={createPassDialogOpen} onOpenChange={setCreatePassDialogOpen}>
               <DialogTrigger asChild>
-                <Button size="icon" variant="outline">
+                <Button size="icon" variant="default" className="btn-bounce" disabled={!selectedClassId || students.length === 0}>
                   <Plus className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Create New Class</DialogTitle>
+                  <DialogTitle>Create Pass for Student</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Class Name</Label>
-                    <Input
-                      value={newClassName}
-                      onChange={(e) => setNewClassName(e.target.value)}
-                      placeholder="e.g., Algebra 1"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Period</Label>
-                    <Select value={newClassPeriod} onValueChange={setNewClassPeriod}>
+                    <Label>Student</Label>
+                    <Select value={selectedStudentForPass} onValueChange={setSelectedStudentForPass}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select period" />
+                        <SelectValue placeholder="Select student" />
                       </SelectTrigger>
                       <SelectContent>
-                        {[1, 2, 3, 4, 5, 6, 7, 8].map(p => (
-                          <SelectItem key={p} value={p.toString()}>Period {p}</SelectItem>
+                        {students.map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button onClick={handleCreateClass} className="w-full">
-                    Create Class
+                  <div className="space-y-2">
+                    <Label>Destination</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {DESTINATIONS.map(dest => (
+                        <Button
+                          key={dest}
+                          variant={selectedDestination === dest ? 'default' : 'outline'}
+                          className="btn-bounce"
+                          onClick={() => setSelectedDestination(dest)}
+                        >
+                          {dest}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  {selectedDestination === 'Other' && (
+                    <Input
+                      placeholder="Enter destination"
+                      value={customDestination}
+                      onChange={(e) => setCustomDestination(e.target.value)}
+                    />
+                  )}
+                  <Button onClick={handleCreatePassForStudent} className="w-full btn-bounce">
+                    Create Pass
                   </Button>
                 </div>
               </DialogContent>
@@ -454,39 +623,29 @@ const TeacherDashboard = () => {
           </div>
         )}
 
-        {currentClass && (
-          <Card>
-            <CardContent className="pt-4">
-              <p className="text-sm text-muted-foreground">
-                Join Code: <span className="font-mono font-bold">{currentClass.join_code}</span>
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
         <Tabs defaultValue="passes">
-          <TabsList className="w-full">
-            <TabsTrigger value="passes" className="flex-1">
-              Pass Requests {pendingPasses.length > 0 && `(${pendingPasses.length})`}
+          <TabsList className="w-full bg-muted">
+            <TabsTrigger value="passes" className="flex-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              Requests {pendingPasses.length > 0 && `(${pendingPasses.length})`}
             </TabsTrigger>
-            <TabsTrigger value="active" className="flex-1">
-              Active Passes {activePasses.length > 0 && `(${activePasses.length})`}
+            <TabsTrigger value="active" className="flex-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              Active {activePasses.length > 0 && `(${activePasses.length})`}
             </TabsTrigger>
-            <TabsTrigger value="roster" className="flex-1">
+            <TabsTrigger value="roster" className="flex-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               Roster ({students.length})
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="passes" className="space-y-2">
             {pendingPasses.length === 0 ? (
-              <Card>
+              <Card className="card-hover">
                 <CardContent className="py-8 text-center text-muted-foreground">
                   No pending pass requests
                 </CardContent>
               </Card>
             ) : (
               pendingPasses.map(pass => (
-                <Card key={pass.id} className={pass.is_quota_exceeded ? 'border-destructive' : ''}>
+                <Card key={pass.id} className={`card-hover ${pass.is_quota_exceeded ? 'border-destructive border-2' : ''}`}>
                   <CardContent className="py-3">
                     <div className="flex items-center justify-between">
                       <div>
@@ -505,14 +664,16 @@ const TeacherDashboard = () => {
                             size="sm"
                             variant="destructive"
                             onClick={() => handleApprovePass(pass.id, true)}
+                            className="btn-bounce"
                           >
-                            Extraordinary Approval
+                            Override
                           </Button>
                         ) : (
                           <Button
                             size="sm"
                             variant="default"
                             onClick={() => handleApprovePass(pass.id)}
+                            className="btn-bounce"
                           >
                             <Check className="h-4 w-4" />
                           </Button>
@@ -521,6 +682,7 @@ const TeacherDashboard = () => {
                           size="sm"
                           variant="outline"
                           onClick={() => handleDenyPass(pass.id)}
+                          className="btn-bounce"
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -534,14 +696,14 @@ const TeacherDashboard = () => {
 
           <TabsContent value="active" className="space-y-2">
             {activePasses.length === 0 ? (
-              <Card>
+              <Card className="card-hover">
                 <CardContent className="py-8 text-center text-muted-foreground">
                   No students currently out
                 </CardContent>
               </Card>
             ) : (
               activePasses.map(pass => (
-                <Card key={pass.id}>
+                <Card key={pass.id} className="card-hover border-l-4 border-l-primary">
                   <CardContent className="py-3">
                     <div className="flex items-center justify-between">
                       <div>
@@ -555,6 +717,7 @@ const TeacherDashboard = () => {
                         <Button
                           size="sm"
                           onClick={() => handleConfirmReturn(pass.id)}
+                          className="btn-bounce"
                         >
                           Confirm Return
                         </Button>
@@ -563,6 +726,7 @@ const TeacherDashboard = () => {
                           size="sm"
                           variant="outline"
                           onClick={() => handleConfirmReturn(pass.id)}
+                          className="btn-bounce"
                         >
                           Check In
                         </Button>
@@ -574,21 +738,133 @@ const TeacherDashboard = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="roster" className="space-y-2">
+          <TabsContent value="roster" className="space-y-4">
+            {/* Roster Header with Join Code and Create Class */}
+            {currentClass && (
+              <Card className="bg-primary/5 border-primary/20">
+                <CardContent className="py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium">Join Code:</span>
+                      <code className="bg-background px-3 py-1 rounded-md font-mono text-lg font-bold">
+                        {currentClass.join_code}
+                      </code>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => copyJoinCode(currentClass.join_code)}
+                        className="btn-bounce"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" className="btn-bounce">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Class
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Create New Class</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Class Name</Label>
+                            <Input
+                              value={newClassName}
+                              onChange={(e) => setNewClassName(e.target.value)}
+                              placeholder="e.g., Algebra 1"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Period</Label>
+                            <Select value={newClassPeriod} onValueChange={setNewClassPeriod}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select period" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {[1, 2, 3, 4, 5, 6, 7, 8].map(p => (
+                                  <SelectItem key={p} value={p.toString()}>Period {p}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Button onClick={handleCreateClass} className="w-full btn-bounce">
+                            Create Class
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* All Classes List */}
+            {!subMode && classes.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                {classes.map(c => (
+                  <Card
+                    key={c.id}
+                    className={`cursor-pointer card-hover ${c.id === selectedClassId ? 'ring-2 ring-primary' : ''}`}
+                    onClick={() => setSelectedClassId(c.id)}
+                  >
+                    <CardContent className="py-3 text-center">
+                      <p className="font-medium">Period {c.period_order}</p>
+                      <p className="text-sm text-muted-foreground truncate">{c.name}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {/* Students List */}
             {students.length === 0 ? (
-              <Card>
+              <Card className="card-hover">
                 <CardContent className="py-8 text-center text-muted-foreground">
                   No students enrolled
                 </CardContent>
               </Card>
             ) : (
               students.map(student => (
-                <Card key={student.id}>
+                <Card key={student.id} className="card-hover">
                   <CardContent className="py-3">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{student.name}</p>
+                      <div 
+                        className="flex-1 cursor-pointer"
+                        onClick={() => {
+                          setSelectedStudentHistory(student);
+                          setHistoryDialogOpen(true);
+                        }}
+                      >
+                        <p className="font-medium hover:text-primary transition-colors">{student.name}</p>
                         <p className="text-sm text-muted-foreground">{student.email}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setSelectedStudentHistory(student);
+                            setHistoryDialogOpen(true);
+                          }}
+                          className="btn-bounce"
+                        >
+                          <ClipboardList className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setStudentToRemove(student);
+                            setRemoveDialogOpen(true);
+                          }}
+                          className="btn-bounce text-destructive hover:text-destructive"
+                        >
+                          <UserMinus className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -598,6 +874,82 @@ const TeacherDashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Student Pass History Dialog */}
+      <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5" />
+              {selectedStudentHistory?.name}'s Pass History
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Select value={historyFilter} onValueChange={setHistoryFilter}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="this_week">This Week</SelectItem>
+                  <SelectItem value="last_week">Last Week</SelectItem>
+                  <SelectItem value="this_month">This Month</SelectItem>
+                  <SelectItem value="last_month">Last Month</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={historyClassFilter} onValueChange={setHistoryClassFilter}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="All Classes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Classes</SelectItem>
+                  {classes.map(c => (
+                    <SelectItem key={c.id} value={c.id}>Period {c.period_order}: {c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {studentPassHistory.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No passes found</p>
+              ) : (
+                studentPassHistory.map(pass => (
+                  <div key={pass.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                    <div>
+                      <p className="font-medium">{pass.destination}</p>
+                      <p className="text-xs text-muted-foreground">{pass.class_name}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm capitalize">{pass.status.replace('_', ' ')}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(pass.requested_at), 'MMM d, h:mm a')}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove Student Confirmation Dialog */}
+      <Dialog open={removeDialogOpen} onOpenChange={setRemoveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Student</DialogTitle>
+          </DialogHeader>
+          <p>Are you sure you want to remove <strong>{studentToRemove?.name}</strong> from this class?</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleRemoveStudent} className="btn-bounce">
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
