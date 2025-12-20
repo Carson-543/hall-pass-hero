@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { PeriodDisplay } from '@/components/PeriodDisplay';
+import { ElapsedTimer } from '@/components/ElapsedTimer';
 import { LogOut, Check, X, UserCheck, Calendar, Clock, Plus, Trash2, Users, Edit, AlertTriangle } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday } from 'date-fns';
 
@@ -318,6 +319,19 @@ const AdminDashboard = () => {
     };
   }, []);
 
+  // Dynamic browser tab title
+  useEffect(() => {
+    if (pendingUsers.length > 0) {
+      document.title = `(${pendingUsers.length}) Users Pending | SmartPass Pro`;
+    } else {
+      document.title = 'Admin Dashboard | SmartPass Pro';
+    }
+
+    return () => {
+      document.title = 'SmartPass Pro';
+    };
+  }, [pendingUsers.length]);
+
   useEffect(() => {
     fetchScheduleAssignments();
   }, [currentMonth]);
@@ -563,12 +577,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const getTimeSinceApproved = (approvedAt: string) => {
-    const diff = Date.now() - new Date(approvedAt).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 60) return `${mins}m`;
-    return `${Math.floor(mins / 60)}h ${mins % 60}m`;
-  };
 
   const getScheduleColor = (scheduleName: string) => {
     switch (scheduleName) {
@@ -755,11 +763,13 @@ const AdminDashboard = () => {
                             <p className="text-sm text-muted-foreground">From: {pass.from_class}</p>
                             <p className="text-sm">To: {pass.destination}</p>
                           </div>
-                          <div className="text-right">
-                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              {getTimeSinceApproved(pass.approved_at)}
-                            </div>
+                          <div className="text-right space-y-1">
+                            {pass.approved_at && (
+                              <ElapsedTimer 
+                                startTime={pass.approved_at} 
+                                destination={pass.destination}
+                              />
+                            )}
                             <p className="text-xs text-muted-foreground capitalize">
                               {pass.status.replace('_', ' ')}
                             </p>
