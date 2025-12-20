@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { PeriodDisplay } from '@/components/PeriodDisplay';
+import { ElapsedTimer } from '@/components/ElapsedTimer';
 import { LogOut, Plus, Users, AlertTriangle, Check, X, Copy, UserMinus, ClipboardList, Calendar, Filter } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
@@ -28,6 +29,7 @@ interface PendingPass {
   destination: string;
   status: string;
   requested_at: string;
+  approved_at?: string;
   is_quota_exceeded: boolean;
 }
 
@@ -109,6 +111,7 @@ const TeacherDashboard = () => {
         destination,
         status,
         requested_at,
+        approved_at,
         profiles!passes_student_id_fkey (full_name)
       `)
       .eq('class_id', classId)
@@ -123,11 +126,12 @@ const TeacherDashboard = () => {
         destination,
         status,
         requested_at,
+        approved_at,
         profiles!passes_student_id_fkey (full_name)
       `)
       .eq('class_id', classId)
       .in('status', ['approved', 'pending_return'])
-      .order('requested_at');
+      .order('approved_at');
 
     // Check quota for each pending pass
     if (pending) {
@@ -171,6 +175,7 @@ const TeacherDashboard = () => {
         destination: p.destination,
         status: p.status,
         requested_at: p.requested_at,
+        approved_at: p.approved_at,
         is_quota_exceeded: false
       })));
     }
@@ -283,6 +288,19 @@ const TeacherDashboard = () => {
     fetchClasses();
     fetchTeachers();
   }, [user]);
+
+  // Dynamic browser tab title
+  useEffect(() => {
+    if (pendingPasses.length > 0) {
+      document.title = `(${pendingPasses.length}) Approval Needed | SmartPass Pro`;
+    } else {
+      document.title = 'Teacher Dashboard | SmartPass Pro';
+    }
+
+    return () => {
+      document.title = 'SmartPass Pro';
+    };
+  }, [pendingPasses.length]);
 
   useEffect(() => {
     if (selectedClassId) {
@@ -706,8 +724,16 @@ const TeacherDashboard = () => {
                 <Card key={pass.id} className="card-hover border-l-4 border-l-primary">
                   <CardContent className="py-3">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{pass.student_name}</p>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{pass.student_name}</p>
+                          {pass.approved_at && (
+                            <ElapsedTimer 
+                              startTime={pass.approved_at} 
+                              destination={pass.destination}
+                            />
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground">{pass.destination}</p>
                         <p className="text-xs text-muted-foreground capitalize">
                           {pass.status.replace('_', ' ')}

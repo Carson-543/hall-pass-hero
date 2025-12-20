@@ -14,6 +14,8 @@ import { QuotaDisplay } from '@/components/QuotaDisplay';
 import { useCurrentPeriod } from '@/hooks/useCurrentPeriod';
 import { useWeeklyQuota } from '@/hooks/useWeeklyQuota';
 import { PassHistory } from '@/components/PassHistory';
+import { ElapsedTimer } from '@/components/ElapsedTimer';
+import { FloatingPassButton } from '@/components/FloatingPassButton';
 import { LogOut, Plus, Clock, BookOpen, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -151,6 +153,25 @@ const StudentDashboard = () => {
       }
     }
   };
+
+  // Dynamic browser tab title
+  useEffect(() => {
+    if (activePass) {
+      if (activePass.status === 'pending') {
+        document.title = '⏳ Waiting for Approval | SmartPass Pro';
+      } else if (activePass.status === 'approved') {
+        document.title = '🚶 Pass Active | SmartPass Pro';
+      } else if (activePass.status === 'pending_return') {
+        document.title = '🔙 Returning | SmartPass Pro';
+      }
+    } else {
+      document.title = 'Student Dashboard | SmartPass Pro';
+    }
+
+    return () => {
+      document.title = 'SmartPass Pro';
+    };
+  }, [activePass]);
 
   useEffect(() => {
     fetchEnrolledClasses();
@@ -359,9 +380,17 @@ const StudentDashboard = () => {
         {activePass && (
           <Card className="border-2 border-primary bg-primary/5 card-hover">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary animate-pulse-gentle" />
-                Active Pass
+              <CardTitle className="text-sm font-medium flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse-gentle" />
+                  Active Pass
+                </div>
+                {activePass.status === 'approved' && activePass.approved_at && (
+                  <ElapsedTimer 
+                    startTime={activePass.approved_at} 
+                    destination={activePass.destination}
+                  />
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -552,6 +581,16 @@ const StudentDashboard = () => {
         {/* Pass History */}
         <PassHistory />
       </div>
+
+      {/* Floating Quick Pass Button */}
+      <FloatingPassButton
+        userId={user.id}
+        currentClassId={currentPeriod ? enrolledClasses.find(c => c.period_order === currentPeriod.period_order)?.id ?? null : null}
+        hasActivePass={!!activePass}
+        isQuotaExceeded={isQuotaExceeded}
+        isSchoolDay={isSchoolDay}
+        onPassRequested={fetchActivePass}
+      />
     </div>
   );
 };
