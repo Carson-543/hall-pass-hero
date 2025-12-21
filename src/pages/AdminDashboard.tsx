@@ -35,6 +35,7 @@ interface Schedule {
   id: string;
   name: string;
   is_school_day: boolean;
+  color: string | null;
 }
 
 interface Period {
@@ -95,8 +96,19 @@ const AdminDashboard = () => {
 
   // Schedule management
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
   const [newScheduleName, setNewScheduleName] = useState('');
   const [newScheduleIsSchoolDay, setNewScheduleIsSchoolDay] = useState(true);
+  const [newScheduleColor, setNewScheduleColor] = useState('#DC2626');
+
+  const SCHEDULE_COLORS = [
+    { name: 'Red', value: '#DC2626' },
+    { name: 'Orange', value: '#F59E0B' },
+    { name: 'Green', value: '#10B981' },
+    { name: 'Blue', value: '#3B82F6' },
+    { name: 'Purple', value: '#8B5CF6' },
+    { name: 'Gray', value: '#6B7280' },
+  ];
 
   // Sub mode for admin
   const [subMode, setSubMode] = useState(false);
@@ -444,19 +456,69 @@ const AdminDashboard = () => {
   const handleCreateSchedule = async () => {
     if (!newScheduleName.trim()) return;
 
+    if (editingSchedule) {
+      const { error } = await supabase
+        .from('schedules')
+        .update({ 
+          name: newScheduleName, 
+          is_school_day: newScheduleIsSchoolDay,
+          color: newScheduleColor
+        })
+        .eq('id', editingSchedule.id);
+
+      if (error) {
+        toast({ title: 'Error', description: 'Failed to update schedule.', variant: 'destructive' });
+      } else {
+        toast({ title: 'Schedule Updated' });
+      }
+    } else {
+      const { error } = await supabase
+        .from('schedules')
+        .insert({ 
+          name: newScheduleName, 
+          is_school_day: newScheduleIsSchoolDay,
+          color: newScheduleColor
+        });
+
+      if (error) {
+        toast({ title: 'Error', description: 'Failed to create schedule.', variant: 'destructive' });
+      } else {
+        toast({ title: 'Schedule Created' });
+      }
+    }
+    
+    setScheduleDialogOpen(false);
+    resetScheduleForm();
+    fetchSchedules();
+  };
+
+  const handleDeleteSchedule = async (scheduleId: string) => {
     const { error } = await supabase
       .from('schedules')
-      .insert({ name: newScheduleName, is_school_day: newScheduleIsSchoolDay });
+      .delete()
+      .eq('id', scheduleId);
 
     if (error) {
-      toast({ title: 'Error', description: 'Failed to create schedule.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Failed to delete schedule. It may have periods or assignments.', variant: 'destructive' });
     } else {
-      toast({ title: 'Schedule Created' });
-      setScheduleDialogOpen(false);
-      setNewScheduleName('');
-      setNewScheduleIsSchoolDay(true);
+      toast({ title: 'Schedule Deleted' });
       fetchSchedules();
     }
+  };
+
+  const openEditSchedule = (schedule: Schedule) => {
+    setEditingSchedule(schedule);
+    setNewScheduleName(schedule.name);
+    setNewScheduleIsSchoolDay(schedule.is_school_day);
+    setNewScheduleColor(schedule.color || '#DC2626');
+    setScheduleDialogOpen(true);
+  };
+
+  const resetScheduleForm = () => {
+    setEditingSchedule(null);
+    setNewScheduleName('');
+    setNewScheduleIsSchoolDay(true);
+    setNewScheduleColor('#DC2626');
   };
 
   const handleSavePeriod = async () => {
@@ -577,15 +639,24 @@ const AdminDashboard = () => {
     }
   };
 
-
-  const getScheduleColor = (scheduleName: string) => {
-    switch (scheduleName) {
+  const getScheduleColor = (schedule: Schedule | undefined) => {
+    if (!schedule) return 'bg-muted/50';
+    if (schedule.color) {
+      return ''; // Will use inline style instead
+    }
+    // Fallback for schedules without color
+    switch (schedule.name) {
       case 'Regular': return 'bg-primary/20';
       case 'Early Release': return 'bg-accent';
       case 'Assembly': return 'bg-secondary';
       case 'No School': return 'bg-muted';
       default: return 'bg-secondary';
     }
+  };
+
+  const getScheduleStyle = (schedule: Schedule | undefined) => {
+    if (!schedule?.color) return {};
+    return { backgroundColor: `${schedule.color}20` }; // 20 = ~12% opacity in hex
   };
 
   if (authLoading) {
@@ -639,16 +710,22 @@ const AdminDashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Select value={selectedTeacherId} onValueChange={setSelectedTeacherId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a teacher" />
-                </SelectTrigger>
-                <SelectContent>
+              <div className="space-y-2">
+                <Label className="text-sm">Select Teacher</Label>
+                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 border rounded-lg bg-background/50">
                   {teachers.map(t => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    <Button
+                      key={t.id}
+                      variant={selectedTeacherId === t.id ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSelectedTeacherId(t.id)}
+                      className="btn-bounce"
+                    >
+                      {t.name}
+                    </Button>
                   ))}
-                </SelectContent>
-              </Select>
+                </div>
+              </div>
 
               {selectedTeacherId && subClasses.length > 0 && (
                 <Select value={selectedClassId} onValueChange={setSelectedClassId}>
@@ -839,7 +916,10 @@ const AdminDashboard = () => {
                       >
                         Next
                       </Button>
-                      <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
+                      <Dialog open={scheduleDialogOpen} onOpenChange={(open) => {
+                        setScheduleDialogOpen(open);
+                        if (!open) resetScheduleForm();
+                      }}>
                         <DialogTrigger asChild>
                           <Button size="sm" variant="outline" className="btn-bounce">
                             <Plus className="h-4 w-4 mr-1" />
@@ -848,7 +928,7 @@ const AdminDashboard = () => {
                         </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>Create Schedule</DialogTitle>
+                            <DialogTitle>{editingSchedule ? 'Edit Schedule' : 'Create Schedule'}</DialogTitle>
                           </DialogHeader>
                           <div className="space-y-4">
                             <div className="space-y-2">
@@ -858,6 +938,21 @@ const AdminDashboard = () => {
                                 onChange={(e) => setNewScheduleName(e.target.value)}
                                 placeholder="e.g., Regular, Early Release"
                               />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Color</Label>
+                              <div className="flex flex-wrap gap-2">
+                                {SCHEDULE_COLORS.map(c => (
+                                  <button
+                                    key={c.value}
+                                    type="button"
+                                    className={`w-8 h-8 rounded-lg border-2 transition-all ${newScheduleColor === c.value ? 'ring-2 ring-ring ring-offset-2' : ''}`}
+                                    style={{ backgroundColor: c.value }}
+                                    onClick={() => setNewScheduleColor(c.value)}
+                                    title={c.name}
+                                  />
+                                ))}
+                              </div>
                             </div>
                             <div className="flex items-center gap-2">
                               <input
@@ -869,7 +964,7 @@ const AdminDashboard = () => {
                               <Label htmlFor="isSchoolDay">Is a school day</Label>
                             </div>
                             <Button onClick={handleCreateSchedule} className="w-full btn-bounce">
-                              Create Schedule
+                              {editingSchedule ? 'Update Schedule' : 'Create Schedule'}
                             </Button>
                           </div>
                         </DialogContent>
@@ -906,11 +1001,12 @@ const AdminDashboard = () => {
                     {Array.from({ length: (daysInMonth[0].getDay() + 6) % 7 }).map((_, i) => (
                       <div key={`empty-${i}`} />
                     ))}
-                    
+
                     {daysInMonth.map(day => {
                       const dateStr = format(day, 'yyyy-MM-dd');
                       const assignment = scheduleAssignments.find(a => a.date === dateStr);
                       const isSelected = selectedDates.includes(dateStr);
+                      const scheduleForDay = schedules.find(s => s.id === assignment?.schedule_id);
 
                       return (
                         <div
@@ -919,45 +1015,33 @@ const AdminDashboard = () => {
                             relative p-1 min-h-[70px] border rounded-lg cursor-pointer transition-all
                             ${isToday(day) ? 'ring-2 ring-primary' : ''}
                             ${isSelected ? 'ring-2 ring-ring bg-primary/5' : ''}
-                            ${assignment ? getScheduleColor(assignment.schedule_name) : 'hover:bg-muted/50'}
+                            ${!scheduleForDay?.color ? getScheduleColor(scheduleForDay) : ''}
                           `}
+                          style={getScheduleStyle(scheduleForDay)}
                           onClick={() => toggleDateSelection(dateStr)}
                         >
                           <div className="text-xs font-medium">{format(day, 'd')}</div>
-                          {assignment ? (
-                            <div className="mt-1">
-                              <div className="text-xs text-muted-foreground truncate">
-                                {assignment.schedule_name}
-                              </div>
-                              <Select
-                                value={assignment.schedule_id}
-                                onValueChange={(v) => handleAssignSchedule(dateStr, v)}
-                              >
-                                <SelectTrigger className="h-5 text-xs mt-1 bg-background/50">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {schedules.map(s => (
-                                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          ) : (
-                            <Select
-                              value=""
-                              onValueChange={(v) => handleAssignSchedule(dateStr, v)}
-                            >
-                              <SelectTrigger className="h-6 text-xs mt-1">
-                                <SelectValue placeholder="—" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {schedules.map(s => (
-                                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
+                          <Select
+                            value={assignment?.schedule_id || ''}
+                            onValueChange={(v) => handleAssignSchedule(dateStr, v)}
+                          >
+                            <SelectTrigger className="h-6 text-xs mt-1 bg-background/80">
+                              <SelectValue placeholder="—" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {schedules.map(s => (
+                                <SelectItem key={s.id} value={s.id}>
+                                  <div className="flex items-center gap-2">
+                                    <div 
+                                      className="w-2 h-2 rounded-full" 
+                                      style={{ backgroundColor: s.color || '#6B7280' }}
+                                    />
+                                    {s.name}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                       );
                     })}
@@ -965,9 +1049,28 @@ const AdminDashboard = () => {
 
                   <div className="flex gap-4 mt-4 text-xs flex-wrap">
                     {schedules.map(s => (
-                      <div key={s.id} className="flex items-center gap-1">
-                        <div className={`w-3 h-3 rounded ${getScheduleColor(s.name)}`} />
+                      <div key={s.id} className="flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded" 
+                          style={{ backgroundColor: s.color || '#6B7280' }}
+                        />
                         <span>{s.name}</span>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-5 w-5"
+                          onClick={() => openEditSchedule(s)}
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-5 w-5 text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteSchedule(s.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                       </div>
                     ))}
                   </div>

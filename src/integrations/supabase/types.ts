@@ -228,18 +228,21 @@ export type Database = {
       }
       schedules: {
         Row: {
+          color: string | null
           created_at: string | null
           id: string
           is_school_day: boolean | null
           name: string
         }
         Insert: {
+          color?: string | null
           created_at?: string | null
           id?: string
           is_school_day?: boolean | null
           name: string
         }
         Update: {
+          color?: string | null
           created_at?: string | null
           id?: string
           is_school_day?: boolean | null

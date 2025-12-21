@@ -541,16 +541,22 @@ const TeacherDashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Select value={selectedTeacherId} onValueChange={setSelectedTeacherId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a teacher" />
-                </SelectTrigger>
-                <SelectContent>
+              <div className="space-y-2">
+                <Label className="text-sm">Select Teacher</Label>
+                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 border rounded-lg bg-background/50">
                   {teachers.map(t => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    <Button
+                      key={t.id}
+                      variant={selectedTeacherId === t.id ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSelectedTeacherId(t.id)}
+                      className="btn-bounce"
+                    >
+                      {t.name}
+                    </Button>
                   ))}
-                </SelectContent>
-              </Select>
+                </div>
+              </div>
 
               {selectedTeacherId && subClasses.length > 0 && (
                 <Select value={selectedClassId} onValueChange={setSelectedClassId}>
@@ -598,17 +604,20 @@ const TeacherDashboard = () => {
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Student</Label>
-                    <Select value={selectedStudentForPass} onValueChange={setSelectedStudentForPass}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select student" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {students.map(s => (
-                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label>Select Student</Label>
+                    <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 border rounded-lg bg-muted/30">
+                      {students.map(s => (
+                        <Button
+                          key={s.id}
+                          variant={selectedStudentForPass === s.id ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setSelectedStudentForPass(s.id)}
+                          className="btn-bounce"
+                        >
+                          {s.name}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Destination</Label>
@@ -765,11 +774,11 @@ const TeacherDashboard = () => {
           </TabsContent>
 
           <TabsContent value="roster" className="space-y-4">
-            {/* Roster Header with Join Code and Create Class */}
-            {currentClass && (
-              <Card className="bg-primary/5 border-primary/20">
-                <CardContent className="py-4">
-                  <div className="flex items-center justify-between">
+            {/* Roster Header with Join Code and Create Class - ALWAYS visible */}
+            <Card className="bg-primary/5 border-primary/20">
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between">
+                  {currentClass ? (
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-medium">Join Code:</span>
                       <code className="bg-background px-3 py-1 rounded-md font-mono text-lg font-bold">
@@ -784,46 +793,62 @@ const TeacherDashboard = () => {
                         <Copy className="h-4 w-4" />
                       </Button>
                     </div>
-                    <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" className="btn-bounce">
-                          <Plus className="h-4 w-4 mr-2" />
+                  ) : (
+                    <span className="text-muted-foreground">No class selected</span>
+                  )}
+                  <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="btn-bounce">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Class
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Create New Class</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Class Name</Label>
+                          <Input
+                            value={newClassName}
+                            onChange={(e) => setNewClassName(e.target.value)}
+                            placeholder="e.g., Algebra 1"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Period</Label>
+                          <Select value={newClassPeriod} onValueChange={setNewClassPeriod}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select period" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {[1, 2, 3, 4, 5, 6, 7, 8].map(p => (
+                                <SelectItem key={p} value={p.toString()}>Period {p}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button onClick={handleCreateClass} className="w-full btn-bounce">
                           Create Class
                         </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Create New Class</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label>Class Name</Label>
-                            <Input
-                              value={newClassName}
-                              onChange={(e) => setNewClassName(e.target.value)}
-                              placeholder="e.g., Algebra 1"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Period</Label>
-                            <Select value={newClassPeriod} onValueChange={setNewClassPeriod}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select period" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {[1, 2, 3, 4, 5, 6, 7, 8].map(p => (
-                                  <SelectItem key={p} value={p.toString()}>Period {p}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <Button onClick={handleCreateClass} className="w-full btn-bounce">
-                            Create Class
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Empty state when no classes exist */}
+            {!subMode && classes.length === 0 && (
+              <Card className="border-dashed border-2 border-muted">
+                <CardContent className="py-8 text-center">
+                  <h3 className="font-semibold mb-2">No classes yet!</h3>
+                  <p className="text-muted-foreground mb-4">Create your first class to get started</p>
+                  <Button onClick={() => setCreateDialogOpen(true)} className="btn-bounce">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Your First Class
+                  </Button>
                 </CardContent>
               </Card>
             )}
