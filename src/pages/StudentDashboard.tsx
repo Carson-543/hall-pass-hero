@@ -440,7 +440,7 @@ const StudentDashboard = () => {
         )}
 
         {/* Request New Pass */}
-        {!activePass && isSchoolDay && (
+        {!activePass && (
           <Card className="card-hover">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Request a Pass</CardTitle>
