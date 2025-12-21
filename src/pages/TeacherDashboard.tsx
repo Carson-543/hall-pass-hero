@@ -103,40 +103,47 @@ const TeacherDashboard = () => {
   };
 
   const fetchPasses = async (classId: string) => {
+    // First fetch passes
     const { data: pending } = await supabase
       .from('passes')
-      .select(`
-        id,
-        student_id,
-        destination,
-        status,
-        requested_at,
-        approved_at,
-        profiles!passes_student_id_fkey (full_name)
-      `)
+      .select('id, student_id, destination, status, requested_at, approved_at')
       .eq('class_id', classId)
       .eq('status', 'pending')
       .order('requested_at');
 
     const { data: active } = await supabase
       .from('passes')
-      .select(`
-        id,
-        student_id,
-        destination,
-        status,
-        requested_at,
-        approved_at,
-        profiles!passes_student_id_fkey (full_name)
-      `)
+      .select('id, student_id, destination, status, requested_at, approved_at')
       .eq('class_id', classId)
       .in('status', ['approved', 'pending_return'])
       .order('approved_at');
 
+    // Get all unique student IDs
+    const allStudentIds = [
+      ...(pending?.map(p => p.student_id) ?? []),
+      ...(active?.map(p => p.student_id) ?? [])
+    ].filter((id, i, arr) => arr.indexOf(id) === i);
+
+    // Fetch profiles for all students
+    let profilesMap: Record<string, string> = {};
+    if (allStudentIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', allStudentIds);
+      
+      if (profiles) {
+        profilesMap = profiles.reduce((acc, p) => {
+          acc[p.id] = p.full_name;
+          return acc;
+        }, {} as Record<string, string>);
+      }
+    }
+
     // Check quota for each pending pass
     if (pending) {
       const passesWithQuota = await Promise.all(
-        pending.map(async (p: any) => {
+        pending.map(async (p) => {
           const { count } = await supabase
             .from('passes')
             .select('*', { count: 'exact', head: true })
@@ -156,10 +163,10 @@ const TeacherDashboard = () => {
           return {
             id: p.id,
             student_id: p.student_id,
-            student_name: (p.profiles as any)?.full_name ?? 'Unknown',
+            student_name: profilesMap[p.student_id] ?? 'Unknown',
             destination: p.destination,
-            status: p.status,
-            requested_at: p.requested_at,
+            status: p.status ?? 'pending',
+            requested_at: p.requested_at ?? '',
             is_quota_exceeded: isExceeded
           };
         })
@@ -168,13 +175,13 @@ const TeacherDashboard = () => {
     }
 
     if (active) {
-      setActivePasses(active.map((p: any) => ({
+      setActivePasses(active.map((p) => ({
         id: p.id,
         student_id: p.student_id,
-        student_name: (p.profiles as any)?.full_name ?? 'Unknown',
+        student_name: profilesMap[p.student_id] ?? 'Unknown',
         destination: p.destination,
-        status: p.status,
-        requested_at: p.requested_at,
+        status: p.status ?? 'approved',
+        requested_at: p.requested_at ?? '',
         approved_at: p.approved_at,
         is_quota_exceeded: false
       })));
@@ -182,37 +189,57 @@ const TeacherDashboard = () => {
   };
 
   const fetchStudents = async (classId: string) => {
-    const { data } = await supabase
+    // First get enrollments
+    const { data: enrollments } = await supabase
       .from('class_enrollments')
-      .select(`
-        student_id,
-        profiles!class_enrollments_student_id_fkey (id, full_name, email)
-      `)
+      .select('student_id')
       .eq('class_id', classId);
 
-    if (data) {
-      setStudents(data.map((e: any) => ({
-        id: e.profiles?.id ?? e.student_id,
-        name: e.profiles?.full_name ?? 'Unknown',
-        email: e.profiles?.email ?? ''
+    if (!enrollments || enrollments.length === 0) {
+      setStudents([]);
+      return;
+    }
+
+    // Then get profiles for those students
+    const studentIds = enrollments.map(e => e.student_id);
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', studentIds);
+
+    if (profiles) {
+      setStudents(profiles.map(p => ({
+        id: p.id,
+        name: p.full_name,
+        email: p.email
       })));
     }
   };
 
   const fetchTeachers = async () => {
-    const { data } = await supabase
+    // First get teacher user_ids
+    const { data: teacherRoles } = await supabase
       .from('user_roles')
-      .select(`
-        user_id,
-        profiles!user_roles_user_id_fkey (id, full_name)
-      `)
+      .select('user_id')
       .eq('role', 'teacher')
       .neq('user_id', user?.id);
 
-    if (data) {
-      setTeachers(data.map((t: any) => ({
-        id: t.user_id,
-        name: t.profiles?.full_name ?? 'Unknown'
+    if (!teacherRoles || teacherRoles.length === 0) {
+      setTeachers([]);
+      return;
+    }
+
+    // Then get their profiles
+    const teacherIds = teacherRoles.map(t => t.user_id);
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', teacherIds);
+
+    if (profiles) {
+      setTeachers(profiles.map(p => ({
+        id: p.id,
+        name: p.full_name
       })));
     }
   };

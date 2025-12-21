@@ -65,35 +65,57 @@ const StudentDashboard = () => {
   const fetchEnrolledClasses = async () => {
     if (!user) return;
 
-    const { data } = await supabase
+    // First get enrollments with class data
+    const { data: enrollments } = await supabase
       .from('class_enrollments')
-      .select(`
-        class_id,
-        classes (
-          id,
-          name,
-          period_order,
-          teacher_id,
-          profiles:teacher_id (full_name)
-        )
-      `)
+      .select('class_id')
       .eq('student_id', user.id);
 
-    if (data) {
-      const classes = data.map((e: any) => ({
-        id: e.classes.id,
-        name: e.classes.name,
-        period_order: e.classes.period_order,
-        teacher_name: e.classes.profiles?.full_name ?? 'Unknown Teacher'
-      }));
-      setEnrolledClasses(classes.sort((a, b) => a.period_order - b.period_order));
+    if (!enrollments || enrollments.length === 0) {
+      setEnrolledClasses([]);
+      return;
+    }
 
-      // Auto-select class for current period
-      if (currentPeriod) {
-        const currentClass = classes.find(c => c.period_order === currentPeriod.period_order);
-        if (currentClass) {
-          setSelectedClassId(currentClass.id);
-        }
+    // Then get class details
+    const classIds = enrollments.map(e => e.class_id);
+    const { data: classesData } = await supabase
+      .from('classes')
+      .select('id, name, period_order, teacher_id')
+      .in('id', classIds)
+      .order('period_order');
+
+    if (!classesData || classesData.length === 0) {
+      setEnrolledClasses([]);
+      return;
+    }
+
+    // Get teacher profiles
+    const teacherIds = classesData.map(c => c.teacher_id).filter((id, i, arr) => arr.indexOf(id) === i);
+    const { data: teacherProfiles } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', teacherIds);
+
+    const teacherMap: Record<string, string> = {};
+    if (teacherProfiles) {
+      teacherProfiles.forEach(p => {
+        teacherMap[p.id] = p.full_name;
+      });
+    }
+
+    const classes = classesData.map(c => ({
+      id: c.id,
+      name: c.name,
+      period_order: c.period_order,
+      teacher_name: teacherMap[c.teacher_id] ?? 'Unknown Teacher'
+    }));
+    setEnrolledClasses(classes);
+
+    // Auto-select class for current period
+    if (currentPeriod) {
+      const currentClass = classes.find(c => c.period_order === currentPeriod.period_order);
+      if (currentClass) {
+        setSelectedClassId(currentClass.id);
       }
     }
   };
