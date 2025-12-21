@@ -165,45 +165,76 @@ const StudentDashboard = () => {
   };
 
   // 2. REALTIME & SUBSCRIPTIONS
+  // 2. REALTIME & SUBSCRIPTIONS
   useEffect(() => {
+    // Only set up if we have a user ID
     if (!user?.id) return;
 
+    // Initial data load
     fetchEnrolledClasses();
     fetchActivePass();
     fetchTodaySchedule();
+
+    console.log("📡 Initializing Realtime for student:", user.id);
 
     const channel = supabase
       .channel(`student-dashboard-realtime-${user.id}`)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: '*', // Listen for INSERT, UPDATE, and DELETE
           schema: 'public',
           table: 'passes',
           filter: `student_id=eq.${user.id}`
         },
         (payload) => {
-          console.log("Realtime event received:", payload);
+          console.log("✨ Realtime event received:", payload);
+          
+          // Re-fetch data to update the UI
           fetchActivePass();
           refreshQuota();
           
-          // Toast notifications for status changes
+          // Show toast notifications for specific status changes
           if (payload.eventType === 'UPDATE') {
             const newStatus = payload.new.status;
-            if (newStatus === 'approved') {
-              toast({ title: "Pass Approved!", description: `You may now head to ${payload.new.destination}.` });
+            const oldStatus = payload.old?.status;
+
+            if (newStatus === 'approved' && oldStatus !== 'approved') {
+              toast({ 
+                title: "Pass Approved!", 
+                description: `Your pass to ${payload.new.destination} is now active.`,
+                variant: "default" 
+              });
             } else if (newStatus === 'completed') {
-              toast({ title: "Pass Completed", description: "Your pass has been closed." });
+              toast({ 
+                title: "Pass Completed", 
+                description: "You have been checked back into class.",
+              });
             }
           }
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Successfully subscribed to pass changes');
+        }
+        if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Realtime connection error:', err);
+        }
+        if (status === 'TIMED_OUT') {
+          console.warn('⌛ Realtime subscription timed out.');
+        }
+      });
 
+    // Cleanup: Remove the channel when the component unmounts or user changes
     return () => {
+      console.log("🔌 Cleaning up Realtime channel");
       supabase.removeChannel(channel);
     };
-  }, [user?.id, currentPeriod]);
+    
+    // NOTE: Removed currentPeriod from dependencies. 
+    // This prevents the socket from closing and reopening every time the clock ticks.
+  }, [user?.id]);
 
   // 3. TAB TITLE MANAGEMENT
   useEffect(() => {
