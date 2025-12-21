@@ -233,7 +233,27 @@ const StudentDashboard = () => {
       toast({ title: "Pass Approved!", description: `Heading to ${payload.new.destination}` });
     }
   }
-          
+          // 1. Immediately re-fetch the active pass state
+  fetchActivePass();
+  
+  // 2. IMPORTANT: Refresh the quota counter
+  // This calls the refresh function from your useWeeklyQuota hook
+  refreshQuota();
+
+  // 3. UI Feedback for checking back in
+  if (payload.eventType === 'UPDATE') {
+    const newStatus = payload.new.status;
+    
+    // If status changed to completed or pending_return, update the count
+    if (newStatus === 'completed' || newStatus === 'pending_return') {
+      console.log("🔄 Pass status updated, refreshing quota...");
+      refreshQuota(); 
+    }
+
+    if (newStatus === 'approved') {
+      toast({ title: "Pass Approved!", description: `Heading to ${payload.new.destination}` });
+    }
+  }
         }
       )
       .subscribe((status, err) => {
