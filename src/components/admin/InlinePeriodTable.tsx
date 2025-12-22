@@ -22,7 +22,7 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
   const handleFieldChange = (index: number, field: keyof Period, value: any) => {
     const updated = [...periods];
     updated[index] = { ...updated[index], [field]: value };
-    onChange(updated); // Sends updated list to parent's local state
+    onChange(updated); // Updates the parent state immediately
   };
 
   const handleAddEntry = (type: 'class' | 'structured') => {
@@ -46,7 +46,8 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
 
   return (
     <div className="space-y-2">
-      {periods.sort((a, b) => a.period_order - b.period_order).map((period, idx) => (
+      {/* Note: We use the index (idx) for editing to ensure stability */}
+      {periods.map((period, idx) => (
         <div key={idx} className={`grid grid-cols-[1fr_110px_110px_40px] gap-3 items-center p-2 rounded-lg border transition-all ${
           period.is_passing_period ? 'bg-muted/10 border-dashed' : 'bg-card'
         }`}>
@@ -57,9 +58,7 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
                 <Input
                   value={period.name}
                   onChange={(e) => handleFieldChange(idx, 'name', e.target.value)}
-                  // The focus-visible:ring-0 removes the highlight ring
                   className="h-8 text-xs bg-background focus-visible:ring-0 focus-visible:ring-offset-0"
-                  placeholder="Name..."
                 />
               </>
             ) : (
@@ -95,7 +94,7 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
           <Plus className="h-3.5 w-3.5 mr-1" /> Add Period
         </Button>
         <Button variant="outline" size="sm" onClick={() => handleAddEntry('structured')} className="flex-1 text-xs border-dashed h-9">
-          <Clock className="h-3.5 w-3.5 mr-1" /> Structured Time
+          <Clock className="h-3.5 w-3.5 mr-1" /> Add Structured Time
         </Button>
       </div>
     </div>
@@ -104,5 +103,5 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
 
 const getOrdinal = (n: number) => {
   const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
-  return s[(v - 20) % 10] || s[v] || s[0];
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
 };
