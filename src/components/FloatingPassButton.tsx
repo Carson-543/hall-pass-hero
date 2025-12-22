@@ -25,8 +25,6 @@ export const FloatingPassButton = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isPressed, setIsPressed] = useState(false);
 
-  // Show the button if it's a school day, they don't have a pass, and they are in a class.
-  // We NO LONGER return null if isQuotaExceeded is true.
   if (!isSchoolDay || hasActivePass || !currentClassId) {
     return null;
   }
@@ -36,15 +34,20 @@ export const FloatingPassButton = ({
     setIsPressed(true);
 
     try {
+      // We explicitly omit 'returned_at' and 'confirmed_by' 
+      // to ensure the pass remains active.
       const { error } = await supabase
         .from('passes')
         .insert({
           student_id: userId,
           class_id: currentClassId,
           destination: 'Restroom',
-          status: 'approved', // Automatically set to approved
-          approved_at: new Date().toISOString(), // Start the timer immediately
-          is_over_limit: isQuotaExceeded, // Inform the teacher if they are over limit
+          status: 'approved', 
+          approved_at: new Date().toISOString(),
+          is_over_limit: isQuotaExceeded,
+          // Explicitly ensure these are null if your DB has defaults
+          returned_at: null,
+          confirmed_by: null
         });
 
       if (error) {
@@ -57,9 +60,8 @@ export const FloatingPassButton = ({
         toast({
           title: isQuotaExceeded ? 'Over-limit Pass Started' : 'Quick Pass Started',
           description: isQuotaExceeded 
-            ? 'Pass approved, but teacher has been notified you are over your weekly limit.' 
+            ? 'Teacher notified of limit. Pass is active.' 
             : 'Your restroom pass is now active.',
-          variant: isQuotaExceeded ? 'default' : 'default',
         });
         onPassRequested();
       }
@@ -81,30 +83,13 @@ export const FloatingPassButton = ({
       disabled={isLoading}
       className={cn(
         "fixed bottom-6 right-6 z-50 w-16 h-16 rounded-full shadow-lg",
-        // Change color to amber/orange if they are over the limit to warn the student
         isQuotaExceeded ? "bg-amber-500 text-white" : "bg-primary text-primary-foreground",
-        "flex items-center justify-center",
-        "transition-all duration-200 ease-out",
-        "hover:scale-110 hover:shadow-xl",
-        "active:scale-95",
-        "disabled:opacity-50 disabled:cursor-not-allowed",
+        "flex items-center justify-center transition-all duration-200 ease-out hover:scale-110 active:scale-95 disabled:opacity-50",
         isPressed && "scale-95",
         isLoading && "animate-pulse"
       )}
-      aria-label="Quick restroom pass"
     >
-      {isQuotaExceeded ? (
-        <AlertTriangle className={cn("h-7 w-7", isLoading && "animate-spin")} />
-      ) : (
-        <Zap className={cn("h-7 w-7", isLoading && "animate-spin")} />
-      )}
-      
-      {/* Small badge to indicate over-limit status visually on the button */}
-      {isQuotaExceeded && (
-        <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white border-2 border-background">
-          !
-        </span>
-      )}
+      {isQuotaExceeded ? <AlertTriangle className="h-7 w-7" /> : <Zap className="h-7 w-7" />}
     </button>
   );
 };
