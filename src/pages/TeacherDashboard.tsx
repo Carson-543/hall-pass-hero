@@ -44,7 +44,6 @@ interface Student {
   email: string;
 }
 
-// Destination color mapping
 const getDestinationColor = (destination: string) => {
   switch (destination.toLowerCase()) {
     case 'restroom': return 'bg-success/10 text-success border-success/20';
@@ -84,9 +83,13 @@ const TeacherDashboard = () => {
   const [selectedDestination, setSelectedDestination] = useState('');
   const [customDestination, setCustomDestination] = useState('');
 
+  // NEW: History States
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [studentHistory, setStudentHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
   const DESTINATIONS = ['Restroom', 'Locker', 'Office', 'Other'];
 
-  // Fetch Classes
   const fetchClasses = useCallback(async () => {
     if (!user) return;
     const { data } = await supabase
@@ -106,7 +109,6 @@ const TeacherDashboard = () => {
     }
   }, [user, selectedClassId]);
 
-  // Fetch Students (Roster)
   const fetchRoster = useCallback(async (classId: string) => {
     const { data: enrollments } = await supabase
       .from('class_enrollments')
@@ -133,7 +135,6 @@ const TeacherDashboard = () => {
     }
   }, []);
 
-  // Fetch Passes
   const fetchPasses = useCallback(async (classId: string) => {
     const { data: passes } = await supabase
       .from('passes')
@@ -186,6 +187,20 @@ const TeacherDashboard = () => {
     setActivePasses(processed.filter(p => p.status !== 'pending'));
   }, []);
 
+  // NEW: Fetch Student History
+  const fetchStudentHistory = useCallback(async (studentId: string) => {
+    setLoadingHistory(true);
+    const { data, error } = await supabase
+      .from('passes')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('requested_at', { ascending: false })
+      .limit(20);
+    
+    if (!error) setStudentHistory(data || []);
+    setLoadingHistory(false);
+  }, []);
+
   useEffect(() => { fetchClasses(); }, [fetchClasses]);
 
   useEffect(() => {
@@ -211,6 +226,13 @@ const TeacherDashboard = () => {
       return () => { supabase.removeChannel(channel); };
     }
   }, [selectedClassId, fetchPasses, fetchRoster]);
+
+  // NEW: Trigger history fetch when dialog opens
+  useEffect(() => {
+    if (historyDialogOpen && selectedStudent) {
+      fetchStudentHistory(selectedStudent.id);
+    }
+  }, [historyDialogOpen, selectedStudent, fetchStudentHistory]);
 
   const handleApprove = async (id: string, override: boolean) => {
     await supabase.from('passes').update({
@@ -261,6 +283,11 @@ const TeacherDashboard = () => {
     }
   };
 
+  const openStudentManagement = (student: Student) => {
+    setSelectedStudent(student);
+    setStudentDialogOpen(true);
+  };
+
   if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
   if (!user || role !== 'teacher') return <Navigate to="/auth" replace />;
 
@@ -302,7 +329,7 @@ const TeacherDashboard = () => {
             <Button 
               variant="outline" 
               size="icon" 
-              className="h-14 w-14 rounded-2xl"
+              className="h-14 w-14 rounded-2xl bg-card border-none shadow-sm"
               onClick={() => { setEditingClass(currentClass); setClassDialogOpen(true); }}
             >
               <Settings className="h-5 w-5" />
@@ -310,7 +337,7 @@ const TeacherDashboard = () => {
           )}
           <Button 
             size="icon" 
-            className="h-14 w-14 rounded-2xl"
+            className="h-14 w-14 rounded-2xl shadow-lg"
             onClick={() => { setEditingClass(null); setClassDialogOpen(true); }}
           >
             <Plus className="h-5 w-5" />
@@ -320,7 +347,6 @@ const TeacherDashboard = () => {
         {selectedClassId && (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Requests Section */}
               <div className="space-y-3">
                 <h2 className="text-sm font-bold uppercase tracking-wider text-warning">
                   Requests ({pendingPasses.length})
@@ -364,7 +390,6 @@ const TeacherDashboard = () => {
                 )}
               </div>
 
-              {/* Active Section */}
               <div className="space-y-3">
                 <h2 className="text-sm font-bold uppercase tracking-wider text-success">
                   Active ({activePasses.length})
@@ -399,7 +424,6 @@ const TeacherDashboard = () => {
               </div>
             </div>
 
-            {/* Roster Section */}
             <div className="space-y-4 pt-4 border-t">
               {currentClass && (
                 <div className="bg-primary/5 rounded-2xl p-4 border border-primary/10 flex items-center justify-between">
@@ -424,47 +448,45 @@ const TeacherDashboard = () => {
               </div>
 
               <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-  {filteredStudents.map(student => (
-    <div 
-      key={student.id} 
-      className="bg-card p-3 rounded-xl shadow-sm border flex items-center justify-between hover:bg-muted/30 transition-colors"
-    >
-      <div className="min-w-0">
-        <p className="font-bold truncate">{student.name}</p>
-        <p className="text-xs text-muted-foreground truncate">{student.email}</p>
-      </div>
-      <div className="flex gap-1">
-        {/* NEW: Student-specific History Button */}
-        <Button 
-          size="icon" 
-          variant="ghost" 
-          className="rounded-lg h-8 w-8 shrink-0 hover:bg-primary/10 hover:text-primary"
-          onClick={() => {
-            setSelectedStudent(student);
-            setHistoryDialogOpen(true);
-          }}
-        >
-          <History className="h-4 w-4" />
-        </Button>
+                {filteredStudents.map(student => (
+                  <div 
+                    key={student.id} 
+                    className="bg-card p-3 rounded-xl shadow-sm border flex items-center justify-between hover:bg-muted/30 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-bold truncate">{student.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{student.email}</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="rounded-lg h-8 w-8 shrink-0 hover:bg-primary/10 hover:text-primary transition-colors"
+                        onClick={() => {
+                          setSelectedStudent(student);
+                          setHistoryDialogOpen(true);
+                        }}
+                      >
+                        <History className="h-4 w-4" />
+                      </Button>
 
-        <Button 
-          size="icon" 
-          variant="ghost" 
-          className="rounded-lg h-8 w-8 shrink-0"
-          onClick={() => openStudentManagement(student)}
-        >
-          <UserMinus className="h-4 w-4 text-muted-foreground" />
-        </Button>
-      </div>
-    </div>
-  ))}
-</div>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="rounded-lg h-8 w-8 shrink-0"
+                        onClick={() => openStudentManagement(student)}
+                      >
+                        <UserMinus className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </>
         )}
       </div>
 
-      {/* Floating Action Button */}
       {selectedClassId && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-md px-4">
           <Button 
@@ -477,7 +499,7 @@ const TeacherDashboard = () => {
         </div>
       )}
 
-      {/* Dialogs */}
+      {/* Quick Pass Dialog */}
       <Dialog open={createPassDialogOpen} onOpenChange={setCreatePassDialogOpen}>
         <DialogContent className="rounded-3xl max-w-sm">
           <DialogHeader><DialogTitle className="text-xl font-bold">Quick Pass</DialogTitle></DialogHeader>
@@ -512,39 +534,40 @@ const TeacherDashboard = () => {
         </DialogContent>
       </Dialog>
 
-<Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-  <DialogContent className="rounded-3xl max-w-md">
-    <DialogHeader>
-      <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-        <History className="h-5 w-5 text-primary" />
-        {selectedStudent?.name}'s History
-      </DialogTitle>
-    </DialogHeader>
-    <div className="space-y-3 py-4 max-h-[60vh] overflow-y-auto pr-2">
-      {loadingHistory ? (
-        <div className="flex justify-center py-8"><Loader2 className="animate-spin text-muted-foreground" /></div>
-      ) : studentHistory.length === 0 ? (
-        <p className="text-center text-muted-foreground py-8">No past passes found.</p>
-      ) : (
-        studentHistory.map((pass) => (
-          <div key={pass.id} className="p-3 rounded-2xl bg-muted/50 border flex items-center justify-between">
-            <div>
-              <p className="font-bold text-sm">{pass.destination}</p>
-              <p className="text-[10px] text-muted-foreground">
-                {new Date(pass.requested_at).toLocaleDateString()} • {new Date(pass.requested_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </p>
-            </div>
-            <div className={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase ${
-              pass.status === 'returned' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
-            }`}>
-              {pass.status}
-            </div>
+      {/* History Dialog */}
+      <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+        <DialogContent className="rounded-3xl max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+              <History className="h-5 w-5 text-primary" />
+              {selectedStudent?.name}'s History
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-4 max-h-[60vh] overflow-y-auto pr-2">
+            {loadingHistory ? (
+              <div className="flex justify-center py-8"><Loader2 className="animate-spin text-muted-foreground" /></div>
+            ) : studentHistory.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No past passes found.</p>
+            ) : (
+              studentHistory.map((pass) => (
+                <div key={pass.id} className="p-3 rounded-2xl bg-muted/50 border flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-sm">{pass.destination}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {new Date(pass.requested_at).toLocaleDateString()} • {new Date(pass.requested_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <div className={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase ${
+                    pass.status === 'returned' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {pass.status}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
-        ))
-      )}
-    </div>
-  </DialogContent>
-</Dialog>
+        </DialogContent>
+      </Dialog>
       
       <ClassManagementDialog
         open={classDialogOpen}
