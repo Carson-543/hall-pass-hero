@@ -24,7 +24,7 @@ export const QuotaDisplay = () => {
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium">Weekly Restroom Passes</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent classname="flex flex-col items-center justify-center">
         <div className="flex gap-2">
           {boxes.map((available, i) => (
             <div
