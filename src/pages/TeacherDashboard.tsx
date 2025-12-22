@@ -424,26 +424,41 @@ const TeacherDashboard = () => {
               </div>
 
               <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredStudents.map(student => (
-                  <div 
-                    key={student.id} 
-                    className="bg-card p-3 rounded-xl shadow-sm border flex items-center justify-between hover:bg-muted/30 transition-colors"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-bold truncate">{student.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{student.email}</p>
-                    </div>
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="rounded-lg h-8 w-8 shrink-0"
-                      onClick={() => { setSelectedStudent(student); setStudentDialogOpen(true); }}
-                    >
-                      <UserMinus className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
+  {filteredStudents.map(student => (
+    <div 
+      key={student.id} 
+      className="bg-card p-3 rounded-xl shadow-sm border flex items-center justify-between hover:bg-muted/30 transition-colors"
+    >
+      <div className="min-w-0">
+        <p className="font-bold truncate">{student.name}</p>
+        <p className="text-xs text-muted-foreground truncate">{student.email}</p>
+      </div>
+      <div className="flex gap-1">
+        {/* NEW: Student-specific History Button */}
+        <Button 
+          size="icon" 
+          variant="ghost" 
+          className="rounded-lg h-8 w-8 shrink-0 hover:bg-primary/10 hover:text-primary"
+          onClick={() => {
+            setSelectedStudent(student);
+            setHistoryDialogOpen(true);
+          }}
+        >
+          <History className="h-4 w-4" />
+        </Button>
+
+        <Button 
+          size="icon" 
+          variant="ghost" 
+          className="rounded-lg h-8 w-8 shrink-0"
+          onClick={() => openStudentManagement(student)}
+        >
+          <UserMinus className="h-4 w-4 text-muted-foreground" />
+        </Button>
+      </div>
+    </div>
+  ))}
+</div>
             </div>
           </>
         )}
