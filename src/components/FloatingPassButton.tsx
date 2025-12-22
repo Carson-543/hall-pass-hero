@@ -30,53 +30,46 @@ export const FloatingPassButton = ({
   }
 
   const handleQuickPass = async () => {
-    setIsLoading(true);
-    setIsPressed(true);
+  setIsLoading(true);
+  setIsPressed(true);
 
-    try {
-      // We explicitly omit 'returned_at' and 'confirmed_by' 
-      // to ensure the pass remains active.
-      const { error } = await supabase
-        .from('passes')
-        .insert({
-          student_id: userId,
-          class_id: currentClassId,
-          destination: 'Restroom',
-          status: 'approved', 
-          approved_at: new Date().toISOString(),
-          is_over_limit: isQuotaExceeded,
-          // Explicitly ensure these are null if your DB has defaults
-          returned_at: null,
-          confirmed_by: null
-        });
+  try {
+    const { error } = await supabase
+      .from('passes')
+      .insert({
+        student_id: userId,          // The teacher's ID (since they are acting as the "student" for this quick pass)
+        class_id: currentClassId,
+        destination: 'Restroom',
+        status: 'approved', 
+        approved_at: new Date().toISOString(),
+        approved_by: userId,         // ADD THIS LINE: Pass the teacher's ID here
+        is_over_limit: isQuotaExceeded,
+        returned_at: null,
+        confirmed_by: null
+      });
 
-      if (error) {
-        toast({
-          title: 'Error',
-          description: 'Failed to start pass.',
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: isQuotaExceeded ? 'Over-limit Pass Started' : 'Quick Pass Started',
-          description: isQuotaExceeded 
-            ? 'Teacher notified of limit. Pass is active.' 
-            : 'Your restroom pass is now active.',
-        });
-        onPassRequested();
-      }
-    } catch {
+    if (error) {
+      console.error('Supabase Error:', error.message); // Log the exact error to console
       toast({
         title: 'Error',
-        description: 'Something went wrong.',
+        description: `Failed to start pass: ${error.message}`,
         variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
-      setTimeout(() => setIsPressed(false), 200);
+    } else {
+      toast({
+        title: 'Quick Pass Started',
+        description: 'The pass is now active in the hallway.',
+      });
+      onPassRequested();
     }
-  };
-
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setIsLoading(false);
+    setTimeout(() => setIsPressed(false), 200);
+  }
+};
+  
   return (
     <button
       onClick={handleQuickPass}
