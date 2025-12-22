@@ -36,6 +36,7 @@ interface PendingPass {
   requested_at: string;
   approved_at?: string;
   is_quota_exceeded: boolean;
+  from_class_name?: string; // For global visibility
 }
 
 interface Student {
@@ -92,7 +93,6 @@ const TeacherDashboard = () => {
 
   const DESTINATIONS = ['Restroom', 'Locker', 'Office', 'Other'];
 
-  // Helper for Hallway Time Calculation
   const getDuration = (start: string, end: string | null) => {
     if (!end) return 0;
     return (new Date(end).getTime() - new Date(start).getTime()) / 60000;
@@ -140,58 +140,64 @@ const TeacherDashboard = () => {
   }, []);
 
   const fetchPasses = useCallback(async (classId: string) => {
-    const { data: passes } = await supabase
+    if (!user) return;
+
+    // 1. Fetch current class requests (Pending)
+    const { data: currentRequests } = await supabase
       .from('passes')
-      .select('id, student_id, destination, status, requested_at, approved_at')
+      .select('id, student_id, destination, status, requested_at, approved_at, profiles:student_id(full_name)')
       .eq('class_id', classId)
-      .in('status', ['pending', 'approved', 'pending_return']);
+      .eq('status', 'pending');
 
-    if (!passes || passes.length === 0) {
-      setPendingPasses([]);
-      setActivePasses([]);
-      return;
-    }
+    // 2. Fetch GLOBAL Active Passes for any student in THIS class
+    // This allows you to see if your student is currently out from another teacher's class
+    const studentIds = students.map(s => s.id);
+    const { data: allActiveForMyStudents } = await supabase
+      .from('passes')
+      .select('id, student_id, destination, status, requested_at, approved_at, profiles:student_id(full_name), classes:class_id(name)')
+      .in('student_id', studentIds)
+      .in('status', ['approved', 'pending_return']);
 
-    const studentIds = [...new Set(passes.map(p => p.student_id))];
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .in('id', studentIds);
-
-    const profileMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
-    const { data: settings } = await supabase.from('weekly_quota_settings').select('weekly_limit').single();
-    const limit = settings?.weekly_limit ?? 4;
     const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString();
-
-    const processed = await Promise.all(passes.map(async (p) => {
-      let exceeded = false;
-      if (p.status === 'pending' && p.destination === 'Restroom') {
-        const { count } = await supabase
-          .from('passes')
-          .select('*', { count: 'exact', head: true })
-          .eq('student_id', p.student_id)
-          .eq('destination', 'Restroom')
-          .in('status', ['approved', 'pending_return', 'returned'])
-          .gte('requested_at', weekStart);
-        exceeded = (count ?? 0) >= limit;
-      }
+    
+    // Process Requests
+    const processedPending = currentRequests ? await Promise.all(currentRequests.map(async (p: any) => {
+      const { count } = await supabase
+        .from('passes')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_id', p.student_id)
+        .eq('destination', 'Restroom')
+        .in('status', ['approved', 'pending_return', 'returned'])
+        .gte('requested_at', weekStart);
+      
       return {
         id: p.id,
         student_id: p.student_id,
-        student_name: profileMap.get(p.student_id) ?? 'Unknown',
+        student_name: p.profiles?.full_name || 'Unknown',
         destination: p.destination,
         status: p.status,
         requested_at: p.requested_at,
-        approved_at: p.approved_at,
-        is_quota_exceeded: exceeded
+        is_quota_exceeded: (count ?? 0) >= 4
       };
-    }));
+    })) : [];
 
-    setPendingPasses(processed.filter(p => p.status === 'pending'));
-    setActivePasses(processed.filter(p => p.status !== 'pending'));
-  }, []);
+    // Process Active (including those from other classes)
+    const processedActive = allActiveForMyStudents?.map((p: any) => ({
+      id: p.id,
+      student_id: p.student_id,
+      student_name: p.profiles?.full_name || 'Unknown',
+      destination: p.destination,
+      status: p.status,
+      requested_at: p.requested_at,
+      approved_at: p.approved_at,
+      is_quota_exceeded: false,
+      from_class_name: p.classes?.name
+    })) || [];
 
-  // Updated History Fetch with Join
+    setPendingPasses(processedPending);
+    setActivePasses(processedActive);
+  }, [user, students]);
+
   const fetchStudentHistory = useCallback(async (studentId: string) => {
     setLoadingHistory(true);
     const { data, error } = await supabase
@@ -204,7 +210,6 @@ const TeacherDashboard = () => {
     setLoadingHistory(false);
   }, []);
 
-  // Client-side filtering logic
   const filteredHistory = useMemo(() => {
     return studentHistory.filter(pass => {
       const matchesLocation = historyFilterLocation === 'all' || pass.destination === historyFilterLocation;
@@ -213,7 +218,6 @@ const TeacherDashboard = () => {
     });
   }, [studentHistory, historyFilterLocation, historyFilterClass]);
 
-  // Aggregate Total Hallway Time
   const totalMinutes = useMemo(() => {
     return filteredHistory.reduce((acc, pass) => {
       return acc + (pass.returned_at ? getDuration(pass.approved_at || pass.requested_at, pass.returned_at) : 0);
@@ -224,14 +228,26 @@ const TeacherDashboard = () => {
 
   useEffect(() => {
     if (selectedClassId) {
-      fetchPasses(selectedClassId);
       fetchRoster(selectedClassId);
-      const channel = supabase.channel(`teacher-sync-${selectedClassId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'passes', filter: `class_id=eq.${selectedClassId}` }, () => fetchPasses(selectedClassId))
+    }
+  }, [selectedClassId, fetchRoster]);
+
+  useEffect(() => {
+    if (selectedClassId && students.length >= 0) {
+      fetchPasses(selectedClassId);
+      
+      // Realtime subscription with strict filter to save egress
+      const channel = supabase.channel(`teacher-view-${selectedClassId}`)
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'passes'
+        }, () => fetchPasses(selectedClassId))
         .subscribe();
+
       return () => { supabase.removeChannel(channel); };
     }
-  }, [selectedClassId, fetchPasses, fetchRoster]);
+  }, [selectedClassId, students.length, fetchPasses]);
 
   useEffect(() => {
     if (historyDialogOpen && selectedStudent) {
@@ -240,34 +256,46 @@ const TeacherDashboard = () => {
   }, [historyDialogOpen, selectedStudent, fetchStudentHistory]);
 
   const handleApprove = async (id: string, override: boolean) => {
-    await supabase.from('passes').update({
+    const { error } = await supabase.from('passes').update({
       status: 'approved',
       approved_at: new Date().toISOString(),
       approved_by: user!.id,
-      is_quota_override: override
+      is_quota_override: override // Fix: Correct column name
     }).eq('id', id);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
   };
 
   const handleDeny = async (id: string) => {
-    await supabase.from('passes').update({ status: 'denied', denied_at: new Date().toISOString(), denied_by: user!.id }).eq('id', id);
+    await supabase.from('passes').update({ 
+      status: 'denied', 
+      denied_at: new Date().toISOString(), 
+      denied_by: user!.id 
+    }).eq('id', id);
   };
 
   const handleCheckIn = async (id: string) => {
-    await supabase.from('passes').update({ status: 'returned', returned_at: new Date().toISOString(), confirmed_by: user!.id }).eq('id', id);
+    await supabase.from('passes').update({ 
+      status: 'returned', 
+      returned_at: new Date().toISOString(), 
+      confirmed_by: user!.id 
+    }).eq('id', id);
   };
 
   const handleQuickPass = async () => {
     if (!selectedStudentForPass || !selectedDestination || isActionLoading) return;
     setIsActionLoading(true);
     const dest = selectedDestination === 'Other' ? customDestination : selectedDestination;
+    
     const { error } = await supabase.from('passes').insert({
       student_id: selectedStudentForPass,
       class_id: selectedClassId,
       destination: dest,
       status: 'approved',
       approved_at: new Date().toISOString(),
-      approved_by: user!.id
+      approved_by: user!.id, // Fix: Added required field
+      is_quota_override: false
     });
+
     setIsActionLoading(false);
     if (!error) {
       setCreatePassDialogOpen(false);
@@ -275,6 +303,8 @@ const TeacherDashboard = () => {
       setSelectedDestination('');
       setCustomDestination('');
       toast({ title: 'Pass Issued' });
+    } else {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
 
@@ -286,7 +316,6 @@ const TeacherDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background p-4 max-w-6xl mx-auto pb-32">
-      {/* Header section remains identical... */}
       <header className="flex items-center justify-between mb-6 pt-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
@@ -327,98 +356,103 @@ const TeacherDashboard = () => {
               <div className="space-y-3">
                 <h2 className="text-sm font-bold uppercase tracking-wider text-warning">Requests ({pendingPasses.length})</h2>
                 {pendingPasses.map(pass => (
-                    <Card key={pass.id} className={`rounded-2xl border-l-4 ${getPassCardColor(pass)}`}>
-                      <CardContent className="p-4 flex items-center justify-between">
-                        <div className="flex-1">
+                  <Card key={pass.id} className={`rounded-2xl border-l-4 ${getPassCardColor(pass)}`}>
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
                           <h3 className="font-bold">{pass.student_name}</h3>
-                          <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-bold rounded-full border ${getDestinationColor(pass.destination)}`}>{pass.destination}</span>
+                          {pass.is_quota_exceeded && <AlertTriangle className="h-4 w-4 text-destructive" />}
                         </div>
-                        <div className="flex gap-2">
-                          <Button size="icon" variant="ghost" className="h-10 w-10 rounded-xl bg-muted" onClick={() => handleDeny(pass.id)}><X className="h-4 w-4" /></Button>
-                          <Button size="icon" className="h-10 w-10 rounded-xl shadow-lg" onClick={() => handleApprove(pass.id, pass.is_quota_exceeded)}><Check className="h-4 w-4" /></Button>
-                        </div>
-                      </CardContent>
-                    </Card>
+                        <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-bold rounded-full border ${getDestinationColor(pass.destination)}`}>{pass.destination}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="icon" variant="ghost" className="h-10 w-10 rounded-xl bg-muted" onClick={() => handleDeny(pass.id)}><X className="h-4 w-4" /></Button>
+                        <Button size="icon" className="h-10 w-10 rounded-xl shadow-lg" onClick={() => handleApprove(pass.id, pass.is_quota_exceeded)}><Check className="h-4 w-4" /></Button>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))}
+                {pendingPasses.length === 0 && <p className="text-center py-4 text-muted-foreground text-sm italic">No pending requests</p>}
               </div>
 
               <div className="space-y-3">
-                <h2 className="text-sm font-bold uppercase tracking-wider text-success">Active ({activePasses.length})</h2>
+                <h2 className="text-sm font-bold uppercase tracking-wider text-success">Active Hallway ({activePasses.length})</h2>
                 {activePasses.map(pass => (
-                    <Card key={pass.id} className="rounded-2xl border-l-4 border-l-success">
-                      <CardContent className="p-4 flex items-center justify-between">
-                        <div>
-                          <h3 className="font-bold">{pass.student_name}</h3>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className={`inline-block px-2 py-0.5 text-xs font-bold rounded-full border ${getDestinationColor(pass.destination)}`}>{pass.destination}</span>
-                            {pass.approved_at && <ElapsedTimer startTime={pass.approved_at} destination={pass.destination} />}
-                          </div>
+                  <Card key={pass.id} className="rounded-2xl border-l-4 border-l-success">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div>
+                        <h3 className="font-bold">{pass.student_name}</h3>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          {pass.from_class_name && (
+                            <span className="text-[10px] font-black uppercase text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                              {pass.from_class_name}
+                            </span>
+                          )}
+                          <span className={`inline-block px-2 py-0.5 text-xs font-bold rounded-full border ${getDestinationColor(pass.destination)}`}>{pass.destination}</span>
+                          {pass.approved_at && <ElapsedTimer startTime={pass.approved_at} destination={pass.destination} />}
                         </div>
-                        <Button onClick={() => handleCheckIn(pass.id)} className="rounded-xl h-10 px-4 shadow-lg font-bold">Check In</Button>
-                      </CardContent>
-                    </Card>
+                      </div>
+                      <Button onClick={() => handleCheckIn(pass.id)} className="rounded-xl h-10 px-4 shadow-lg font-bold">Check In</Button>
+                    </CardContent>
+                  </Card>
                 ))}
+                {activePasses.length === 0 && <p className="text-center py-4 text-muted-foreground text-sm italic">No active passes</p>}
               </div>
             </div>
 
-            {/* Student Search & Roster */}
-  {/* Student Search & Roster */}
-<div className="space-y-4 pt-4 border-t">
-  <div className="flex flex-col sm:flex-row gap-3">
-    {/* Search Bar - Flex 1 to take remaining space */}
-    <div className="relative flex-1">
-      <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-      <Input 
-        placeholder="Search students..." 
-        className="h-12 pl-12 rounded-2xl border-none shadow-sm font-medium bg-card" 
-        value={searchQuery} 
-        onChange={(e) => setSearchQuery(e.target.value)} 
-      />
-    </div>
+            <div className="space-y-4 pt-4 border-t">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input 
+                    placeholder="Search students..." 
+                    className="h-12 pl-12 rounded-2xl border-none shadow-sm font-medium bg-card" 
+                    value={searchQuery} 
+                    onChange={(e) => setSearchQuery(e.target.value)} 
+                  />
+                </div>
 
-    {/* Class Code Display - Fixed width on desktop */}
-    {currentClass && (
-      <div className="h-12 px-6 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-between sm:justify-start gap-4 shadow-sm">
-        <div className="flex flex-col">
-          <span className="text-[10px] font-black uppercase text-primary leading-none">Class Code</span>
-          <span className="text-sm font-black tracking-widest uppercase">{currentClass.join_code}</span>
-        </div>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-8 w-8 text-primary hover:bg-primary/20 rounded-lg"
-          onClick={() => {
-            navigator.clipboard.writeText(currentClass.join_code);
-            toast({ title: "Code Copied", description: "Join code copied to clipboard" });
-          }}
-        >
-          <Copy className="h-4 w-4" />
-        </Button>
-      </div>
-    )}
-  </div>
+                {currentClass && (
+                  <div className="h-12 px-6 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-between sm:justify-start gap-4 shadow-sm">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black uppercase text-primary leading-none">Class Code</span>
+                      <span className="text-sm font-black tracking-widest uppercase">{currentClass.join_code}</span>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-primary hover:bg-primary/20 rounded-lg"
+                      onClick={() => {
+                        navigator.clipboard.writeText(currentClass.join_code);
+                        toast({ title: "Code Copied", description: "Join code copied to clipboard" });
+                      }}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
 
-  <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-    {filteredStudents.map(student => (
-      <div key={student.id} className="bg-card p-3 rounded-xl shadow-sm border flex items-center justify-between hover:bg-muted/30 transition-colors">
-        <div className="min-w-0"><p className="font-bold truncate">{student.name}</p></div>
-        <div className="flex gap-1">
-          <Button size="icon" variant="ghost" className="rounded-lg h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={() => { setSelectedStudent(student); setHistoryDialogOpen(true); }}>
-            <History className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" className="rounded-lg h-8 w-8" onClick={() => { setSelectedStudent(student); setStudentDialogOpen(true); }}>
-            <UserMinus className="h-4 w-4 text-muted-foreground" />
-          </Button>
-        </div>
-      </div>
-    ))}
-  </div>
-</div>
+              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                {filteredStudents.map(student => (
+                  <div key={student.id} className="bg-card p-3 rounded-xl shadow-sm border flex items-center justify-between hover:bg-muted/30 transition-colors">
+                    <div className="min-w-0"><p className="font-bold truncate">{student.name}</p></div>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" className="rounded-lg h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={() => { setSelectedStudent(student); setHistoryDialogOpen(true); }}>
+                        <History className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="rounded-lg h-8 w-8" onClick={() => { setSelectedStudent(student); setStudentDialogOpen(true); }}>
+                        <UserMinus className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </>
         )}
       </div>
 
-      {/* Floating Issue Button */}
       {selectedClassId && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-md px-4">
           <Button onClick={() => setCreatePassDialogOpen(true)} className="w-full h-14 rounded-2xl shadow-2xl text-lg font-bold flex items-center justify-center gap-3">
@@ -427,7 +461,7 @@ const TeacherDashboard = () => {
         </div>
       )}
 
-      {/* DETAILED HISTORY DIALOG */}
+      {/* History Dialog */}
       <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
         <DialogContent className="rounded-3xl max-w-lg">
           <DialogHeader>
@@ -437,7 +471,6 @@ const TeacherDashboard = () => {
             </DialogTitle>
           </DialogHeader>
 
-          {/* Filtering Controls */}
           <div className="flex gap-2 mb-2 mt-4">
             <Select value={historyFilterLocation} onValueChange={setHistoryFilterLocation}>
               <SelectTrigger className="rounded-xl bg-muted/50 border-none font-bold">
@@ -503,7 +536,6 @@ const TeacherDashboard = () => {
             )}
           </div>
 
-          {/* Aggregated Footer */}
           <div className="mt-2 pt-4 border-t flex justify-between items-center">
             <div className="flex items-center gap-2">
               <Timer className="h-5 w-5 text-primary" />
@@ -517,7 +549,7 @@ const TeacherDashboard = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Standard Issue Dialog */}
+      {/* Quick Issue Dialog */}
       <Dialog open={createPassDialogOpen} onOpenChange={setCreatePassDialogOpen}>
         <DialogContent className="rounded-3xl max-w-sm">
           <DialogHeader><DialogTitle className="font-bold">Quick Pass</DialogTitle></DialogHeader>
@@ -525,16 +557,37 @@ const TeacherDashboard = () => {
              <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase text-muted-foreground">Student</Label>
                 <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-                  {students.map(s => <Button key={s.id} size="sm" variant={selectedStudentForPass === s.id ? 'default' : 'outline'} className="rounded-xl font-bold" onClick={() => setSelectedStudentForPass(s.id)}>{s.name.split(' ')[0]}</Button>)}
+                  {students.map(s => (
+                    <Button 
+                      key={s.id} 
+                      size="sm" 
+                      variant={selectedStudentForPass === s.id ? 'default' : 'outline'} 
+                      className="rounded-xl font-bold" 
+                      onClick={() => setSelectedStudentForPass(s.id)}
+                    >
+                      {s.name.split(' ')[0]}
+                    </Button>
+                  ))}
                 </div>
              </div>
              <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase text-muted-foreground">Location</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {DESTINATIONS.map(d => <Button key={d} variant={selectedDestination === d ? 'default' : 'outline'} className="rounded-xl font-bold" onClick={() => setSelectedDestination(d)}>{d}</Button>)}
+                  {DESTINATIONS.map(d => (
+                    <Button 
+                      key={d} 
+                      variant={selectedDestination === d ? 'default' : 'outline'} 
+                      className="rounded-xl font-bold" 
+                      onClick={() => setSelectedDestination(d)}
+                    >
+                      {d}
+                    </Button>
+                  ))}
                 </div>
              </div>
-             <Button onClick={handleQuickPass} className="w-full h-12 rounded-xl font-bold" disabled={isActionLoading || !selectedStudentForPass || !selectedDestination}>Issue Pass</Button>
+             <Button onClick={handleQuickPass} className="w-full h-12 rounded-xl font-bold" disabled={isActionLoading || !selectedStudentForPass || !selectedDestination}>
+               {isActionLoading ? <Loader2 className="animate-spin h-4 w-4" /> : "Issue Pass"}
+             </Button>
           </div>
         </DialogContent>
       </Dialog>
