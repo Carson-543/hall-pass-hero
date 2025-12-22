@@ -52,6 +52,10 @@
     --sidebar-ring: 0 84% 50%;
   }
 
+#lovable-badge {
+      display: none ! important;
+    }
+  
   .dark {
     --background: 0 0% 5%;
     --foreground: 0 0% 95%;
