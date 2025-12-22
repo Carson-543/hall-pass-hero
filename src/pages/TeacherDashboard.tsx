@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,7 +16,7 @@ import { StudentManagementDialog } from '@/components/teacher/StudentManagementD
 import { 
   LogOut, Plus, AlertTriangle, Check, X, 
   Copy, Search, Loader2, Clock, Settings, UserMinus,
-  History, Calendar
+  History, Calendar, Timer
 } from 'lucide-react';
 import { startOfWeek } from 'date-fns';
 
@@ -46,18 +46,11 @@ interface Student {
 
 const getDestinationColor = (destination: string) => {
   switch (destination.toLowerCase()) {
-    case 'restroom': return 'bg-success/10 text-success border-success/20';
+    case 'restroom': return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
     case 'locker': return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
     case 'office': return 'bg-purple-500/10 text-purple-600 border-purple-500/20';
     default: return 'bg-muted text-muted-foreground border-border';
   }
-};
-
-const getPassCardColor = (pass: PendingPass) => {
-  if (pass.status === 'pending') {
-    return pass.is_quota_exceeded ? 'border-l-destructive' : 'border-l-warning';
-  }
-  return 'border-l-success';
 };
 
 const TeacherDashboard = () => {
@@ -83,10 +76,12 @@ const TeacherDashboard = () => {
   const [selectedDestination, setSelectedDestination] = useState('');
   const [customDestination, setCustomDestination] = useState('');
 
-  // NEW: History States
+  // History & Filtering States
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [studentHistory, setStudentHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyFilterLocation, setHistoryFilterLocation] = useState<string>('all');
+  const [historyFilterClass, setHistoryFilterClass] = useState<string>('all');
 
   const DESTINATIONS = ['Restroom', 'Locker', 'Office', 'Other'];
 
@@ -103,9 +98,6 @@ const TeacherDashboard = () => {
       if (!selectedClassId || !data.find(c => c.id === selectedClassId)) {
         setSelectedClassId(data[0].id);
       }
-    } else {
-      setClasses([]);
-      setSelectedClassId('');
     }
   }, [user, selectedClassId]);
 
@@ -127,11 +119,7 @@ const TeacherDashboard = () => {
       .in('id', studentIds);
 
     if (profiles) {
-      setStudents(profiles.map(p => ({
-        id: p.id,
-        name: p.full_name,
-        email: p.email
-      })));
+      setStudents(profiles.map(p => ({ id: p.id, name: p.full_name, email: p.email })));
     }
   }, []);
 
@@ -142,11 +130,7 @@ const TeacherDashboard = () => {
       .eq('class_id', classId)
       .in('status', ['pending', 'approved', 'pending_return']);
 
-    if (!passes || passes.length === 0) {
-      setPendingPasses([]);
-      setActivePasses([]);
-      return;
-    }
+    if (!passes) return;
 
     const studentIds = [...new Set(passes.map(p => p.student_id))];
     const { data: profiles } = await supabase
@@ -187,53 +171,54 @@ const TeacherDashboard = () => {
     setActivePasses(processed.filter(p => p.status !== 'pending'));
   }, []);
 
-  // NEW: Fetch Student History
   const fetchStudentHistory = useCallback(async (studentId: string) => {
     setLoadingHistory(true);
     const { data, error } = await supabase
       .from('passes')
-      .select('*')
+      .select(`*, classes (name, period_order)`)
       .eq('student_id', studentId)
-      .order('requested_at', { ascending: false })
-      .limit(20);
+      .order('requested_at', { ascending: false });
     
     if (!error) setStudentHistory(data || []);
     setLoadingHistory(false);
   }, []);
 
   useEffect(() => { fetchClasses(); }, [fetchClasses]);
-
   useEffect(() => {
     if (selectedClassId) {
       fetchPasses(selectedClassId);
       fetchRoster(selectedClassId);
-
-      const channel = supabase.channel(`teacher-sync-${selectedClassId}`)
-        .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
-          table: 'passes', 
-          filter: `class_id=eq.${selectedClassId}` 
-        }, () => fetchPasses(selectedClassId))
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'class_enrollments',
-          filter: `class_id=eq.${selectedClassId}`
-        }, () => fetchRoster(selectedClassId))
-        .subscribe();
-
-      return () => { supabase.removeChannel(channel); };
     }
   }, [selectedClassId, fetchPasses, fetchRoster]);
 
-  // NEW: Trigger history fetch when dialog opens
   useEffect(() => {
     if (historyDialogOpen && selectedStudent) {
       fetchStudentHistory(selectedStudent.id);
     }
   }, [historyDialogOpen, selectedStudent, fetchStudentHistory]);
 
+  // Pass Duration Helpers
+  const getDuration = (start: string, end: string | null) => {
+    if (!end) return 0;
+    return (new Date(end).getTime() - new Date(start).getTime()) / 60000;
+  };
+
+  // Filtered History Logic
+  const filteredHistory = useMemo(() => {
+    return studentHistory.filter(pass => {
+      const matchesLocation = historyFilterLocation === 'all' || pass.destination === historyFilterLocation;
+      const matchesClass = historyFilterClass === 'all' || pass.class_id === historyFilterClass;
+      return matchesLocation && matchesClass;
+    });
+  }, [studentHistory, historyFilterLocation, historyFilterClass]);
+
+  const totalMinutes = useMemo(() => {
+    return filteredHistory.reduce((acc, pass) => {
+      return acc + (pass.returned_at ? getDuration(pass.approved_at || pass.requested_at, pass.returned_at) : 0);
+    }, 0);
+  }, [filteredHistory]);
+
+  // Event Handlers
   const handleApprove = async (id: string, override: boolean) => {
     await supabase.from('passes').update({
       status: 'approved',
@@ -241,54 +226,39 @@ const TeacherDashboard = () => {
       approved_by: user!.id,
       is_quota_override: override
     }).eq('id', id);
+    fetchPasses(selectedClassId);
   };
 
   const handleDeny = async (id: string) => {
-    await supabase.from('passes').update({
-      status: 'denied',
-      denied_at: new Date().toISOString(),
-      denied_by: user!.id
-    }).eq('id', id);
+    await supabase.from('passes').update({ status: 'denied', denied_at: new Date().toISOString() }).eq('id', id);
+    fetchPasses(selectedClassId);
   };
 
   const handleCheckIn = async (id: string) => {
-    await supabase.from('passes').update({
-      status: 'returned',
-      returned_at: new Date().toISOString(),
-      confirmed_by: user!.id
-    }).eq('id', id);
+    await supabase.from('passes').update({ status: 'returned', returned_at: new Date().toISOString() }).eq('id', id);
+    fetchPasses(selectedClassId);
   };
 
   const handleQuickPass = async () => {
-    if (!selectedStudentForPass || !selectedDestination || isActionLoading) return;
+    if (!selectedStudentForPass || !selectedDestination) return;
     setIsActionLoading(true);
-    
-    const dest = selectedDestination === 'Other' ? customDestination : selectedDestination;
     const { error } = await supabase.from('passes').insert({
       student_id: selectedStudentForPass,
       class_id: selectedClassId,
-      destination: dest,
+      destination: selectedDestination === 'Other' ? customDestination : selectedDestination,
       status: 'approved',
       approved_at: new Date().toISOString(),
       approved_by: user!.id
     });
-
     setIsActionLoading(false);
     if (!error) {
       setCreatePassDialogOpen(false);
-      setSelectedStudentForPass('');
-      setSelectedDestination('');
-      setCustomDestination('');
+      fetchPasses(selectedClassId);
       toast({ title: 'Pass Issued' });
     }
   };
 
-  const openStudentManagement = (student: Student) => {
-    setSelectedStudent(student);
-    setStudentDialogOpen(true);
-  };
-
-  if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
+  if (authLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
   if (!user || role !== 'teacher') return <Navigate to="/auth" replace />;
 
   const filteredStudents = students.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -298,12 +268,12 @@ const TeacherDashboard = () => {
     <div className="min-h-screen bg-background p-4 max-w-6xl mx-auto pb-32">
       <header className="flex items-center justify-between mb-6 pt-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
+          <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg">
             <span className="text-primary-foreground font-bold text-xl">T</span>
           </div>
           <div>
-            <h1 className="text-xl font-bold">Teacher Central</h1>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Pass Management</p>
+            <h1 className="text-xl font-bold">Teacher Dashboard</h1>
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Pass Control</p>
           </div>
         </div>
         <Button variant="ghost" size="icon" onClick={signOut} className="rounded-full bg-card shadow-sm border">
@@ -314,6 +284,7 @@ const TeacherDashboard = () => {
       <div className="space-y-6">
         <PeriodDisplay />
 
+        {/* Class Selection */}
         <div className="flex gap-2">
           <Select value={selectedClassId} onValueChange={setSelectedClassId}>
             <SelectTrigger className="h-14 rounded-2xl bg-card border-none shadow-sm text-lg font-bold px-6 flex-1">
@@ -325,266 +296,169 @@ const TeacherDashboard = () => {
               ))}
             </SelectContent>
           </Select>
-          {currentClass && (
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="h-14 w-14 rounded-2xl bg-card border-none shadow-sm"
-              onClick={() => { setEditingClass(currentClass); setClassDialogOpen(true); }}
-            >
-              <Settings className="h-5 w-5" />
-            </Button>
-          )}
-          <Button 
-            size="icon" 
-            className="h-14 w-14 rounded-2xl shadow-lg"
-            onClick={() => { setEditingClass(null); setClassDialogOpen(true); }}
-          >
+          <Button variant="outline" size="icon" className="h-14 w-14 rounded-2xl bg-card border-none shadow-sm" onClick={() => setClassDialogOpen(true)}>
+            <Settings className="h-5 w-5" />
+          </Button>
+          <Button size="icon" className="h-14 w-14 rounded-2xl shadow-lg" onClick={() => { setEditingClass(null); setClassDialogOpen(true); }}>
             <Plus className="h-5 w-5" />
           </Button>
         </div>
 
         {selectedClassId && (
-          <>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <h2 className="text-sm font-bold uppercase tracking-wider text-warning">
-                  Requests ({pendingPasses.length})
-                </h2>
-                {pendingPasses.length === 0 ? (
-                  <Card className="rounded-3xl border-2 border-dashed">
-                    <CardContent className="py-12 text-center">
-                      <Check className="mx-auto h-10 w-10 text-success/50 mb-3" />
-                      <p className="text-muted-foreground font-medium">No pending requests</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  pendingPasses.map(pass => (
-                    <Card key={pass.id} className={`rounded-2xl border-l-4 ${getPassCardColor(pass)} ${pass.is_quota_exceeded ? 'bg-destructive/5' : ''}`}>
-                      <CardContent className="p-4 flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-bold">{pass.student_name}</h3>
-                            {pass.is_quota_exceeded && (
-                              <div className="flex items-center gap-1 text-destructive bg-destructive/10 px-2 py-0.5 rounded-lg">
-                                <AlertTriangle className="h-3 w-3" />
-                                <span className="text-[10px] font-bold uppercase">Quota!</span>
-                              </div>
-                            )}
-                          </div>
-                          <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-bold rounded-full border ${getDestinationColor(pass.destination)}`}>
-                            {pass.destination}
-                          </span>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button size="icon" variant="ghost" className="h-10 w-10 rounded-xl bg-muted" onClick={() => handleDeny(pass.id)}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant={pass.is_quota_exceeded ? "destructive" : "default"} className="h-10 w-10 rounded-xl shadow-lg" onClick={() => handleApprove(pass.id, pass.is_quota_exceeded)}>
-                            <Check className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
-
-              <div className="space-y-3">
-                <h2 className="text-sm font-bold uppercase tracking-wider text-success">
-                  Active ({activePasses.length})
-                </h2>
-                {activePasses.length === 0 ? (
-                  <Card className="rounded-3xl border-2 border-dashed">
-                    <CardContent className="py-12 text-center">
-                      <Clock className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
-                      <p className="text-muted-foreground font-medium">Classroom is full</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  activePasses.map(pass => (
-                    <Card key={pass.id} className={`rounded-2xl border-l-4 ${getPassCardColor(pass)}`}>
-                      <CardContent className="p-4 flex items-center justify-between">
-                        <div>
-                          <h3 className="font-bold">{pass.student_name}</h3>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className={`inline-block px-2 py-0.5 text-xs font-bold rounded-full border ${getDestinationColor(pass.destination)}`}>
-                              {pass.destination}
-                            </span>
-                            {pass.approved_at && <ElapsedTimer startTime={pass.approved_at} destination={pass.destination} />}
-                          </div>
-                        </div>
-                        <Button onClick={() => handleCheckIn(pass.id)} className="rounded-xl h-10 px-4 shadow-lg font-bold">
-                          Check In
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Requests */}
+            <div className="space-y-3">
+              <h2 className="text-sm font-bold uppercase text-orange-500">Pending ({pendingPasses.length})</h2>
+              {pendingPasses.map(pass => (
+                <Card key={pass.id} className={`rounded-2xl border-l-4 ${pass.is_quota_exceeded ? 'border-destructive' : 'border-warning'}`}>
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold">{pass.student_name}</h3>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getDestinationColor(pass.destination)}`}>
+                        {pass.destination}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="icon" variant="ghost" className="rounded-xl" onClick={() => handleDeny(pass.id)}><X className="h-4 w-4" /></Button>
+                      <Button size="icon" className="rounded-xl shadow-md" onClick={() => handleApprove(pass.id, pass.is_quota_exceeded)}><Check className="h-4 w-4" /></Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
 
-            <div className="space-y-4 pt-4 border-t">
-              {currentClass && (
-                <div className="bg-primary/5 rounded-2xl p-4 border border-primary/10 flex items-center justify-between">
-                  <div>
-                    <p className="text-[10px] uppercase font-bold text-primary mb-1">Class Join Code</p>
-                    <code className="text-2xl font-black tracking-widest text-primary">{currentClass.join_code}</code>
-                  </div>
-                  <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10" onClick={() => { navigator.clipboard.writeText(currentClass.join_code); toast({ title: 'Copied!' }); }}>
-                    <Copy className="h-5 w-5" />
-                  </Button>
-                </div>
-              )}
-
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input 
-                  placeholder="Search students..." 
-                  className="h-12 pl-12 rounded-2xl border-none shadow-sm font-medium bg-card" 
-                  value={searchQuery} 
-                  onChange={(e) => setSearchQuery(e.target.value)} 
-                />
-              </div>
-
-              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredStudents.map(student => (
-                  <div 
-                    key={student.id} 
-                    className="bg-card p-3 rounded-xl shadow-sm border flex items-center justify-between hover:bg-muted/30 transition-colors"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-bold truncate">{student.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{student.email}</p>
+            {/* Active */}
+            <div className="space-y-3">
+              <h2 className="text-sm font-bold uppercase text-emerald-500">Active ({activePasses.length})</h2>
+              {activePasses.map(pass => (
+                <Card key={pass.id} className="rounded-2xl border-l-4 border-emerald-500">
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold">{pass.student_name}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getDestinationColor(pass.destination)}`}>{pass.destination}</span>
+                         {pass.approved_at && <ElapsedTimer startTime={pass.approved_at} destination={pass.destination} />}
+                      </div>
                     </div>
-                    <div className="flex gap-1">
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        className="rounded-lg h-8 w-8 shrink-0 hover:bg-primary/10 hover:text-primary transition-colors"
-                        onClick={() => {
-                          setSelectedStudent(student);
-                          setHistoryDialogOpen(true);
-                        }}
-                      >
-                        <History className="h-4 w-4" />
-                      </Button>
-
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        className="rounded-lg h-8 w-8 shrink-0"
-                        onClick={() => openStudentManagement(student)}
-                      >
-                        <UserMinus className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    <Button onClick={() => handleCheckIn(pass.id)} className="rounded-xl font-bold px-4">Check In</Button>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
-          </>
+          </div>
         )}
+
+        {/* Roster & History Search */}
+        <div className="pt-6 border-t space-y-4">
+           <div className="relative">
+             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+             <Input placeholder="Search students..." className="h-12 pl-12 rounded-2xl bg-card border-none shadow-sm" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+           </div>
+
+           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+             {filteredStudents.map(student => (
+               <div key={student.id} className="bg-card p-3 rounded-xl border flex items-center justify-between">
+                 <div className="min-w-0">
+                   <p className="font-bold truncate">{student.name}</p>
+                   <p className="text-[10px] text-muted-foreground">{student.email}</p>
+                 </div>
+                 <div className="flex gap-1">
+                   <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-primary/10" onClick={() => { setSelectedStudent(student); setHistoryDialogOpen(true); }}>
+                     <History className="h-4 w-4" />
+                   </Button>
+                   <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg" onClick={() => { setSelectedStudent(student); setStudentDialogOpen(true); }}>
+                     <UserMinus className="h-4 w-4" />
+                   </Button>
+                 </div>
+               </div>
+             ))}
+           </div>
+        </div>
       </div>
 
+      {/* Floating Action */}
       {selectedClassId && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-md px-4">
-          <Button 
-            onClick={() => setCreatePassDialogOpen(true)}
-            className="w-full h-14 rounded-2xl shadow-2xl shadow-primary/40 text-lg font-bold flex items-center justify-center gap-3 active:scale-95 transition-transform"
-          >
-            <Plus className="h-5 w-5 stroke-[3px]" />
-            ISSUE QUICK PASS
-          </Button>
+          <Button onClick={() => setCreatePassDialogOpen(true)} className="w-full h-14 rounded-2xl shadow-xl text-lg font-bold">ISSUE QUICK PASS</Button>
         </div>
       )}
 
-      {/* Quick Pass Dialog */}
-      <Dialog open={createPassDialogOpen} onOpenChange={setCreatePassDialogOpen}>
-        <DialogContent className="rounded-3xl max-w-sm">
-          <DialogHeader><DialogTitle className="text-xl font-bold">Quick Pass</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label className="text-xs uppercase font-bold text-muted-foreground">Select Student</Label>
-              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
-                {students.map(s => (
-                  <Button key={s.id} variant={selectedStudentForPass === s.id ? 'default' : 'outline'} size="sm" className="rounded-xl font-bold" onClick={() => setSelectedStudentForPass(s.id)}>
-                    {s.name.split(' ')[0]}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs uppercase font-bold text-muted-foreground">Location</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {DESTINATIONS.map(d => (
-                  <Button key={d} variant={selectedDestination === d ? 'default' : 'outline'} className="rounded-xl font-bold" onClick={() => setSelectedDestination(d)}>
-                    {d}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            {selectedDestination === 'Other' && (
-              <Input placeholder="Specific location..." className="rounded-xl h-12" value={customDestination} onChange={(e) => setCustomDestination(e.target.value)} />
-            )}
-            <Button onClick={handleQuickPass} className="w-full h-12 rounded-xl font-bold mt-4" disabled={isActionLoading || !selectedStudentForPass || !selectedDestination}>
-              {isActionLoading ? <Loader2 className="animate-spin" /> : "ISSUE PASS"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* History Dialog */}
+      {/* DETAILED HISTORY DIALOG */}
       <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-        <DialogContent className="rounded-3xl max-w-md">
+        <DialogContent className="rounded-3xl max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl font-bold">
               <History className="h-5 w-5 text-primary" />
-              {selectedStudent?.name}'s History
+              {selectedStudent?.name}'s Records
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 py-4 max-h-[60vh] overflow-y-auto pr-2">
+
+          <div className="flex gap-2 mb-2">
+            <Select value={historyFilterLocation} onValueChange={setHistoryFilterLocation}>
+              <SelectTrigger className="rounded-xl bg-muted/50 border-none font-bold"><SelectValue placeholder="Location" /></SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="all">All Locations</SelectItem>
+                {DESTINATIONS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            <Select value={historyFilterClass} onValueChange={setHistoryFilterClass}>
+              <SelectTrigger className="rounded-xl bg-muted/50 border-none font-bold"><SelectValue placeholder="Class" /></SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="all">All Classes</SelectItem>
+                {classes.map(c => <SelectItem key={c.id} value={c.id}>P{c.period_order}: {c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2 py-2 max-h-[50vh] overflow-y-auto pr-2">
             {loadingHistory ? (
-              <div className="flex justify-center py-8"><Loader2 className="animate-spin text-muted-foreground" /></div>
-            ) : studentHistory.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No past passes found.</p>
-            ) : (
-              studentHistory.map((pass) => (
-                <div key={pass.id} className="p-3 rounded-2xl bg-muted/50 border flex items-center justify-between">
-                  <div>
-                    <p className="font-bold text-sm">{pass.destination}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {new Date(pass.requested_at).toLocaleDateString()} • {new Date(pass.requested_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
+              <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>
+            ) : filteredHistory.map(pass => {
+              const dur = pass.returned_at ? getDuration(pass.approved_at || pass.requested_at, pass.returned_at) : null;
+              return (
+                <div key={pass.id} className="p-4 rounded-2xl bg-muted/30 border border-muted/50 flex flex-col gap-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border ${getDestinationColor(pass.destination)}`}>{pass.destination}</span>
+                      <p className="text-xs font-bold mt-1 text-muted-foreground">{pass.classes?.name} (P{pass.classes?.period_order})</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-bold text-muted-foreground">{new Date(pass.requested_at).toLocaleDateString()}</p>
+                      {dur && <p className="text-xs font-black text-primary">{Math.round(dur)}m duration</p>}
+                    </div>
                   </div>
-                  <div className={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase ${
-                    pass.status === 'returned' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
-                  }`}>
-                    {pass.status}
+                  <div className="grid grid-cols-2 gap-4 border-t border-muted/50 pt-2">
+                    <div>
+                      <p className="text-[9px] uppercase font-bold text-muted-foreground">Time Out</p>
+                      <p className="text-xs font-bold">{new Date(pass.approved_at || pass.requested_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] uppercase font-bold text-muted-foreground">Time In</p>
+                      <p className="text-xs font-bold">{pass.returned_at ? new Date(pass.returned_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</p>
+                    </div>
                   </div>
                 </div>
-              ))
-            )}
+              );
+            })}
+          </div>
+
+          <div className="mt-4 pt-4 border-t flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <Timer className="h-4 w-4 text-primary" />
+              <p className="text-xs font-bold uppercase text-muted-foreground tracking-widest">Total Hallway Time</p>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-black text-primary leading-none">{Math.round(totalMinutes)}m</p>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase">Filtered Total</p>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
-      
-      <ClassManagementDialog
-        open={classDialogOpen}
-        onOpenChange={setClassDialogOpen}
-        editingClass={editingClass}
-        userId={user?.id || ''}
-        onSaved={fetchClasses}
-      />
 
-      <StudentManagementDialog
-        open={studentDialogOpen}
-        onOpenChange={setStudentDialogOpen}
-        student={selectedStudent}
-        currentClassId={selectedClassId}
-        teacherClasses={classes}
-        onUpdated={() => fetchRoster(selectedClassId)}
-      />
+      {/* External Dialogs */}
+      <ClassManagementDialog open={classDialogOpen} onOpenChange={setClassDialogOpen} editingClass={editingClass} userId={user?.id || ''} onSaved={fetchClasses} />
+      <StudentManagementDialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen} student={selectedStudent} currentClassId={selectedClassId} teacherClasses={classes} onUpdated={() => fetchRoster(selectedClassId)} />
     </div>
   );
 };
