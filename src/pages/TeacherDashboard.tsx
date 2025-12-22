@@ -15,7 +15,8 @@ import { ClassManagementDialog } from '@/components/teacher/ClassManagementDialo
 import { StudentManagementDialog } from '@/components/teacher/StudentManagementDialog';
 import { 
   LogOut, Plus, AlertTriangle, Check, X, 
-  Copy, Search, Loader2, Clock, Settings, UserMinus
+  Copy, Search, Loader2, Clock, Settings, UserMinus,
+  History, Calendar
 } from 'lucide-react';
 import { startOfWeek } from 'date-fns';
 
@@ -105,7 +106,7 @@ const TeacherDashboard = () => {
     }
   }, [user, selectedClassId]);
 
-  // Fetch Students (Roster) - using two-step query
+  // Fetch Students (Roster)
   const fetchRoster = useCallback(async (classId: string) => {
     const { data: enrollments } = await supabase
       .from('class_enrollments')
@@ -132,7 +133,7 @@ const TeacherDashboard = () => {
     }
   }, []);
 
-  // Fetch Passes (Requests & Active) - using two-step query
+  // Fetch Passes
   const fetchPasses = useCallback(async (classId: string) => {
     const { data: passes } = await supabase
       .from('passes')
@@ -146,7 +147,6 @@ const TeacherDashboard = () => {
       return;
     }
 
-    // Get student profiles
     const studentIds = [...new Set(passes.map(p => p.student_id))];
     const { data: profiles } = await supabase
       .from('profiles')
@@ -154,8 +154,6 @@ const TeacherDashboard = () => {
       .in('id', studentIds);
 
     const profileMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
-
-    // Quota Logic
     const { data: settings } = await supabase.from('weekly_quota_settings').select('weekly_limit').single();
     const limit = settings?.weekly_limit ?? 4;
     const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString();
@@ -188,7 +186,6 @@ const TeacherDashboard = () => {
     setActivePasses(processed.filter(p => p.status !== 'pending'));
   }, []);
 
-  // Sync Logic
   useEffect(() => { fetchClasses(); }, [fetchClasses]);
 
   useEffect(() => {
@@ -264,16 +261,6 @@ const TeacherDashboard = () => {
     }
   };
 
-  const openEditClass = (classInfo: ClassInfo) => {
-    setEditingClass(classInfo);
-    setClassDialogOpen(true);
-  };
-
-  const openStudentManagement = (student: Student) => {
-    setSelectedStudent(student);
-    setStudentDialogOpen(true);
-  };
-
   if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
   if (!user || role !== 'teacher') return <Navigate to="/auth" replace />;
 
@@ -282,7 +269,6 @@ const TeacherDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background p-4 max-w-6xl mx-auto pb-32">
-      {/* Header */}
       <header className="flex items-center justify-between mb-6 pt-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
@@ -301,7 +287,6 @@ const TeacherDashboard = () => {
       <div className="space-y-6">
         <PeriodDisplay />
 
-        {/* Class Selector with Create/Edit */}
         <div className="flex gap-2">
           <Select value={selectedClassId} onValueChange={setSelectedClassId}>
             <SelectTrigger className="h-14 rounded-2xl bg-card border-none shadow-sm text-lg font-bold px-6 flex-1">
@@ -318,7 +303,7 @@ const TeacherDashboard = () => {
               variant="outline" 
               size="icon" 
               className="h-14 w-14 rounded-2xl"
-              onClick={() => openEditClass(currentClass)}
+              onClick={() => { setEditingClass(currentClass); setClassDialogOpen(true); }}
             >
               <Settings className="h-5 w-5" />
             </Button>
@@ -332,17 +317,14 @@ const TeacherDashboard = () => {
           </Button>
         </div>
 
-        {/* Main Grid: Requests + Active Passes */}
         {selectedClassId && (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Pending Requests */}
+              {/* Requests Section */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-bold uppercase tracking-wider text-warning">
-                    Requests ({pendingPasses.length})
-                  </h2>
-                </div>
+                <h2 className="text-sm font-bold uppercase tracking-wider text-warning">
+                  Requests ({pendingPasses.length})
+                </h2>
                 {pendingPasses.length === 0 ? (
                   <Card className="rounded-3xl border-2 border-dashed">
                     <CardContent className="py-12 text-center">
@@ -382,7 +364,7 @@ const TeacherDashboard = () => {
                 )}
               </div>
 
-              {/* Active Passes */}
+              {/* Active Section */}
               <div className="space-y-3">
                 <h2 className="text-sm font-bold uppercase tracking-wider text-success">
                   Active ({activePasses.length})
@@ -419,7 +401,6 @@ const TeacherDashboard = () => {
 
             {/* Roster Section */}
             <div className="space-y-4 pt-4 border-t">
-              {/* Join Code */}
               {currentClass && (
                 <div className="bg-primary/5 rounded-2xl p-4 border border-primary/10 flex items-center justify-between">
                   <div>
@@ -432,7 +413,6 @@ const TeacherDashboard = () => {
                 </div>
               )}
 
-              {/* Search + Roster */}
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input 
@@ -457,34 +437,15 @@ const TeacherDashboard = () => {
                       size="icon" 
                       variant="ghost" 
                       className="rounded-lg h-8 w-8 shrink-0"
-                      onClick={() => openStudentManagement(student)}
+                      onClick={() => { setSelectedStudent(student); setStudentDialogOpen(true); }}
                     >
                       <UserMinus className="h-4 w-4 text-muted-foreground" />
                     </Button>
                   </div>
                 ))}
-                {filteredStudents.length === 0 && (
-                  <p className="col-span-full text-center text-muted-foreground py-8">
-                    {students.length === 0 ? 'No students enrolled. Share the join code!' : 'No matching students'}
-                  </p>
-                )}
               </div>
             </div>
           </>
-        )}
-
-        {!selectedClassId && classes.length === 0 && (
-          <Card className="rounded-3xl border-2 border-dashed">
-            <CardContent className="py-16 text-center">
-              <Plus className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-              <p className="text-lg font-bold mb-2">No Classes Yet</p>
-              <p className="text-muted-foreground mb-4">Create your first class to get started</p>
-              <Button onClick={() => { setEditingClass(null); setClassDialogOpen(true); }} className="rounded-xl">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Class
-              </Button>
-            </CardContent>
-          </Card>
         )}
       </div>
 
@@ -501,7 +462,7 @@ const TeacherDashboard = () => {
         </div>
       )}
 
-      {/* Quick Issue Dialog */}
+      {/* Dialogs */}
       <Dialog open={createPassDialogOpen} onOpenChange={setCreatePassDialogOpen}>
         <DialogContent className="rounded-3xl max-w-sm">
           <DialogHeader><DialogTitle className="text-xl font-bold">Quick Pass</DialogTitle></DialogHeader>
@@ -536,7 +497,6 @@ const TeacherDashboard = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Class Management Dialog */}
       <ClassManagementDialog
         open={classDialogOpen}
         onOpenChange={setClassDialogOpen}
@@ -545,7 +505,6 @@ const TeacherDashboard = () => {
         onSaved={fetchClasses}
       />
 
-      {/* Student Management Dialog */}
       <StudentManagementDialog
         open={studentDialogOpen}
         onOpenChange={setStudentDialogOpen}
