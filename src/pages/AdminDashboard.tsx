@@ -615,14 +615,15 @@ const AdminDashboard = () => {
                   )}
 
                   <div className="grid grid-cols-7 gap-1 mb-2 text-center text-xs font-medium text-muted-foreground">
+                    {/* Header with Sunday on the left */}
                     {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d}>{d}</div>)}
                   </div>
 
                   <div className="grid grid-cols-7 gap-1">
-                    {/* Sunday-start logic: getDay() gives exactly the number of empty slots needed */}
-  {Array.from({ length: daysInMonth[0].getDay() }).map((_, i) => (
-    <div key={`empty-${i}`} />
-  ))}
+                    {/* Sunday-start logic for empty slots */}
+                    {Array.from({ length: daysInMonth[0].getDay() }).map((_, i) => (
+                      <div key={`empty-${i}`} />
+                    ))}
                     {daysInMonth.map(day => {
                       const dateStr = format(day, 'yyyy-MM-dd');
                       const assignment = scheduleAssignments.find(a => a.date === dateStr);
@@ -730,7 +731,7 @@ const AdminDashboard = () => {
       <Dialog 
         open={scheduleDialogOpen} 
         onOpenChange={(open) => { 
-          if (!open) resetScheduleForm(); // Logic for "Click Outside" or "ESC"
+          if (!open) resetScheduleForm(); 
           setScheduleDialogOpen(open); 
         }}
       >
@@ -780,7 +781,7 @@ const AdminDashboard = () => {
             <Button 
               variant="outline" 
               onClick={() => {
-                resetScheduleForm(); // Force-reset state
+                resetScheduleForm(); 
                 setScheduleDialogOpen(false); 
               }}
             >
