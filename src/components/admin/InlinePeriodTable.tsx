@@ -2,9 +2,8 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Trash2, Clock, BookOpen } from 'lucide-react';
 
 interface Period {
   id: string;
@@ -13,7 +12,7 @@ interface Period {
   period_order: number;
   start_time: string;
   end_time: string;
-  is_passing_period: boolean;
+  is_passing_period: boolean; // Used here to denote "Structured Time"
 }
 
 interface InlinePeriodTableProps {
@@ -30,30 +29,23 @@ const getOrdinal = (n: number) => {
 
 export const InlinePeriodTable = ({ scheduleId, periods, onPeriodsChange }: InlinePeriodTableProps) => {
   const { toast } = useToast();
-  const [editingPeriods, setEditingPeriods] = useState<Period[]>(periods);
-
-  // Sync when periods prop changes
-  useState(() => {
-    setEditingPeriods(periods);
-  });
 
   const handleFieldChange = async (periodId: string, field: keyof Period, value: any) => {
-    const updated = editingPeriods.map(p => 
-      p.id === periodId ? { ...p, [field]: value } : p
-    );
-    setEditingPeriods(updated);
+    const { error } = await supabase
+      .from('periods')
+      .update({ [field]: value })
+      .eq('id', periodId);
 
-    // Debounced save
-    const period = updated.find(p => p.id === periodId);
-    if (period) {
-      await supabase
-        .from('periods')
-        .update({ [field]: value })
-        .eq('id', periodId);
+    if (error) {
+      toast({ title: 'Error', description: 'Failed to update time.', variant: 'destructive' });
+    } else {
+      onPeriodsChange();
     }
   };
 
-  const handleAddPeriod = async () => {
+  const handleAddEntry = async (type: 'class' | 'structured') => {
+    // Calculate how many actual "class periods" exist to get the correct ordinal
+    const classPeriodCount = periods.filter(p => !p.is_passing_period).length;
     const nextOrder = periods.length > 0 
       ? Math.max(...periods.map(p => p.period_order)) + 1 
       : 1;
@@ -62,138 +54,107 @@ export const InlinePeriodTable = ({ scheduleId, periods, onPeriodsChange }: Inli
       .from('periods')
       .insert({
         schedule_id: scheduleId,
-        name: `${getOrdinal(nextOrder)} Period`,
+        name: type === 'class' ? `${getOrdinal(classPeriodCount + 1)} Period` : 'New Structured Time',
         period_order: nextOrder,
         start_time: '08:00',
         end_time: '08:50',
-        is_passing_period: false
+        is_passing_period: type === 'structured'
       });
 
     if (error) {
-      toast({ title: 'Error', description: 'Failed to add period.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Failed to add entry.', variant: 'destructive' });
     } else {
       onPeriodsChange();
     }
   };
 
   const handleDeletePeriod = async (periodId: string) => {
-    const { error } = await supabase
-      .from('periods')
-      .delete()
-      .eq('id', periodId);
-
-    if (error) {
-      toast({ title: 'Error', description: 'Failed to delete period.', variant: 'destructive' });
-    } else {
-      onPeriodsChange();
-    }
-  };
-
-  const handleMoveUp = async (index: number) => {
-    if (index === 0) return;
-    const currentPeriod = periods[index];
-    const abovePeriod = periods[index - 1];
-    
-    // Swap period_order values
-    await supabase.from('periods').update({ period_order: abovePeriod.period_order }).eq('id', currentPeriod.id);
-    await supabase.from('periods').update({ period_order: currentPeriod.period_order }).eq('id', abovePeriod.id);
-    onPeriodsChange();
-  };
-
-  const handleMoveDown = async (index: number) => {
-    if (index === periods.length - 1) return;
-    const currentPeriod = periods[index];
-    const belowPeriod = periods[index + 1];
-    
-    // Swap period_order values
-    await supabase.from('periods').update({ period_order: belowPeriod.period_order }).eq('id', currentPeriod.id);
-    await supabase.from('periods').update({ period_order: currentPeriod.period_order }).eq('id', belowPeriod.id);
-    onPeriodsChange();
+    const { error } = await supabase.from('periods').delete().eq('id', periodId);
+    if (!error) onPeriodsChange();
   };
 
   return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-[auto_1fr_80px_100px_100px_auto] gap-2 text-xs font-medium text-muted-foreground px-2">
-        <div className="w-8"></div>
-        <div>Period Name</div>
-        <div className="text-center">Included</div>
-        <div>Start</div>
-        <div>End</div>
-        <div className="w-10"></div>
+    <div className="space-y-3">
+      <div className="grid grid-cols-[1fr_120px_120px_40px] gap-4 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        <div>Label / Name</div>
+        <div>Start Time</div>
+        <div>End Time</div>
+        <div></div>
       </div>
       
-      {periods.map((period, index) => (
-        <div 
-          key={period.id} 
-          className="grid grid-cols-[auto_1fr_80px_100px_100px_auto] gap-2 items-center p-2 rounded-lg bg-card border hover:bg-muted/30 transition-colors"
-        >
-          <div className="flex flex-col gap-0.5">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-5 w-8 hover:bg-muted"
-              onClick={() => handleMoveUp(index)}
-              disabled={index === 0}
-            >
-              <span className="text-xs">↑</span>
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-5 w-8 hover:bg-muted"
-              onClick={() => handleMoveDown(index)}
-              disabled={index === periods.length - 1}
-            >
-              <span className="text-xs">↓</span>
-            </Button>
-          </div>
-          
-          <Input
-            value={period.name}
-            onChange={(e) => handleFieldChange(period.id, 'name', e.target.value)}
-            className="h-9 text-sm"
-          />
-          
-          <div className="flex justify-center">
-            <Checkbox
-              checked={!period.is_passing_period}
-              onCheckedChange={(checked) => handleFieldChange(period.id, 'is_passing_period', !checked)}
-            />
-          </div>
-          
-          <Input
-            type="time"
-            value={period.start_time}
-            onChange={(e) => handleFieldChange(period.id, 'start_time', e.target.value)}
-            className="h-9 text-sm"
-          />
-          
-          <Input
-            type="time"
-            value={period.end_time}
-            onChange={(e) => handleFieldChange(period.id, 'end_time', e.target.value)}
-            className="h-9 text-sm"
-          />
-          
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-            onClick={() => handleDeletePeriod(period.id)}
+      <div className="space-y-2">
+        {periods.sort((a, b) => a.period_order - b.period_order).map((period) => (
+          <div 
+            key={period.id} 
+            className={`grid grid-cols-[1fr_120px_120px_40px] gap-4 items-center p-3 rounded-xl border transition-all ${
+              period.is_passing_period ? 'bg-muted/30 border-dashed' : 'bg-card shadow-sm'
+            }`}
           >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      ))}
+            {/* Period Name: Text for Classes, Input for Structured */}
+            <div className="flex items-center gap-3">
+              {period.is_passing_period ? (
+                <div className="flex items-center gap-2 w-full">
+                  <Clock className="h-4 w-4 text-orange-500 shrink-0" />
+                  <Input
+                    value={period.name}
+                    onChange={(e) => handleFieldChange(period.id, 'name', e.target.value)}
+                    className="h-8 text-sm bg-background"
+                    placeholder="e.g. Lunch or Homeroom"
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-primary shrink-0" />
+                  <span className="font-bold text-sm text-foreground">{period.name}</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Time Inputs */}
+            <Input
+              type="time"
+              value={period.start_time}
+              onChange={(e) => handleFieldChange(period.id, 'start_time', e.target.value)}
+              className="h-9 text-sm font-medium"
+            />
+            
+            <Input
+              type="time"
+              value={period.end_time}
+              onChange={(e) => handleFieldChange(period.id, 'end_time', e.target.value)}
+              className="h-9 text-sm font-medium"
+            />
+            
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              onClick={() => handleDeletePeriod(period.id)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+      </div>
       
-      <Button 
-        variant="outline" 
-        onClick={handleAddPeriod}
-        className="w-full mt-2 border-dashed"
-      >
-        <Plus className="h-4 w-4 mr-2" />
-        Add Period
-      </Button>
+      <div className="flex gap-2 pt-2">
+        <Button 
+          variant="outline" 
+          onClick={() => handleAddEntry('class')}
+          className="flex-1 bg-primary/5 border-primary/20 hover:bg-primary/10 text-primary"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add Class Period
+        </Button>
+        <Button 
+          variant="outline" 
+          onClick={() => handleAddEntry('structured')}
+          className="flex-1 border-dashed"
+        >
+          <Clock className="h-4 w-4 mr-2" />
+          Add Structured Time
+        </Button>
+      </div>
     </div>
   );
 };
