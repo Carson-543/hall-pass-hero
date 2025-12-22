@@ -19,14 +19,19 @@ interface InlinePeriodTableProps {
 
 export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps) => {
   
-  const handleFieldChange = (index: number, field: keyof Period, value: any) => {
-    const updated = [...periods];
-    updated[index] = { ...updated[index], [field]: value };
+  // 1. Sort the periods consistently before rendering
+  const sortedPeriods = [...periods].sort((a, b) => a.period_order - b.period_order);
+
+  const handleFieldChange = (periodId: string | undefined, indexInSorted: number, field: keyof Period, value: any) => {
+    // Update based on the sorted list
+    const updated = [...sortedPeriods];
+    updated[indexInSorted] = { ...updated[indexInSorted], [field]: value };
     onChange(updated);
   };
 
   const handleAddEntry = (type: 'class' | 'structured') => {
     const classCount = periods.filter(p => !p.is_passing_period).length;
+    // Calculate order based on existing periods
     const nextOrder = periods.length > 0 ? Math.max(...periods.map(p => p.period_order)) + 1 : 1;
     
     const newPeriod: Period = {
@@ -40,8 +45,9 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
     onChange([...periods, newPeriod]);
   };
 
-  const handleDelete = (index: number) => {
-    onChange(periods.filter((_, i) => i !== index));
+  const handleDelete = (indexInSorted: number) => {
+    const updated = sortedPeriods.filter((_, i) => i !== indexInSorted);
+    onChange(updated);
   };
 
   const getOrdinal = (n: number) => {
@@ -51,7 +57,7 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
 
   return (
     <div className="space-y-2">
-      {periods.sort((a, b) => a.period_order - b.period_order).map((period, idx) => (
+      {sortedPeriods.map((period, idx) => (
         <div key={idx} className={`grid grid-cols-[1fr_110px_110px_40px] gap-3 items-center p-2 rounded-lg border transition-all ${
           period.is_passing_period ? 'bg-muted/10 border-dashed' : 'bg-card'
         }`}>
@@ -61,8 +67,7 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
                 <Clock className="h-3.5 w-3.5 text-orange-500 shrink-0" />
                 <Input
                   value={period.name}
-                  onChange={(e) => handleFieldChange(idx, 'name', e.target.value)}
-                  // No ring, standard box look
+                  onChange={(e) => handleFieldChange(period.id, idx, 'name', e.target.value)}
                   className="h-8 text-xs bg-background focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
               </>
@@ -77,14 +82,14 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
           <Input
             type="time"
             value={period.start_time}
-            onChange={(e) => handleFieldChange(idx, 'start_time', e.target.value)}
+            onChange={(e) => handleFieldChange(period.id, idx, 'start_time', e.target.value)}
             className="h-8 text-xs px-2 focus-visible:ring-0 focus-visible:ring-offset-0"
           />
           
           <Input
             type="time"
             value={period.end_time}
-            onChange={(e) => handleFieldChange(idx, 'end_time', e.target.value)}
+            onChange={(e) => handleFieldChange(period.id, idx, 'end_time', e.target.value)}
             className="h-8 text-xs px-2 focus-visible:ring-0 focus-visible:ring-offset-0"
           />
           
