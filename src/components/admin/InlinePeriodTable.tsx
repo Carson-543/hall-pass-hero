@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2, Clock, BookOpen, Save } from 'lucide-react';
+import { Plus, Trash2, Clock, BookOpen } from 'lucide-react';
 
 interface Period {
   id: string;
@@ -30,38 +30,26 @@ const getOrdinal = (n: number) => {
 export const InlinePeriodTable = ({ scheduleId, periods, onPeriodsChange }: InlinePeriodTableProps) => {
   const { toast } = useToast();
   
-  // Local state to hold changes before they are saved to the DB
+  // Local state for smooth typing and time selection
   const [localPeriods, setLocalPeriods] = useState<Period[]>([]);
 
-  // Sync local state when the source data changes (e.g., initial load)
   useEffect(() => {
     setLocalPeriods(periods);
   }, [periods]);
 
-  const handleLocalFieldChange = (periodId: string, field: keyof Period, value: any) => {
+  const handleLocalFieldChange = async (periodId: string, field: keyof Period, value: any) => {
+    // 1. Update local UI state immediately for responsiveness
     setLocalPeriods(prev => prev.map(p => 
       p.id === periodId ? { ...p, [field]: value } : p
     ));
-  };
 
-  const handleSaveAll = async () => {
-    try {
-      // Upsert all current local periods to the database
-      const { error } = await supabase
-        .from('periods')
-        .upsert(localPeriods, { onConflict: 'id' });
-
-      if (error) throw error;
-
-      toast({ title: 'Schedule Saved', description: 'All changes have been synced.' });
-      onPeriodsChange(); // Refresh parent data
-    } catch (error) {
-      toast({ 
-        title: 'Error', 
-        description: 'Failed to save changes. Please check your connection.', 
-        variant: 'destructive' 
-      });
-    }
+    // 2. Silently update the DB in the background so the parent 
+    // "Save" button doesn't have to handle a complex bulk upsert.
+    // This resolves the "finicky" typing while staying synced.
+    await supabase
+      .from('periods')
+      .update({ [field]: value })
+      .eq('id', periodId);
   };
 
   const handleAddEntry = async (type: 'class' | 'structured') => {
@@ -70,20 +58,19 @@ export const InlinePeriodTable = ({ scheduleId, periods, onPeriodsChange }: Inli
       ? Math.max(...localPeriods.map(p => p.period_order)) + 1 
       : 1;
 
-    const newPeriod = {
-      schedule_id: scheduleId,
-      name: type === 'class' ? `${getOrdinal(classPeriodCount + 1)} Period` : 'New Structured Time',
-      period_order: nextOrder,
-      start_time: '08:00',
-      end_time: '08:50',
-      is_passing_period: type === 'structured'
-    };
+    const { error } = await supabase
+      .from('periods')
+      .insert({
+        schedule_id: scheduleId,
+        name: type === 'class' ? `${getOrdinal(classPeriodCount + 1)} Period` : 'New Structured Time',
+        period_order: nextOrder,
+        start_time: '08:00',
+        end_time: '08:50',
+        is_passing_period: type === 'structured'
+      });
 
-    // Add to DB immediately to get an ID, then refresh local
-    const { error } = await supabase.from('periods').insert(newPeriod);
-    
     if (error) {
-      toast({ title: 'Error', description: 'Could not add row.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Could not add entry.', variant: 'destructive' });
     } else {
       onPeriodsChange();
     }
@@ -95,92 +82,86 @@ export const InlinePeriodTable = ({ scheduleId, periods, onPeriodsChange }: Inli
   };
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-[1fr_120px_120px_40px] gap-4 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+    <div className="space-y-3">
+      <div className="grid grid-cols-[1fr_110px_110px_40px] gap-3 px-4 text-[10px] font-bold text-muted-foreground uppercase">
         <div>Label / Name</div>
-        <div>Start Time</div>
-        <div>End Time</div>
+        <div>Start</div>
+        <div>End</div>
         <div></div>
       </div>
       
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {localPeriods.sort((a, b) => a.period_order - b.period_order).map((period) => (
           <div 
             key={period.id} 
-            className={`grid grid-cols-[1fr_120px_120px_40px] gap-4 items-center p-3 rounded-xl border transition-all ${
-              period.is_passing_period ? 'bg-muted/30 border-dashed' : 'bg-card shadow-sm'
+            className={`grid grid-cols-[1fr_110px_110px_40px] gap-3 items-center p-2 rounded-lg border transition-all ${
+              period.is_passing_period ? 'bg-muted/20 border-dashed' : 'bg-card'
             }`}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 overflow-hidden">
               {period.is_passing_period ? (
-                <div className="flex items-center gap-2 w-full">
-                  <Clock className="h-4 w-4 text-orange-500 shrink-0" />
+                <>
+                  <Clock className="h-3.5 w-3.5 text-orange-500 shrink-0" />
                   <Input
                     value={period.name}
                     onChange={(e) => handleLocalFieldChange(period.id, 'name', e.target.value)}
-                    className="h-8 text-sm bg-background"
+                    className="h-7 text-xs bg-background"
                   />
-                </div>
+                </>
               ) : (
-                <div className="flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-primary shrink-0" />
-                  <span className="font-bold text-sm text-foreground">{period.name}</span>
-                </div>
+                <>
+                  <BookOpen className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <span className="font-semibold text-xs truncate">{period.name}</span>
+                </>
               )}
             </div>
             
             <Input
               type="time"
+              step="60" // Ensures multi-digit typing works better in some browsers
               value={period.start_time}
               onChange={(e) => handleLocalFieldChange(period.id, 'start_time', e.target.value)}
-              className="h-9 text-sm font-medium"
+              className="h-8 text-xs px-2"
             />
             
             <Input
               type="time"
+              step="60"
               value={period.end_time}
               onChange={(e) => handleLocalFieldChange(period.id, 'end_time', e.target.value)}
-              className="h-9 text-sm font-medium"
+              className="h-8 text-xs px-2"
             />
             
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              className="h-7 w-7 text-muted-foreground hover:text-destructive"
               onClick={() => handleDeletePeriod(period.id)}
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
         ))}
       </div>
       
-      <div className="flex flex-col gap-3 pt-2">
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => handleAddEntry('class')}
-            className="flex-1 bg-primary/5 border-primary/20 hover:bg-primary/10 text-primary h-10"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Class Period
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => handleAddEntry('structured')}
-            className="flex-1 border-dashed h-10"
-          >
-            <Clock className="h-4 w-4 mr-2" />
-            Add Structured Time
-          </Button>
-        </div>
-
+      <div className="flex gap-2 pt-1">
         <Button 
-          onClick={handleSaveAll} 
-          className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-11"
+          variant="outline" 
+          size="sm"
+          onClick={() => handleAddEntry('class')}
+          className="flex-1 text-xs h-8"
         >
-          <Save className="h-4 w-4 mr-2" />
-          Save All Changes
+          <Plus className="h-3.5 w-3.5 mr-1" />
+          Add Period
+        </Button>
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => handleAddEntry('structured')}
+          className="flex-1 text-xs border-dashed h-8"
+        >
+          <Clock className="h-3.5 w-3.5 mr-1" />
+          Structured Time
         </Button>
       </div>
     </div>
