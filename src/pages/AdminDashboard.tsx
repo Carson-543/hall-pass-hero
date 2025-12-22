@@ -352,23 +352,40 @@ const AdminDashboard = () => {
   };
 
   const handleSaveSchedule = async () => {
-    if (!newScheduleName.trim()) return;
+  if (!newScheduleName.trim()) return;
 
-    if (editingSchedule) {
-      await supabase
-        .from('schedules')
-        .update({ name: newScheduleName, is_school_day: newScheduleIsSchoolDay, color: newScheduleColor })
-        .eq('id', editingSchedule.id);
-      toast({ title: 'Schedule Updated' });
-    } else {
-      await supabase.from('schedules').insert({ name: newScheduleName, is_school_day: newScheduleIsSchoolDay, color: newScheduleColor });
-      toast({ title: 'Schedule Created' });
-    }
-    setScheduleDialogOpen(false);
-    resetScheduleForm();
-    fetchSchedules();
-  };
+  let scheduleId = editingSchedule?.id;
 
+  if (editingSchedule) {
+    await supabase
+      .from('schedules')
+      .update({ name: newScheduleName, is_school_day: newScheduleIsSchoolDay, color: newScheduleColor })
+      .eq('id', editingSchedule.id);
+  } else {
+    const { data } = await supabase
+      .from('schedules')
+      .insert({ name: newScheduleName, is_school_day: newScheduleIsSchoolDay, color: newScheduleColor })
+      .select()
+      .single();
+    scheduleId = data?.id;
+  }
+
+  // NEW: Bulk save the periods only when this button is clicked
+  if (scheduleId) {
+    // 1. Delete periods that are no longer in our local list
+    const currentIds = periods.filter(p => p.id).map(p => p.id);
+    await supabase.from('periods').delete().eq('schedule_id', scheduleId).not('id', 'in', `(${currentIds.join(',')})`);
+
+    // 2. Upsert the current list (handles new additions and edits)
+    const periodsWithIds = periods.map(p => ({ ...p, schedule_id: scheduleId }));
+    await supabase.from('periods').upsert(periodsWithIds);
+  }
+
+  toast({ title: editingSchedule ? 'Schedule Updated' : 'Schedule Created' });
+  setScheduleDialogOpen(false);
+  resetScheduleForm();
+  fetchSchedules();
+};
   const handleDeleteSchedule = async (scheduleId: string) => {
     const { error } = await supabase.from('schedules').delete().eq('id', scheduleId);
     if (error) {
