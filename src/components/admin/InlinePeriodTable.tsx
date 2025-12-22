@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2, Clock, BookOpen } from 'lucide-react';
+import { Plus, Trash2, Clock, BookOpen, Save } from 'lucide-react';
 
 interface Period {
   id: string;
@@ -12,7 +12,7 @@ interface Period {
   period_order: number;
   start_time: string;
   end_time: string;
-  is_passing_period: boolean; // Used here to denote "Structured Time"
+  is_passing_period: boolean;
 }
 
 interface InlinePeriodTableProps {
@@ -29,40 +29,61 @@ const getOrdinal = (n: number) => {
 
 export const InlinePeriodTable = ({ scheduleId, periods, onPeriodsChange }: InlinePeriodTableProps) => {
   const { toast } = useToast();
+  
+  // Local state to hold changes before they are saved to the DB
+  const [localPeriods, setLocalPeriods] = useState<Period[]>([]);
 
-  const handleFieldChange = async (periodId: string, field: keyof Period, value: any) => {
-    const { error } = await supabase
-      .from('periods')
-      .update({ [field]: value })
-      .eq('id', periodId);
+  // Sync local state when the source data changes (e.g., initial load)
+  useEffect(() => {
+    setLocalPeriods(periods);
+  }, [periods]);
 
-    if (error) {
-      toast({ title: 'Error', description: 'Failed to update time.', variant: 'destructive' });
-    } else {
-      onPeriodsChange();
+  const handleLocalFieldChange = (periodId: string, field: keyof Period, value: any) => {
+    setLocalPeriods(prev => prev.map(p => 
+      p.id === periodId ? { ...p, [field]: value } : p
+    ));
+  };
+
+  const handleSaveAll = async () => {
+    try {
+      // Upsert all current local periods to the database
+      const { error } = await supabase
+        .from('periods')
+        .upsert(localPeriods, { onConflict: 'id' });
+
+      if (error) throw error;
+
+      toast({ title: 'Schedule Saved', description: 'All changes have been synced.' });
+      onPeriodsChange(); // Refresh parent data
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to save changes. Please check your connection.', 
+        variant: 'destructive' 
+      });
     }
   };
 
   const handleAddEntry = async (type: 'class' | 'structured') => {
-    // Calculate how many actual "class periods" exist to get the correct ordinal
-    const classPeriodCount = periods.filter(p => !p.is_passing_period).length;
-    const nextOrder = periods.length > 0 
-      ? Math.max(...periods.map(p => p.period_order)) + 1 
+    const classPeriodCount = localPeriods.filter(p => !p.is_passing_period).length;
+    const nextOrder = localPeriods.length > 0 
+      ? Math.max(...localPeriods.map(p => p.period_order)) + 1 
       : 1;
 
-    const { error } = await supabase
-      .from('periods')
-      .insert({
-        schedule_id: scheduleId,
-        name: type === 'class' ? `${getOrdinal(classPeriodCount + 1)} Period` : 'New Structured Time',
-        period_order: nextOrder,
-        start_time: '08:00',
-        end_time: '08:50',
-        is_passing_period: type === 'structured'
-      });
+    const newPeriod = {
+      schedule_id: scheduleId,
+      name: type === 'class' ? `${getOrdinal(classPeriodCount + 1)} Period` : 'New Structured Time',
+      period_order: nextOrder,
+      start_time: '08:00',
+      end_time: '08:50',
+      is_passing_period: type === 'structured'
+    };
 
+    // Add to DB immediately to get an ID, then refresh local
+    const { error } = await supabase.from('periods').insert(newPeriod);
+    
     if (error) {
-      toast({ title: 'Error', description: 'Failed to add entry.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Could not add row.', variant: 'destructive' });
     } else {
       onPeriodsChange();
     }
@@ -74,7 +95,7 @@ export const InlinePeriodTable = ({ scheduleId, periods, onPeriodsChange }: Inli
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="grid grid-cols-[1fr_120px_120px_40px] gap-4 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
         <div>Label / Name</div>
         <div>Start Time</div>
@@ -83,23 +104,21 @@ export const InlinePeriodTable = ({ scheduleId, periods, onPeriodsChange }: Inli
       </div>
       
       <div className="space-y-2">
-        {periods.sort((a, b) => a.period_order - b.period_order).map((period) => (
+        {localPeriods.sort((a, b) => a.period_order - b.period_order).map((period) => (
           <div 
             key={period.id} 
             className={`grid grid-cols-[1fr_120px_120px_40px] gap-4 items-center p-3 rounded-xl border transition-all ${
               period.is_passing_period ? 'bg-muted/30 border-dashed' : 'bg-card shadow-sm'
             }`}
           >
-            {/* Period Name: Text for Classes, Input for Structured */}
             <div className="flex items-center gap-3">
               {period.is_passing_period ? (
                 <div className="flex items-center gap-2 w-full">
                   <Clock className="h-4 w-4 text-orange-500 shrink-0" />
                   <Input
                     value={period.name}
-                    onChange={(e) => handleFieldChange(period.id, 'name', e.target.value)}
+                    onChange={(e) => handleLocalFieldChange(period.id, 'name', e.target.value)}
                     className="h-8 text-sm bg-background"
-                    placeholder="e.g. Lunch or Homeroom"
                   />
                 </div>
               ) : (
@@ -110,18 +129,17 @@ export const InlinePeriodTable = ({ scheduleId, periods, onPeriodsChange }: Inli
               )}
             </div>
             
-            {/* Time Inputs */}
             <Input
               type="time"
               value={period.start_time}
-              onChange={(e) => handleFieldChange(period.id, 'start_time', e.target.value)}
+              onChange={(e) => handleLocalFieldChange(period.id, 'start_time', e.target.value)}
               className="h-9 text-sm font-medium"
             />
             
             <Input
               type="time"
               value={period.end_time}
-              onChange={(e) => handleFieldChange(period.id, 'end_time', e.target.value)}
+              onChange={(e) => handleLocalFieldChange(period.id, 'end_time', e.target.value)}
               className="h-9 text-sm font-medium"
             />
             
@@ -137,22 +155,32 @@ export const InlinePeriodTable = ({ scheduleId, periods, onPeriodsChange }: Inli
         ))}
       </div>
       
-      <div className="flex gap-2 pt-2">
+      <div className="flex flex-col gap-3 pt-2">
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => handleAddEntry('class')}
+            className="flex-1 bg-primary/5 border-primary/20 hover:bg-primary/10 text-primary h-10"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Class Period
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => handleAddEntry('structured')}
+            className="flex-1 border-dashed h-10"
+          >
+            <Clock className="h-4 w-4 mr-2" />
+            Add Structured Time
+          </Button>
+        </div>
+
         <Button 
-          variant="outline" 
-          onClick={() => handleAddEntry('class')}
-          className="flex-1 bg-primary/5 border-primary/20 hover:bg-primary/10 text-primary"
+          onClick={handleSaveAll} 
+          className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-11"
         >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Class Period
-        </Button>
-        <Button 
-          variant="outline" 
-          onClick={() => handleAddEntry('structured')}
-          className="flex-1 border-dashed"
-        >
-          <Clock className="h-4 w-4 mr-2" />
-          Add Structured Time
+          <Save className="h-4 w-4 mr-2" />
+          Save All Changes
         </Button>
       </div>
     </div>
