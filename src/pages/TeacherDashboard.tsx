@@ -362,27 +362,58 @@ const TeacherDashboard = () => {
             </div>
 
             {/* Student Search & Roster */}
-            <div className="space-y-4 pt-4 border-t">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input placeholder="Search students..." className="h-12 pl-12 rounded-2xl border-none shadow-sm font-medium bg-card" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-              </div>
-              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredStudents.map(student => (
-                  <div key={student.id} className="bg-card p-3 rounded-xl shadow-sm border flex items-center justify-between hover:bg-muted/30 transition-colors">
-                    <div className="min-w-0"><p className="font-bold truncate">{student.name}</p></div>
-                    <div className="flex gap-1">
-                      <Button size="icon" variant="ghost" className="rounded-lg h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={() => { setSelectedStudent(student); setHistoryDialogOpen(true); }}>
-                        <History className="h-4 w-4" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="rounded-lg h-8 w-8" onClick={() => { setSelectedStudent(student); setStudentDialogOpen(true); }}>
-                        <UserMinus className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+  {/* Student Search & Roster */}
+<div className="space-y-4 pt-4 border-t">
+  <div className="flex flex-col sm:flex-row gap-3">
+    {/* Search Bar - Flex 1 to take remaining space */}
+    <div className="relative flex-1">
+      <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+      <Input 
+        placeholder="Search students..." 
+        className="h-12 pl-12 rounded-2xl border-none shadow-sm font-medium bg-card" 
+        value={searchQuery} 
+        onChange={(e) => setSearchQuery(e.target.value)} 
+      />
+    </div>
+
+    {/* Class Code Display - Fixed width on desktop */}
+    {currentClass && (
+      <div className="h-12 px-6 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-between sm:justify-start gap-4 shadow-sm">
+        <div className="flex flex-col">
+          <span className="text-[10px] font-black uppercase text-primary leading-none">Class Code</span>
+          <span className="text-sm font-black tracking-widest uppercase">{currentClass.join_code}</span>
+        </div>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-8 w-8 text-primary hover:bg-primary/20 rounded-lg"
+          onClick={() => {
+            navigator.clipboard.writeText(currentClass.join_code);
+            toast({ title: "Code Copied", description: "Join code copied to clipboard" });
+          }}
+        >
+          <Copy className="h-4 w-4" />
+        </Button>
+      </div>
+    )}
+  </div>
+
+  <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+    {filteredStudents.map(student => (
+      <div key={student.id} className="bg-card p-3 rounded-xl shadow-sm border flex items-center justify-between hover:bg-muted/30 transition-colors">
+        <div className="min-w-0"><p className="font-bold truncate">{student.name}</p></div>
+        <div className="flex gap-1">
+          <Button size="icon" variant="ghost" className="rounded-lg h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={() => { setSelectedStudent(student); setHistoryDialogOpen(true); }}>
+            <History className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="ghost" className="rounded-lg h-8 w-8" onClick={() => { setSelectedStudent(student); setStudentDialogOpen(true); }}>
+            <UserMinus className="h-4 w-4 text-muted-foreground" />
+          </Button>
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
           </>
         )}
       </div>
