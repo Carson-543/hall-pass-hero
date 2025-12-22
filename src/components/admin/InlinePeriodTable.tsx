@@ -22,7 +22,7 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
   const handleFieldChange = (index: number, field: keyof Period, value: any) => {
     const updated = [...periods];
     updated[index] = { ...updated[index], [field]: value };
-    onChange(updated); // Updates the parent state immediately
+    onChange(updated);
   };
 
   const handleAddEntry = (type: 'class' | 'structured') => {
@@ -30,7 +30,7 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
     const nextOrder = periods.length > 0 ? Math.max(...periods.map(p => p.period_order)) + 1 : 1;
     
     const newPeriod: Period = {
-      name: type === 'class' ? `${getOrdinal(classCount + 1)} Period` : 'Lunch',
+      name: type === 'class' ? `${classCount + 1}${getOrdinal(classCount + 1)} Period` : 'Lunch',
       period_order: nextOrder,
       start_time: '08:00',
       end_time: '08:50',
@@ -44,10 +44,14 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
     onChange(periods.filter((_, i) => i !== index));
   };
 
+  const getOrdinal = (n: number) => {
+    const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+    return s[(v - 20) % 10] || s[v] || s[0];
+  };
+
   return (
     <div className="space-y-2">
-      {/* Note: We use the index (idx) for editing to ensure stability */}
-      {periods.map((period, idx) => (
+      {periods.sort((a, b) => a.period_order - b.period_order).map((period, idx) => (
         <div key={idx} className={`grid grid-cols-[1fr_110px_110px_40px] gap-3 items-center p-2 rounded-lg border transition-all ${
           period.is_passing_period ? 'bg-muted/10 border-dashed' : 'bg-card'
         }`}>
@@ -58,6 +62,7 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
                 <Input
                   value={period.name}
                   onChange={(e) => handleFieldChange(idx, 'name', e.target.value)}
+                  // No ring, standard box look
                   className="h-8 text-xs bg-background focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
               </>
@@ -83,7 +88,12 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
             className="h-8 text-xs px-2 focus-visible:ring-0 focus-visible:ring-offset-0"
           />
           
-          <Button variant="ghost" size="icon" onClick={() => handleDelete(idx)} className="h-8 w-8 text-muted-foreground hover:text-destructive">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => handleDelete(idx)} 
+            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+          >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -99,9 +109,4 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
       </div>
     </div>
   );
-};
-
-const getOrdinal = (n: number) => {
-  const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
 };
