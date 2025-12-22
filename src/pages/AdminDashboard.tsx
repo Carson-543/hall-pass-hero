@@ -340,55 +340,80 @@ const AdminDashboard = () => {
   };
 
   const handleSaveSchedule = async () => {
-    if (!newScheduleName.trim()) return;
+  if (!newScheduleName.trim()) return;
 
-    let scheduleId = editingSchedule?.id;
+  let scheduleId = editingSchedule?.id;
 
-    if (editingSchedule) {
-      await supabase
-        .from('schedules')
-        .update({ name: newScheduleName, is_school_day: newScheduleIsSchoolDay, color: newScheduleColor })
-        .eq('id', editingSchedule.id);
-    } else {
-      const { data } = await supabase
-        .from('schedules')
-        .insert({ name: newScheduleName, is_school_day: newScheduleIsSchoolDay, color: newScheduleColor })
-        .select()
-        .single();
-      scheduleId = data?.id;
-    }
-
-    if (scheduleId) {
-      // 1. Find and delete database periods that are not in our current state list
-      const currentIds = periods.filter(p => p.id).map(p => p.id);
-      if (currentIds.length > 0) {
-        await supabase.from('periods').delete().eq('schedule_id', scheduleId).not('id', 'in', `(${currentIds.join(',')})`);
-      } else {
-        await supabase.from('periods').delete().eq('schedule_id', scheduleId);
-      }
-
-      // 2. Upsert the current list (handles new additions and edits)
-      const periodsToSave = periods.map(p => ({ ...p, schedule_id: scheduleId }));
-      if (periodsToSave.length > 0) {
-        await supabase.from('periods').upsert(periodsToSave);
-      }
-    }
-
-    toast({ title: editingSchedule ? 'Schedule Updated' : 'Schedule Created' });
-    setScheduleDialogOpen(false);
-    resetScheduleForm();
-    fetchSchedules();
-  };
-
-  const handleDeleteSchedule = async (scheduleId: string) => {
-    const { error } = await supabase.from('schedules').delete().eq('id', scheduleId);
+  // 1. Save or Update the main Schedule record
+  if (editingSchedule) {
+    await supabase
+      .from('schedules')
+      .update({ 
+        name: newScheduleName, 
+        is_school_day: newScheduleIsSchoolDay, 
+        color: newScheduleColor 
+      })
+      .eq('id', editingSchedule.id);
+  } else {
+    const { data, error } = await supabase
+      .from('schedules')
+      .insert({ 
+        name: newScheduleName, 
+        is_school_day: newScheduleIsSchoolDay, 
+        color: newScheduleColor 
+      })
+      .select()
+      .single();
+    
     if (error) {
-      toast({ title: 'Error', description: 'Failed to delete schedule. Remove periods first.', variant: 'destructive' });
-    } else {
-      toast({ title: 'Schedule Deleted' });
-      fetchSchedules();
+      toast({ title: "Error", description: "Could not create schedule", variant: "destructive" });
+      return;
     }
-  };
+    scheduleId = data.id;
+  }
+
+  if (scheduleId) {
+    // 2. Sync Periods: This is where the table data is saved
+    // First, remove any periods in the DB that are no longer in our local list
+    const currentIds = periods.filter(p => p.id).map(p => p.id);
+    
+    if (currentIds.length > 0) {
+      await supabase
+        .from('periods')
+        .delete()
+        .eq('schedule_id', scheduleId)
+        .not('id', 'in', `(${currentIds.join(',')})`);
+    } else {
+      // If we have no IDs (all new or all deleted), clear the schedule's periods
+      await supabase.from('periods').delete().eq('schedule_id', scheduleId);
+    }
+
+    // 3. Prepare the data for upsert
+    // We map the periods to ensure they all have the correct schedule_id
+    const periodsToSave = periods.map(p => ({
+      ...(p.id ? { id: p.id } : {}), // Only include ID if it exists (for updates)
+      schedule_id: scheduleId,
+      name: p.name,
+      period_order: p.period_order,
+      start_time: p.start_time,
+      end_time: p.end_time,
+      is_passing_period: p.is_passing_period
+    }));
+
+    if (periodsToSave.length > 0) {
+      const { error: upsertError } = await supabase.from('periods').upsert(periodsToSave);
+      if (upsertError) {
+        console.error("Upsert Error:", upsertError);
+        toast({ title: "Error", description: "Failed to save bell schedule rows", variant: "destructive" });
+      }
+    }
+  }
+
+  toast({ title: editingSchedule ? 'Schedule Updated' : 'Schedule Created' });
+  setScheduleDialogOpen(false);
+  resetScheduleForm();
+  fetchSchedules();
+};
 
   const handleApprovePass = async (passId: string) => {
     await supabase.from('passes').update({ status: 'approved', approved_at: new Date().toISOString(), approved_by: user!.id }).eq('id', passId);
