@@ -29,27 +29,39 @@ const getOrdinal = (n: number) => {
 
 export const InlinePeriodTable = ({ scheduleId, periods, onPeriodsChange }: InlinePeriodTableProps) => {
   const { toast } = useToast();
-  
-  // Local state for smooth typing and time selection
   const [localPeriods, setLocalPeriods] = useState<Period[]>([]);
 
+  // Only sync from props when the number of periods changes or the schedule changes
+  // This prevents the "jumping" cursor caused by external re-fetches during typing
   useEffect(() => {
     setLocalPeriods(periods);
-  }, [periods]);
+  }, [periods.length, scheduleId]);
 
-  const handleLocalFieldChange = async (periodId: string, field: keyof Period, value: any) => {
-    // 1. Update local UI state immediately for responsiveness
+  const handleLocalUpdate = (periodId: string, field: keyof Period, value: any) => {
     setLocalPeriods(prev => prev.map(p => 
       p.id === periodId ? { ...p, [field]: value } : p
     ));
+  };
 
-    // 2. Silently update the DB in the background so the parent 
-    // "Save" button doesn't have to handle a complex bulk upsert.
-    // This resolves the "finicky" typing while staying synced.
-    await supabase
+  const syncToDatabase = async (periodId: string) => {
+    const period = localPeriods.find(p => p.id === periodId);
+    if (!period) return;
+
+    const { error } = await supabase
       .from('periods')
-      .update({ [field]: value })
+      .update({
+        name: period.name,
+        start_time: period.start_time,
+        end_time: period.end_time
+      })
       .eq('id', periodId);
+
+    if (error) {
+      toast({ title: 'Sync Error', description: 'Failed to save changes.', variant: 'destructive' });
+    } else {
+      // Notify parent, but don't force a full re-render that might disrupt typing
+      onPeriodsChange(); 
+    }
   };
 
   const handleAddEntry = async (type: 'class' | 'structured') => {
@@ -62,7 +74,7 @@ export const InlinePeriodTable = ({ scheduleId, periods, onPeriodsChange }: Inli
       .from('periods')
       .insert({
         schedule_id: scheduleId,
-        name: type === 'class' ? `${getOrdinal(classPeriodCount + 1)} Period` : 'New Structured Time',
+        name: type === 'class' ? `${getOrdinal(classPeriodCount + 1)} Period` : 'Lunch',
         period_order: nextOrder,
         start_time: '08:00',
         end_time: '08:50',
@@ -98,37 +110,39 @@ export const InlinePeriodTable = ({ scheduleId, periods, onPeriodsChange }: Inli
               period.is_passing_period ? 'bg-muted/20 border-dashed' : 'bg-card'
             }`}
           >
-            <div className="flex items-center gap-2 overflow-hidden">
+            <div className="flex items-center gap-2 overflow-hidden px-1">
               {period.is_passing_period ? (
                 <>
                   <Clock className="h-3.5 w-3.5 text-orange-500 shrink-0" />
                   <Input
                     value={period.name}
-                    onChange={(e) => handleLocalFieldChange(period.id, 'name', e.target.value)}
-                    className="h-7 text-xs bg-background focus-visible:ring-0"
+                    onChange={(e) => handleLocalUpdate(period.id, 'name', e.target.value)}
+                    onBlur={() => syncToDatabase(period.id)}
+                    placeholder="Enter name..."
+                    className="h-7 text-xs bg-transparent border-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0 font-medium"
                   />
                 </>
               ) : (
                 <>
                   <BookOpen className="h-3.5 w-3.5 text-primary shrink-0" />
-                  <span className="font-semibold text-xs truncate">{period.name}</span>
+                  <span className="font-semibold text-xs truncate py-1">{period.name}</span>
                 </>
               )}
             </div>
             
             <Input
               type="time"
-              step="60" // Ensures multi-digit typing works better in some browsers
               value={period.start_time}
-              onChange={(e) => handleLocalFieldChange(period.id, 'start_time', e.target.value)}
+              onChange={(e) => handleLocalUpdate(period.id, 'start_time', e.target.value)}
+              onBlur={() => syncToDatabase(period.id)}
               className="h-8 text-xs px-2"
             />
             
             <Input
               type="time"
-              step="60"
               value={period.end_time}
-              onChange={(e) => handleLocalFieldChange(period.id, 'end_time', e.target.value)}
+              onChange={(e) => handleLocalUpdate(period.id, 'end_time', e.target.value)}
+              onBlur={() => syncToDatabase(period.id)}
               className="h-8 text-xs px-2"
             />
             
@@ -145,23 +159,11 @@ export const InlinePeriodTable = ({ scheduleId, periods, onPeriodsChange }: Inli
       </div>
       
       <div className="flex gap-2 pt-1">
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={() => handleAddEntry('class')}
-          className="flex-1 text-xs h-8"
-        >
-          <Plus className="h-3.5 w-3.5 mr-1" />
-          Add Period
+        <Button variant="outline" size="sm" onClick={() => handleAddEntry('class')} className="flex-1 text-xs h-8">
+          <Plus className="h-3.5 w-3.5 mr-1" /> Add Period
         </Button>
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={() => handleAddEntry('structured')}
-          className="flex-1 text-xs border-dashed h-8"
-        >
-          <Clock className="h-3.5 w-3.5 mr-1" />
-          Structured Time
+        <Button variant="outline" size="sm" onClick={() => handleAddEntry('structured')} className="flex-1 text-xs border-dashed h-8">
+          <Clock className="h-3.5 w-3.5 mr-1" /> Structured Time
         </Button>
       </div>
     </div>
