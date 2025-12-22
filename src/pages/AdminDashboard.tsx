@@ -110,28 +110,20 @@ const AdminDashboard = () => {
   const [classPendingPasses, setClassPendingPasses] = useState<PendingPass[]>([]);
   const [classActivePasses, setClassActivePasses] = useState<PendingPass[]>([]);
 
-  const fetchPendingUsers = async () => {
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, full_name, email')
-      .eq('is_approved', false);
+  // --- Data Fetching ---
 
-    if (!profiles) return;
+  const fetchSchedules = async () => {
+    const { data } = await supabase.from('schedules').select('*').order('name');
+    if (data) setSchedules(data);
+  };
 
-    const userIds = profiles.map(p => p.id);
-    const { data: roles } = await supabase
-      .from('user_roles')
-      .select('user_id, role')
-      .in('user_id', userIds);
-
-    const roleMap = new Map(roles?.map(r => [r.user_id, r.role]) || []);
-
-    setPendingUsers(profiles.map(p => ({
-      id: p.id,
-      full_name: p.full_name,
-      email: p.email,
-      role: roleMap.get(p.id) ?? 'unknown'
-    })));
+  const fetchPeriodsForStaging = async (scheduleId: string) => {
+    const { data } = await supabase
+      .from('periods')
+      .select('*')
+      .eq('schedule_id', scheduleId)
+      .order('period_order');
+    if (data) setPeriods(data);
   };
 
   const fetchActivePasses = async () => {
@@ -164,18 +156,28 @@ const AdminDashboard = () => {
     })));
   };
 
-  const fetchSchedules = async () => {
-    const { data } = await supabase.from('schedules').select('*').order('name');
-    if (data) setSchedules(data);
-  };
+  const fetchPendingUsers = async () => {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .eq('is_approved', false);
 
-  const fetchPeriods = async (scheduleId: string) => {
-    const { data } = await supabase
-      .from('periods')
-      .select('*')
-      .eq('schedule_id', scheduleId)
-      .order('period_order');
-    if (data) setPeriods(data);
+    if (!profiles) return;
+
+    const userIds = profiles.map(p => p.id);
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('user_id, role')
+      .in('user_id', userIds);
+
+    const roleMap = new Map(roles?.map(r => [r.user_id, r.role]) || []);
+
+    setPendingUsers(profiles.map(p => ({
+      id: p.id,
+      full_name: p.full_name,
+      email: p.email,
+      role: roleMap.get(p.id) ?? 'unknown'
+    })));
   };
 
   const fetchScheduleAssignments = async () => {
@@ -262,37 +264,7 @@ const AdminDashboard = () => {
     setClassActivePasses(active);
   };
 
-  useEffect(() => {
-    fetchPendingUsers();
-    fetchActivePasses();
-    fetchSchedules();
-    fetchSettings();
-    fetchTeachers();
-
-    const channel = supabase
-      .channel('admin-passes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'passes' }, () => {
-        fetchActivePasses();
-        if (selectedClassId) fetchClassPasses(selectedClassId);
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, []);
-
-  useEffect(() => {
-    if (pendingUsers.length > 0) {
-      document.title = `(${pendingUsers.length}) Users Pending | SmartPass Pro`;
-    } else {
-      document.title = 'Admin Dashboard | SmartPass Pro';
-    }
-    return () => { document.title = 'SmartPass Pro'; };
-  }, [pendingUsers.length]);
-
-  useEffect(() => { fetchScheduleAssignments(); }, [currentMonth, schedules]);
-  useEffect(() => { if (editingSchedule) fetchPeriods(editingSchedule.id); }, [editingSchedule]);
-  useEffect(() => { if (selectedTeacherId) fetchSubClasses(selectedTeacherId); }, [selectedTeacherId]);
-  useEffect(() => { if (selectedClassId) fetchClassPasses(selectedClassId); }, [selectedClassId]);
+  // --- Handlers ---
 
   const handleApproveUser = async (userId: string) => {
     const { error } = await supabase.from('profiles').update({ is_approved: true }).eq('id', userId);
@@ -347,6 +319,26 @@ const AdminDashboard = () => {
     setSelectedDates(prev => prev.includes(date) ? prev.filter(d => d !== date) : [...prev, date]);
   };
 
+  // --- Schedule Dialog Control ---
+
+  const resetScheduleForm = () => {
+    setEditingSchedule(null);
+    setNewScheduleName('');
+    setNewScheduleIsSchoolDay(true);
+    setNewScheduleColor('#DC2626');
+    setPeriods([]); // Clear the scratchpad memory
+  };
+
+  const openEditSchedule = (schedule: Schedule) => {
+    setEditingSchedule(schedule);
+    setNewScheduleName(schedule.name);
+    setNewScheduleIsSchoolDay(schedule.is_school_day);
+    setNewScheduleColor(schedule.color || '#DC2626');
+    // Important: Re-fetch periods from DB into state every time we open
+    fetchPeriodsForStaging(schedule.id);
+    setScheduleDialogOpen(true);
+  };
+
   const handleSaveSchedule = async () => {
     if (!newScheduleName.trim()) return;
 
@@ -367,11 +359,19 @@ const AdminDashboard = () => {
     }
 
     if (scheduleId) {
+      // 1. Find and delete database periods that are not in our current state list
       const currentIds = periods.filter(p => p.id).map(p => p.id);
-      await supabase.from('periods').delete().eq('schedule_id', scheduleId).not('id', 'in', `(${currentIds.join(',')})`);
+      if (currentIds.length > 0) {
+        await supabase.from('periods').delete().eq('schedule_id', scheduleId).not('id', 'in', `(${currentIds.join(',')})`);
+      } else {
+        await supabase.from('periods').delete().eq('schedule_id', scheduleId);
+      }
 
-      const periodsWithIds = periods.map(p => ({ ...p, schedule_id: scheduleId }));
-      await supabase.from('periods').upsert(periodsWithIds);
+      // 2. Upsert the current list (handles new additions and edits)
+      const periodsToSave = periods.map(p => ({ ...p, schedule_id: scheduleId }));
+      if (periodsToSave.length > 0) {
+        await supabase.from('periods').upsert(periodsToSave);
+      }
     }
 
     toast({ title: editingSchedule ? 'Schedule Updated' : 'Schedule Created' });
@@ -390,22 +390,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const openEditSchedule = (schedule: Schedule) => {
-    setEditingSchedule(schedule);
-    setNewScheduleName(schedule.name);
-    setNewScheduleIsSchoolDay(schedule.is_school_day);
-    setNewScheduleColor(schedule.color || '#DC2626');
-    setScheduleDialogOpen(true);
-  };
-
-  const resetScheduleForm = () => {
-    setEditingSchedule(null);
-    setNewScheduleName('');
-    setNewScheduleIsSchoolDay(true);
-    setNewScheduleColor('#DC2626');
-    setPeriods([]);
-  };
-
   const handleApprovePass = async (passId: string) => {
     await supabase.from('passes').update({ status: 'approved', approved_at: new Date().toISOString(), approved_by: user!.id }).eq('id', passId);
   };
@@ -422,6 +406,39 @@ const AdminDashboard = () => {
     if (!schedule?.color) return {};
     return { backgroundColor: `${schedule.color}20` };
   };
+
+  // --- Effects ---
+
+  useEffect(() => {
+    fetchPendingUsers();
+    fetchActivePasses();
+    fetchSchedules();
+    fetchSettings();
+    fetchTeachers();
+
+    const channel = supabase
+      .channel('admin-passes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'passes' }, () => {
+        fetchActivePasses();
+        if (selectedClassId) fetchClassPasses(selectedClassId);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  useEffect(() => {
+    if (pendingUsers.length > 0) {
+      document.title = `(${pendingUsers.length}) Users Pending | SmartPass Pro`;
+    } else {
+      document.title = 'Admin Dashboard | SmartPass Pro';
+    }
+    return () => { document.title = 'SmartPass Pro'; };
+  }, [pendingUsers.length]);
+
+  useEffect(() => { fetchScheduleAssignments(); }, [currentMonth, schedules]);
+  useEffect(() => { if (selectedTeacherId) fetchSubClasses(selectedTeacherId); }, [selectedTeacherId]);
+  useEffect(() => { if (selectedClassId) fetchClassPasses(selectedClassId); }, [selectedClassId]);
 
   if (authLoading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   if (!user || role !== 'admin') return <Navigate to="/auth" replace />;
@@ -530,17 +547,17 @@ const AdminDashboard = () => {
         {!subMode && (
           <Tabs defaultValue="hallway">
             <TabsList className="w-full bg-muted">
-              <TabsTrigger value="hallway" className="flex-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Hallway</TabsTrigger>
-              <TabsTrigger value="schedule" className="flex-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Schedule</TabsTrigger>
-              <TabsTrigger value="settings" className="flex-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="hallway" className="flex-1">Hallway</TabsTrigger>
+              <TabsTrigger value="schedule" className="flex-1">Schedule</TabsTrigger>
+              <TabsTrigger value="settings" className="flex-1">
                 Settings {pendingUsers.length > 0 && <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-destructive text-destructive-foreground">{pendingUsers.length}</span>}
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="hallway" className="space-y-2">
-              <p className="text-sm text-muted-foreground mb-4">{activePasses.length} student{activePasses.length !== 1 ? 's' : ''} currently out</p>
+              <p className="text-sm text-muted-foreground mb-4">{activePasses.length} student{activePasses.length !== 1 ? 's' : ''} out</p>
               {activePasses.length === 0 ? (
-                <Card><CardContent className="py-8 text-center text-muted-foreground">No students currently in hallways</CardContent></Card>
+                <Card><CardContent className="py-8 text-center text-muted-foreground">No students in hallways</CardContent></Card>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2">
                   {activePasses.map(pass => (
@@ -710,7 +727,7 @@ const AdminDashboard = () => {
       <Dialog 
         open={scheduleDialogOpen} 
         onOpenChange={(open) => { 
-          if (!open) resetScheduleForm(); // Resets if user clicks outside
+          if (!open) resetScheduleForm(); // Logic for "Click Outside" or "ESC"
           setScheduleDialogOpen(open); 
         }}
       >
@@ -746,7 +763,9 @@ const AdminDashboard = () => {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-base font-semibold flex items-center gap-2"><Clock className="h-4 w-4" />Bell Schedule</Label>
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  <Clock className="h-4 w-4" />Bell Schedule
+                </Label>
               </div>
               <InlinePeriodTable 
                 periods={periods} 
@@ -755,17 +774,15 @@ const AdminDashboard = () => {
             </div>
           </div>
           <DialogFooter className="mt-4">
-            {/* CANCEL BUTTON: Explicitly calls reset and close */}
             <Button 
               variant="outline" 
               onClick={() => {
-                resetScheduleForm(); 
+                resetScheduleForm(); // Force-reset state
                 setScheduleDialogOpen(false); 
               }}
             >
               Cancel
             </Button>
-            {/* SAVE BUTTON: The only thing that triggers handleSaveSchedule */}
             <Button onClick={handleSaveSchedule}>
               {editingSchedule ? 'Save Changes' : 'Create Schedule'}
             </Button>
