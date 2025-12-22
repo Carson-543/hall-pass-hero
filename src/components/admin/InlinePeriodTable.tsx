@@ -19,19 +19,25 @@ interface InlinePeriodTableProps {
 
 export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps) => {
   
-  // 1. Sort the periods consistently before rendering
+  // Create a sorted version for the UI so the indices match the rows seen by the user
   const sortedPeriods = [...periods].sort((a, b) => a.period_order - b.period_order);
 
-  const handleFieldChange = (periodId: string | undefined, indexInSorted: number, field: keyof Period, value: any) => {
-    // Update based on the sorted list
+  const handleFieldChange = (indexInSorted: number, field: keyof Period, value: any) => {
+    // 1. Work with the sorted copy
     const updated = [...sortedPeriods];
-    updated[indexInSorted] = { ...updated[indexInSorted], [field]: value };
+    
+    // 2. Update the specific field while keeping everything else (like id) intact
+    updated[indexInSorted] = { 
+      ...updated[indexInSorted], 
+      [field]: value 
+    };
+    
+    // 3. Send the full updated array back to AdminDashboard
     onChange(updated);
   };
 
   const handleAddEntry = (type: 'class' | 'structured') => {
     const classCount = periods.filter(p => !p.is_passing_period).length;
-    // Calculate order based on existing periods
     const nextOrder = periods.length > 0 ? Math.max(...periods.map(p => p.period_order)) + 1 : 1;
     
     const newPeriod: Period = {
@@ -67,7 +73,7 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
                 <Clock className="h-3.5 w-3.5 text-orange-500 shrink-0" />
                 <Input
                   value={period.name}
-                  onChange={(e) => handleFieldChange(period.id, idx, 'name', e.target.value)}
+                  onChange={(e) => handleFieldChange(idx, 'name', e.target.value)}
                   className="h-8 text-xs bg-background focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
               </>
@@ -82,14 +88,14 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
           <Input
             type="time"
             value={period.start_time}
-            onChange={(e) => handleFieldChange(period.id, idx, 'start_time', e.target.value)}
+            onChange={(e) => handleFieldChange(idx, 'start_time', e.target.value)}
             className="h-8 text-xs px-2 focus-visible:ring-0 focus-visible:ring-offset-0"
           />
           
           <Input
             type="time"
             value={period.end_time}
-            onChange={(e) => handleFieldChange(period.id, idx, 'end_time', e.target.value)}
+            onChange={(e) => handleFieldChange(idx, 'end_time', e.target.value)}
             className="h-8 text-xs px-2 focus-visible:ring-0 focus-visible:ring-offset-0"
           />
           
