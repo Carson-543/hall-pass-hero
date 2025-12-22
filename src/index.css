@@ -111,6 +111,14 @@
 @layer utilities {
   .animate-pulse-gentle {
     animation: pulse-gentle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    /* Hide Lovable Badge */
+  #lovable-badge, 
+  .lovable-badge,
+  a[href*="lovable.app"] {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
   }
 
   @keyframes pulse-gentle {
