@@ -273,16 +273,19 @@ export type Database = {
       }
       weekly_quota_settings: {
         Row: {
+          default_period_count: number | null
           id: string
           updated_at: string | null
           weekly_limit: number | null
         }
         Insert: {
+          default_period_count?: number | null
           id?: string
           updated_at?: string | null
           weekly_limit?: number | null
         }
         Update: {
+          default_period_count?: number | null
           id?: string
           updated_at?: string | null
           weekly_limit?: number | null
