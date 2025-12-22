@@ -29,7 +29,7 @@ export const FloatingPassButton = ({
     return null;
   }
 
-  const handleQuickPass = async () => {
+ const handleQuickPass = async () => {
   setIsLoading(true);
   setIsPressed(true);
 
@@ -37,29 +37,26 @@ export const FloatingPassButton = ({
     const { error } = await supabase
       .from('passes')
       .insert({
-        student_id: userId,          // The teacher's ID (since they are acting as the "student" for this quick pass)
+        student_id: userId,
         class_id: currentClassId,
         destination: 'Restroom',
-        status: 'approved', 
+        status: 'approved',
         approved_at: new Date().toISOString(),
-        approved_by: userId,         // ADD THIS LINE: Pass the teacher's ID here
-        is_over_limit: isQuotaExceeded,
-        returned_at: null,
-        confirmed_by: null
+        approved_by: userId, 
+        // FIX: The column name in your SQL is is_quota_override, not is_over_limit
+        is_quota_override: isQuotaExceeded, 
+        requested_at: new Date().toISOString()
       });
 
     if (error) {
-      console.error('Supabase Error:', error.message); // Log the exact error to console
+      console.error('Supabase Error:', error.message);
       toast({
         title: 'Error',
-        description: `Failed to start pass: ${error.message}`,
+        description: error.message,
         variant: 'destructive',
       });
     } else {
-      toast({
-        title: 'Quick Pass Started',
-        description: 'The pass is now active in the hallway.',
-      });
+      toast({ title: 'Quick Pass Started' });
       onPassRequested();
     }
   } catch (err) {
