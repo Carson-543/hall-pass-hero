@@ -8,10 +8,10 @@ export const QuotaDisplay = () => {
     return (
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Weekly Restroom Passes</CardTitle>
+          <CardTitle className="text-sm font-medium text-center">Weekly Restroom Passes</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="animate-pulse h-8 bg-muted rounded" />
+          <div className="animate-pulse h-8 bg-muted rounded w-3/4 mx-auto" />
         </CardContent>
       </Card>
     );
@@ -22,10 +22,13 @@ export const QuotaDisplay = () => {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium">Weekly Restroom Passes</CardTitle>
+        {/* Centered the Title */}
+        <CardTitle className="text-sm font-medium text-center">Weekly Restroom Passes</CardTitle>
       </CardHeader>
-      <CardContent classname="flex flex-col items-center justify-center">
-        <div className="flex gap-2">
+      {/* Corrected "className" typo and centered content */}
+      <CardContent className="flex flex-col items-center justify-center">
+        {/* Added justify-center and flex-wrap for the boxes */}
+        <div className="flex flex-wrap gap-2 justify-center">
           {boxes.map((available, i) => (
             <div
               key={i}
@@ -37,8 +40,9 @@ export const QuotaDisplay = () => {
             />
           ))}
         </div>
-        <p className="text-xs text-muted-foreground mt-2">
-          {weeklyLimit - usedPasses} passes remaining this week
+        {/* Added text-center to the text below */}
+        <p className="text-xs text-muted-foreground mt-3 text-center">
+          {Math.max(0, weeklyLimit - usedPasses)} passes remaining this week
         </p>
       </CardContent>
     </Card>
