@@ -105,7 +105,7 @@ export const InlinePeriodTable = ({ scheduleId, periods, onPeriodsChange }: Inli
                   <Input
                     value={period.name}
                     onChange={(e) => handleLocalFieldChange(period.id, 'name', e.target.value)}
-                    className="h-7 text-xs bg-background"
+                    className="h-7 text-xs bg-background focus-visible:ring-0"
                   />
                 </>
               ) : (
