@@ -512,6 +512,40 @@ const TeacherDashboard = () => {
         </DialogContent>
       </Dialog>
 
+<Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+  <DialogContent className="rounded-3xl max-w-md">
+    <DialogHeader>
+      <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+        <History className="h-5 w-5 text-primary" />
+        {selectedStudent?.name}'s History
+      </DialogTitle>
+    </DialogHeader>
+    <div className="space-y-3 py-4 max-h-[60vh] overflow-y-auto pr-2">
+      {loadingHistory ? (
+        <div className="flex justify-center py-8"><Loader2 className="animate-spin text-muted-foreground" /></div>
+      ) : studentHistory.length === 0 ? (
+        <p className="text-center text-muted-foreground py-8">No past passes found.</p>
+      ) : (
+        studentHistory.map((pass) => (
+          <div key={pass.id} className="p-3 rounded-2xl bg-muted/50 border flex items-center justify-between">
+            <div>
+              <p className="font-bold text-sm">{pass.destination}</p>
+              <p className="text-[10px] text-muted-foreground">
+                {new Date(pass.requested_at).toLocaleDateString()} • {new Date(pass.requested_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+            <div className={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase ${
+              pass.status === 'returned' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
+            }`}>
+              {pass.status}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  </DialogContent>
+</Dialog>
+      
       <ClassManagementDialog
         open={classDialogOpen}
         onOpenChange={setClassDialogOpen}
