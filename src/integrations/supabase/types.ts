@@ -297,6 +297,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_user_and_data: { Args: { _user_id: string }; Returns: undefined }
       generate_join_code: { Args: never; Returns: string }
       get_user_role: {
         Args: { _user_id: string }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { PeriodDisplay } from '@/components/PeriodDisplay';
 import { ElapsedTimer } from '@/components/ElapsedTimer';
 import { ClassManagementDialog } from '@/components/teacher/ClassManagementDialog';
@@ -64,6 +65,8 @@ const getPassCardColor = (pass: PendingPass) => {
 const TeacherDashboard = () => {
   const { user, role, signOut, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const isVisible = usePageVisibility();
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Core Data States
   const [classes, setClasses] = useState<ClassInfo[]>([]);
@@ -232,22 +235,38 @@ const TeacherDashboard = () => {
     }
   }, [selectedClassId, fetchRoster]);
 
+  // Real-time subscription with tab visibility optimization
   useEffect(() => {
-    if (selectedClassId && students.length >= 0) {
-      fetchPasses(selectedClassId);
-      
-      // Realtime subscription with strict filter to save egress
-      const channel = supabase.channel(`teacher-view-${selectedClassId}`)
+    if (!selectedClassId || students.length < 0) return;
+
+    // Always fetch on mount or class change
+    fetchPasses(selectedClassId);
+
+    // Only subscribe to real-time when tab is visible
+    if (isVisible) {
+      channelRef.current = supabase.channel(`teacher-view-${selectedClassId}`)
         .on('postgres_changes', { 
           event: '*', 
           schema: 'public', 
           table: 'passes'
         }, () => fetchPasses(selectedClassId))
         .subscribe();
-
-      return () => { supabase.removeChannel(channel); };
     }
-  }, [selectedClassId, students.length, fetchPasses]);
+
+    return () => { 
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [selectedClassId, students.length, fetchPasses, isVisible]);
+
+  // Refresh data when tab becomes visible again
+  useEffect(() => {
+    if (isVisible && selectedClassId) {
+      fetchPasses(selectedClassId);
+    }
+  }, [isVisible, selectedClassId, fetchPasses]);
 
   useEffect(() => {
     if (historyDialogOpen && selectedStudent) {
