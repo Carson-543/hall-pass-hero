@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
+import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -84,6 +85,8 @@ const SCHEDULE_COLORS = [
 const AdminDashboard = () => {
   const { user, role, signOut, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const isVisible = usePageVisibility();
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
   const [activePasses, setActivePasses] = useState<ActivePass[]>([]);
@@ -415,6 +418,29 @@ const AdminDashboard = () => {
   fetchSchedules();
 };
 
+  const handleDeleteSchedule = async (scheduleId: string) => {
+    if (!confirm('Are you sure you want to delete this schedule? This will also delete all associated periods and date assignments.')) {
+      return;
+    }
+
+    // Delete periods first
+    await supabase.from('periods').delete().eq('schedule_id', scheduleId);
+    
+    // Delete schedule assignments
+    await supabase.from('schedule_assignments').delete().eq('schedule_id', scheduleId);
+    
+    // Delete the schedule
+    const { error } = await supabase.from('schedules').delete().eq('id', scheduleId);
+    
+    if (error) {
+      toast({ title: 'Error', description: 'Failed to delete schedule.', variant: 'destructive' });
+    } else {
+      toast({ title: 'Schedule Deleted' });
+      fetchSchedules();
+      fetchScheduleAssignments();
+    }
+  };
+
   const handleApprovePass = async (passId: string) => {
     await supabase.from('passes').update({ status: 'approved', approved_at: new Date().toISOString(), approved_by: user!.id }).eq('id', passId);
   };
@@ -434,23 +460,40 @@ const AdminDashboard = () => {
 
   // --- Effects ---
 
+  // Real-time subscription with tab visibility optimization
   useEffect(() => {
     fetchPendingUsers();
     fetchActivePasses();
     fetchSchedules();
     fetchSettings();
     fetchTeachers();
-
-    const channel = supabase
-      .channel('admin-passes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'passes' }, () => {
-        fetchActivePasses();
-        if (selectedClassId) fetchClassPasses(selectedClassId);
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
   }, []);
+
+  useEffect(() => {
+    if (isVisible) {
+      channelRef.current = supabase
+        .channel('admin-passes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'passes' }, () => {
+          fetchActivePasses();
+          if (selectedClassId) fetchClassPasses(selectedClassId);
+        })
+        .subscribe();
+    }
+
+    return () => { 
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [isVisible, selectedClassId]);
+
+  // Refresh when tab becomes visible
+  useEffect(() => {
+    if (isVisible) {
+      fetchActivePasses();
+    }
+  }, [isVisible]);
 
   useEffect(() => {
     if (pendingUsers.length > 0) {
