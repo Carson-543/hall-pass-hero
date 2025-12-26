@@ -279,7 +279,8 @@ const TeacherDashboard = () => {
 
     fetchRoster(selectedClassId);
     fetchPasses(selectedClassId);
-
+    console.log("🔄 useEffect fired! Timestamp:", new Date().toISOString());
+    
     if (isVisible) {
       const channel = supabase.channel(`teacher-${selectedClassId}`)
         .on(
