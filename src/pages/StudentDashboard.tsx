@@ -16,8 +16,9 @@ import { useWeeklyQuota } from '@/hooks/useWeeklyQuota';
 import { PassHistory } from '@/components/PassHistory';
 import { ElapsedTimer } from '@/components/ElapsedTimer';
 import { FloatingPassButton } from '@/components/FloatingPassButton';
-import { LogOut, Plus, Clock, BookOpen, Calendar, MapPin, CheckCircle2 } from 'lucide-react';
+import { LogOut, Plus, Clock, BookOpen, Calendar, MapPin, CheckCircle2, Settings} from 'lucide-react';
 import { format } from 'date-fns';
+import { Navigate, useNavigate } from 'react-router-dom';
 
 const DESTINATIONS = ['Restroom', 'Locker', 'Office', 'Other'];
 
@@ -48,6 +49,7 @@ interface Period {
 
 const StudentDashboard = () => {
   const { user, role, signOut, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { currentPeriod } = useCurrentPeriod();
   const { isQuotaExceeded, refresh: refreshQuota } = useWeeklyQuota();
@@ -302,9 +304,26 @@ const StudentDashboard = () => {
             <p className="text-sm text-muted-foreground">{user.email}</p>
           </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground hover:text-destructive">
-          <LogOut className="h-4 w-4 mr-2" /> Sign Out
-        </Button>
+        
+        <div className="flex items-center gap-2"> {/* Added a wrapper div for multiple buttons */}
+    <Button 
+      variant="ghost" 
+      size="sm" 
+      onClick={() => navigate('/settings')} 
+      className="text-muted-foreground hover:text-primary"
+    >
+      <Settings className="h-4 w-4 mr-2" /> Settings
+    </Button>
+
+    <Button 
+      variant="ghost" 
+      size="sm" 
+      onClick={signOut} 
+      className="text-muted-foreground hover:text-destructive"
+    >
+      <LogOut className="h-4 w-4 mr-2" /> Sign Out
+    </Button>
+  </div>
       </header>
 
       <div className="grid gap-6">
