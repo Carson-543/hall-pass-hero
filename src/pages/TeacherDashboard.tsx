@@ -17,10 +17,11 @@ import { StudentManagementDialog } from '@/components/teacher/StudentManagementD
 import { 
   LogOut, Plus, AlertTriangle, Check, X, 
   Copy, Search, Loader2, Clock, Settings, UserMinus,
-  History, Calendar, Timer
+  History, Timer
 } from 'lucide-react';
 import { startOfWeek } from 'date-fns';
 
+// --- Interfaces ---
 interface ClassInfo {
   id: string;
   name: string;
@@ -46,6 +47,7 @@ interface Student {
   email: string;
 }
 
+// --- Helpers ---
 const getDestinationColor = (destination: string) => {
   switch (destination.toLowerCase()) {
     case 'restroom': return 'bg-success/10 text-success border-success/20';
@@ -68,31 +70,31 @@ const TeacherDashboard = () => {
   const isVisible = usePageVisibility();
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // Core Data States
+  // Core Data
   const [classes, setClasses] = useState<ClassInfo[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [pendingPasses, setPendingPasses] = useState<PendingPass[]>([]);
   const [activePasses, setActivePasses] = useState<PendingPass[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isActionLoading, setIsActionLoading] = useState(false);
-  const [weeklyLimit, setWeeklyLimit] = useState<number>(4); // Store limit globally
+  const [weeklyLimit, setWeeklyLimit] = useState<number>(4);
 
-  // Dialog States
+  // UI States
+  const [isActionLoading, setIsActionLoading] = useState(false);
   const [createPassDialogOpen, setCreatePassDialogOpen] = useState(false);
   const [classDialogOpen, setClassDialogOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<ClassInfo | null>(null);
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  
-  // Quick Pass Specific States
+
+  // Quick Pass Logic
   const [selectedStudentForPass, setSelectedStudentForPass] = useState('');
   const [selectedDestination, setSelectedDestination] = useState('');
   const [customDestination, setCustomDestination] = useState('');
   const [quickPassQuota, setQuickPassQuota] = useState<{ count: number; exceeded: boolean } | null>(null);
   const [loadingQuotaCheck, setLoadingQuotaCheck] = useState(false);
 
-  // History & Filter States
+  // History Logic
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [studentHistory, setStudentHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -105,6 +107,8 @@ const TeacherDashboard = () => {
     if (!end) return 0;
     return (new Date(end).getTime() - new Date(start).getTime()) / 60000;
   };
+
+  // --- Data Fetching ---
 
   const fetchClasses = useCallback(async () => {
     if (!user) return;
@@ -121,11 +125,11 @@ const TeacherDashboard = () => {
       }
     } else {
       setClasses([]);
-      setSelectedClassId('');
     }
   }, [user, selectedClassId]);
 
   const fetchRoster = useCallback(async (classId: string) => {
+    // 1. Get Enrollments
     const { data: enrollments } = await supabase
       .from('class_enrollments')
       .select('student_id')
@@ -136,87 +140,113 @@ const TeacherDashboard = () => {
       return;
     }
 
+    // 2. Get Profiles
     const studentIds = enrollments.map(e => e.student_id);
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, full_name, email')
-      .in('id', studentIds);
+      .in('id', studentIds)
+      .order('full_name');
 
     if (profiles) {
       setStudents(profiles.map(p => ({ id: p.id, name: p.full_name, email: p.email })));
     }
   }, []);
 
+  // FIXED: Independent fetchPasses that doesn't rely on 'students' state
   const fetchPasses = useCallback(async (classId: string) => {
     if (!user) return;
 
-    // 1. Fetch Dynamic Quota Settings
-    const { data: settings } = await supabase
-      .from('weekly_quota_settings')
-      .select('weekly_limit')
-      .single();
-    
-    const limit = settings?.weekly_limit ?? 4;
-    setWeeklyLimit(limit); // Update global state
+    try {
+      // 1. Fetch Settings & Roster IDs in parallel for speed
+      const [settingsRes, enrollmentsRes] = await Promise.all([
+        supabase.from('weekly_quota_settings').select('weekly_limit').single(),
+        supabase.from('class_enrollments').select('student_id').eq('class_id', classId)
+      ]);
 
-    // 2. Fetch current class requests (Pending)
-    const { data: currentRequests } = await supabase
-      .from('passes')
-      .select('id, student_id, destination, status, requested_at, approved_at, profiles:student_id(full_name)')
-      .eq('class_id', classId)
-      .eq('status', 'pending');
+      const limit = settingsRes.data?.weekly_limit ?? 4;
+      setWeeklyLimit(limit);
 
-    // 3. Fetch GLOBAL Active Passes
-    const studentIds = students.map(s => s.id);
-    const { data: allActiveForMyStudents } = await supabase
-      .from('passes')
-      .select('id, student_id, destination, status, requested_at, approved_at, profiles:student_id(full_name), classes:class_id(name)')
-      .in('student_id', studentIds)
-      .in('status', ['approved', 'pending_return']);
+      const studentIds = enrollmentsRes.data?.map(e => e.student_id) || [];
 
-    const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString();
-    
-    const processedPending = currentRequests ? await Promise.all(currentRequests.map(async (p: any) => {
-      let isExceeded = false;
-      if (p.destination === 'Restroom') {
-        const { count } = await supabase
-          .from('passes')
-          .select('*', { count: 'exact', head: true })
-          .eq('student_id', p.student_id)
-          .eq('destination', 'Restroom')
-          .in('status', ['approved', 'pending_return', 'returned'])
-          .gte('requested_at', weekStart);
-        
-        isExceeded = (count ?? 0) >= limit;
+      // 2. Fetch Pending Requests (Specific to this class)
+      const pendingQuery = supabase
+        .from('passes')
+        .select('id, student_id, destination, status, requested_at, approved_at, profiles:student_id(full_name)')
+        .eq('class_id', classId)
+        .eq('status', 'pending');
+
+      // 3. Fetch Active Passes (For ANY student in this class, even if pass is from another class)
+      let activeQuery = supabase
+        .from('passes')
+        .select('id, student_id, destination, status, requested_at, approved_at, profiles:student_id(full_name), classes:class_id(name)')
+        .in('status', ['approved', 'pending_return']);
+      
+      if (studentIds.length > 0) {
+        activeQuery = activeQuery.in('student_id', studentIds);
+      } else {
+        // If no students, ensure we return empty by forcing an impossible condition or just skipping
+        // We'll handle empty result in the Promise resolution
       }
-      return {
+
+      const [pendingRes, activeRes] = await Promise.all([
+        pendingQuery,
+        studentIds.length > 0 ? activeQuery : Promise.resolve({ data: [] })
+      ]);
+
+      // 4. Process Pending (Calculate Quota)
+      const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString();
+      
+      const processedPending = pendingRes.data ? await Promise.all(pendingRes.data.map(async (p: any) => {
+        let isExceeded = false;
+        if (p.destination === 'Restroom') {
+          // Check usage count
+          const { count } = await supabase
+            .from('passes')
+            .select('*', { count: 'exact', head: true })
+            .eq('student_id', p.student_id)
+            .eq('destination', 'Restroom')
+            .in('status', ['approved', 'pending_return', 'returned'])
+            .gte('requested_at', weekStart);
+          
+          isExceeded = (count ?? 0) >= limit;
+        }
+        return {
+          id: p.id,
+          student_id: p.student_id,
+          student_name: p.profiles?.full_name || 'Unknown',
+          destination: p.destination,
+          status: p.status,
+          requested_at: p.requested_at,
+          is_quota_exceeded: isExceeded
+        };
+      })) : [];
+
+      // 5. Process Active
+      const processedActive = activeRes.data?.map((p: any) => ({
         id: p.id,
         student_id: p.student_id,
         student_name: p.profiles?.full_name || 'Unknown',
         destination: p.destination,
         status: p.status,
         requested_at: p.requested_at,
-        is_quota_exceeded: isExceeded
-      };
-    })) : [];
+        approved_at: p.approved_at,
+        is_quota_exceeded: false,
+        from_class_name: p.classes?.name
+      })) || [];
 
-    const processedActive = allActiveForMyStudents?.map((p: any) => ({
-      id: p.id,
-      student_id: p.student_id,
-      student_name: p.profiles?.full_name || 'Unknown',
-      destination: p.destination,
-      status: p.status,
-      requested_at: p.requested_at,
-      approved_at: p.approved_at,
-      is_quota_exceeded: false,
-      from_class_name: p.classes?.name
-    })) || [];
+      setPendingPasses(processedPending);
+      setActivePasses(processedActive);
 
-    setPendingPasses(processedPending);
-    setActivePasses(processedActive);
-  }, [user, students]);
+    } catch (error) {
+      console.error("Error fetching passes:", error);
+      toast({ title: "Error", description: "Failed to load passes", variant: "destructive" });
+    }
+  }, [user, toast]);
 
-  // NEW: Check quota for specific student in Quick Pass Dialog
+  // --- Effects ---
+
+  // Check Quota when selecting student in Quick Pass
   useEffect(() => {
     if (!selectedStudentForPass || !createPassDialogOpen) {
       setQuickPassQuota(null);
@@ -246,6 +276,31 @@ const TeacherDashboard = () => {
     checkQuota();
   }, [selectedStudentForPass, createPassDialogOpen, weeklyLimit]);
 
+  // Initial Class Fetch
+  useEffect(() => { 
+    fetchClasses(); 
+  }, [fetchClasses]);
+
+  // Class Selection Changes
+  useEffect(() => {
+    if (selectedClassId) {
+      fetchRoster(selectedClassId);
+      fetchPasses(selectedClassId); // Pass ID explicitly
+      
+      // Subscribe to changes
+      if (isVisible) {
+        channelRef.current = supabase.channel(`teacher-view-${selectedClassId}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'passes' }, 
+            () => fetchPasses(selectedClassId))
+          .subscribe();
+      }
+    }
+    return () => { 
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
+    };
+  }, [selectedClassId, fetchRoster, fetchPasses, isVisible]);
+
+  // Fetch History
   const fetchStudentHistory = useCallback(async (studentId: string) => {
     setLoadingHistory(true);
     const { data, error } = await supabase
@@ -257,6 +312,12 @@ const TeacherDashboard = () => {
     if (!error) setStudentHistory(data || []);
     setLoadingHistory(false);
   }, []);
+
+  useEffect(() => {
+    if (historyDialogOpen && selectedStudent) {
+      fetchStudentHistory(selectedStudent.id);
+    }
+  }, [historyDialogOpen, selectedStudent, fetchStudentHistory]);
 
   const filteredHistory = useMemo(() => {
     return studentHistory.filter(pass => {
@@ -272,45 +333,8 @@ const TeacherDashboard = () => {
     }, 0);
   }, [filteredHistory]);
 
-  useEffect(() => { fetchClasses(); }, [fetchClasses]);
 
-  useEffect(() => {
-    if (selectedClassId) {
-      fetchRoster(selectedClassId);
-    }
-  }, [selectedClassId, fetchRoster]);
-
-  useEffect(() => {
-    if (!selectedClassId || students.length < 0) return;
-    fetchPasses(selectedClassId);
-    if (isVisible) {
-      channelRef.current = supabase.channel(`teacher-view-${selectedClassId}`)
-        .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
-          table: 'passes'
-        }, () => fetchPasses(selectedClassId))
-        .subscribe();
-    }
-    return () => { 
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-    };
-  }, [selectedClassId, students.length, fetchPasses, isVisible]);
-
-  useEffect(() => {
-    if (isVisible && selectedClassId) {
-      fetchPasses(selectedClassId);
-    }
-  }, [isVisible, selectedClassId, fetchPasses]);
-
-  useEffect(() => {
-    if (historyDialogOpen && selectedStudent) {
-      fetchStudentHistory(selectedStudent.id);
-    }
-  }, [historyDialogOpen, selectedStudent, fetchStudentHistory]);
+  // --- Actions ---
 
   const handleApprove = async (id: string, override: boolean) => {
     const { error } = await supabase.from('passes').update({
@@ -362,7 +386,7 @@ const TeacherDashboard = () => {
       setSelectedStudentForPass('');
       setSelectedDestination('');
       setCustomDestination('');
-      setQuickPassQuota(null); // Reset quota state
+      setQuickPassQuota(null);
       toast({ title: 'Pass Issued' });
     } else {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -414,6 +438,7 @@ const TeacherDashboard = () => {
         {selectedClassId && (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* PENDING REQUESTS */}
               <div className="space-y-3">
                 <h2 className="text-sm font-bold uppercase tracking-wider text-warning">Requests ({pendingPasses.length})</h2>
                 {pendingPasses.map(pass => (
@@ -436,6 +461,7 @@ const TeacherDashboard = () => {
                 {pendingPasses.length === 0 && <p className="text-center py-4 text-muted-foreground text-sm italic">No pending requests</p>}
               </div>
 
+              {/* ACTIVE PASSES */}
               <div className="space-y-3">
                 <h2 className="text-sm font-bold uppercase tracking-wider text-success">Active Hallway ({activePasses.length})</h2>
                 {activePasses.map(pass => (
@@ -461,6 +487,7 @@ const TeacherDashboard = () => {
               </div>
             </div>
 
+            {/* STUDENT ROSTER */}
             <div className="space-y-4 pt-4 border-t">
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
@@ -651,8 +678,8 @@ const TeacherDashboard = () => {
                <Button onClick={handleQuickPass} className="w-full h-12 rounded-xl font-bold" disabled={isActionLoading || !selectedStudentForPass || !selectedDestination}>
                  {isActionLoading ? <Loader2 className="animate-spin h-4 w-4" /> : "Issue Pass"}
                </Button>
-
-               {/* QUOTA WARNING MESSAGE */}
+               
+               {/* QUOTA WARNING MESSAGE (Updated Placement) */}
                {selectedStudentForPass && (selectedDestination === 'Restroom' || !selectedDestination) && (
                  <div className="text-center text-xs font-medium transition-all duration-300">
                     {loadingQuotaCheck ? (
