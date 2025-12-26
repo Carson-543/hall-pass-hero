@@ -156,6 +156,8 @@ const TeacherDashboard = () => {
   const fetchPasses = useCallback(async (classId: string) => {
     if (!userId || !classId) return;
 
+    console.log("💸 DATA COST: Fetching passes from Supabase...");
+    
     try {
       // A. Settings
       const { data: settings } = await supabase
