@@ -96,6 +96,7 @@ const Settings = () => {
               <AlertTitle>Your Data Rights</AlertTitle>
               <AlertDescription className="mt-2 space-y-2">
                 <p><strong>Data Ownership:</strong> All student data is the property of the school district and may be accessed by authorized district personnel. This application does not sell or use your data for commercial purposes, marketing, or advertising.</p>
+                <p><strong>Data Sharing within Organization:</strong> Teachers may be granted temporary or delegated access to classes for instructional or supervisory purposes, such as serving as a substitute.</p>
                 <p><strong>Data Collection:</strong> We only collect data necessary for hall pass management: your name, email, class enrollments, and pass history.</p>
                 <p><strong>Data Storage:</strong> Student data is stored using Supabase, a managed cloud platform that provides industry-standard security protections, including encryption and access controls.</p>
                 <p><strong>Data Retention:</strong> Student data is retained only while the account remains active and is permanently deleted immediately upon account deletion.</p>
