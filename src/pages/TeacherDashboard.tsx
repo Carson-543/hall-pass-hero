@@ -68,7 +68,7 @@ const TeacherDashboard = () => {
   const { toast } = useToast();
   const isVisible = usePageVisibility();
   
-  // CRITICAL FIX: Depend on primitive ID string, not the full user object
+  // Safe dependency
   const userId = user?.id;
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
@@ -107,7 +107,7 @@ const TeacherDashboard = () => {
 
   // --- Main Data Fetching Logic ---
 
-  // 1. Fetch Classes (Optimized: Specific columns only)
+  // 1. Fetch Classes 
   const fetchClasses = useCallback(async () => {
     if (!userId) return;
     
@@ -119,7 +119,6 @@ const TeacherDashboard = () => {
 
     if (data && data.length > 0) {
       setClasses(data);
-      // Logic to prevent resetting selection on every re-fetch
       setSelectedClassId(prev => {
         if (prev && data.find(c => c.id === prev)) return prev;
         return data[0].id;
@@ -153,12 +152,12 @@ const TeacherDashboard = () => {
     }
   }, []);
 
-  // 3. Fetch Passes (Robust & 400 Error Safe)
+  // 3. Fetch Passes (FIXED: Manual Join Strategy)
   const fetchPasses = useCallback(async (classId: string) => {
     if (!userId || !classId) return;
 
     try {
-      // A. Settings (Use maybeSingle to prevent 406 errors)
+      // A. Settings
       const { data: settings } = await supabase
         .from('weekly_quota_settings')
         .select('weekly_limit')
@@ -167,55 +166,53 @@ const TeacherDashboard = () => {
       const limit = settings?.weekly_limit ?? 4;
       setWeeklyLimit(limit);
 
-      // B. Pending Passes (Corrected Syntax)
-      // We remove the alias (profiles:student_id) to let Supabase auto-detect the relationship
-      const { data: pendingData, error: pendingError } = await supabase
+      // --- B. PENDING PASSES (No Joins) ---
+      const { data: rawPending, error: pendingError } = await supabase
         .from('passes')
-        .select(`
-          id, student_id, destination, status, requested_at,
-          profiles ( full_name )
-        `)
+        .select('id, student_id, destination, status, requested_at')
         .eq('class_id', classId)
         .eq('status', 'pending');
 
       if (pendingError) {
         console.error("Error fetching pending:", pendingError);
+      } else {
+        // Fetch Names Manually to avoid 400 Error
+        const pIds = rawPending.map(p => p.student_id);
+        const { data: pNames } = await supabase
+           .from('profiles')
+           .select('id, full_name')
+           .in('id', pIds);
+        
+        const nameMap = new Map(pNames?.map(n => [n.id, n.full_name]));
+        const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString();
+
+        const pendingMapped = await Promise.all(rawPending.map(async (p: any) => {
+          let isExceeded = false;
+          if (p.destination === 'Restroom') {
+            const { count } = await supabase
+              .from('passes')
+              .select('id', { count: 'exact', head: true })
+              .eq('student_id', p.student_id)
+              .eq('destination', 'Restroom')
+              .in('status', ['approved', 'pending_return', 'returned'])
+              .gte('requested_at', weekStart);
+            isExceeded = (count || 0) >= limit;
+          }
+          
+          return {
+            id: p.id,
+            student_id: p.student_id,
+            student_name: nameMap.get(p.student_id) || 'Unknown',
+            destination: p.destination,
+            status: p.status,
+            requested_at: p.requested_at,
+            is_quota_exceeded: isExceeded
+          };
+        }));
+        setPendingPasses(pendingMapped);
       }
 
-      const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString();
-
-      const pendingMapped = pendingData ? await Promise.all(pendingData.map(async (p: any) => {
-        let isExceeded = false;
-        if (p.destination === 'Restroom') {
-           // HEAD request for count is much lighter on data
-           const { count } = await supabase
-            .from('passes')
-            .select('id', { count: 'exact', head: true })
-            .eq('student_id', p.student_id)
-            .eq('destination', 'Restroom')
-            .in('status', ['approved', 'pending_return', 'returned'])
-            .gte('requested_at', weekStart);
-           
-           isExceeded = (count || 0) >= limit;
-        }
-        
-        // Handle if profiles is returned as array or object
-        const sName = Array.isArray(p.profiles) ? p.profiles[0]?.full_name : p.profiles?.full_name;
-
-        return {
-          id: p.id,
-          student_id: p.student_id,
-          student_name: sName || 'Unknown',
-          destination: p.destination,
-          status: p.status,
-          requested_at: p.requested_at,
-          is_quota_exceeded: isExceeded
-        };
-      })) : [];
-
-      setPendingPasses(pendingMapped);
-
-      // C. Active Passes
+      // --- C. ACTIVE PASSES (No Joins) ---
       const { data: enrollments } = await supabase
         .from('class_enrollments')
         .select('student_id')
@@ -224,36 +221,42 @@ const TeacherDashboard = () => {
       const studentIds = enrollments?.map(e => e.student_id) || [];
 
       if (studentIds.length > 0) {
-        const { data: activeData, error: activeError } = await supabase
+        const { data: rawActive, error: activeError } = await supabase
           .from('passes')
-          .select(`
-            id, student_id, destination, status, requested_at, approved_at,
-            profiles ( full_name ),
-            classes ( name )
-          `)
+          .select('id, student_id, class_id, destination, status, requested_at, approved_at')
           .in('student_id', studentIds)
           .in('status', ['approved', 'pending_return']);
 
         if (activeError) console.error("Error fetching active:", activeError);
 
-        const activeMapped = activeData?.map((p: any) => {
-          const sName = Array.isArray(p.profiles) ? p.profiles[0]?.full_name : p.profiles?.full_name;
-          const cName = Array.isArray(p.classes) ? p.classes[0]?.name : p.classes?.name;
+        if (rawActive && rawActive.length > 0) {
+            // Manual Joins for Active
+            const activeSIds = rawActive.map(p => p.student_id);
+            const activeCIds = rawActive.map(p => p.class_id);
+            
+            const [profilesRes, classesRes] = await Promise.all([
+                supabase.from('profiles').select('id, full_name').in('id', activeSIds),
+                supabase.from('classes').select('id, name').in('id', activeCIds)
+            ]);
+            
+            const pMap = new Map(profilesRes.data?.map(p => [p.id, p.full_name]));
+            const cMap = new Map(classesRes.data?.map(c => [c.id, c.name]));
 
-          return {
-            id: p.id,
-            student_id: p.student_id,
-            student_name: sName || 'Unknown',
-            destination: p.destination,
-            status: p.status,
-            requested_at: p.requested_at,
-            approved_at: p.approved_at,
-            is_quota_exceeded: false,
-            from_class_name: cName
-          };
-        }) || [];
-
-        setActivePasses(activeMapped);
+            const activeMapped = rawActive.map(p => ({
+                id: p.id,
+                student_id: p.student_id,
+                student_name: pMap.get(p.student_id) || 'Unknown',
+                destination: p.destination,
+                status: p.status,
+                requested_at: p.requested_at,
+                approved_at: p.approved_at,
+                is_quota_exceeded: false,
+                from_class_name: cMap.get(p.class_id)
+            }));
+            setActivePasses(activeMapped);
+        } else {
+            setActivePasses([]);
+        }
       } else {
         setActivePasses([]);
       }
@@ -265,12 +268,12 @@ const TeacherDashboard = () => {
 
   // --- Effects ---
 
-  // Initial Data Load
+  // Initial Class Load
   useEffect(() => { 
     if(userId) fetchClasses(); 
   }, [userId, fetchClasses]);
 
-  // Realtime Subscription (The Filter Fix)
+  // Realtime Subscription
   useEffect(() => {
     if (!selectedClassId || !userId) return;
 
@@ -285,8 +288,6 @@ const TeacherDashboard = () => {
             event: '*', 
             schema: 'public', 
             table: 'passes',
-            // IMPORTANT: This filter prevents receiving events for other classes
-            // This massively reduces data usage and re-renders
             filter: `class_id=eq.${selectedClassId}` 
           }, 
           () => fetchPasses(selectedClassId)
@@ -335,7 +336,6 @@ const TeacherDashboard = () => {
       approved_by: userId,
       is_quota_override: override
     }).eq('id', id);
-    // Realtime will handle the UI update
   };
 
   const handleDeny = async (id: string) => {
@@ -385,20 +385,31 @@ const TeacherDashboard = () => {
     }
   };
 
-  // --- History ---
+  // --- History (Fix 400 for History too) ---
   const fetchStudentHistory = useCallback(async (studentId: string) => {
     setLoadingHistory(true);
-    const { data } = await supabase
+    
+    // Manual Join for History
+    const { data: rawHistory } = await supabase
       .from('passes')
-      .select(`
-        id, destination, requested_at, approved_at, returned_at, class_id,
-        classes (name, period_order)
-      `)
+      .select('id, destination, requested_at, approved_at, returned_at, class_id')
       .eq('student_id', studentId)
       .order('requested_at', { ascending: false })
-      .limit(50); // Hard limit to save bandwidth
+      .limit(50);
       
-    setStudentHistory(data || []);
+    if (rawHistory && rawHistory.length > 0) {
+        const classIds = rawHistory.map(p => p.class_id);
+        const { data: cData } = await supabase.from('classes').select('id, name, period_order').in('id', classIds);
+        const cMap = new Map(cData?.map(c => [c.id, c]));
+        
+        const mappedHistory = rawHistory.map(p => ({
+            ...p,
+            classes: cMap.get(p.class_id)
+        }));
+        setStudentHistory(mappedHistory);
+    } else {
+        setStudentHistory([]);
+    }
     setLoadingHistory(false);
   }, []);
 
