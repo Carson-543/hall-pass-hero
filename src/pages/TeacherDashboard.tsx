@@ -67,6 +67,9 @@ const TeacherDashboard = () => {
   const { user, role, signOut, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const isVisible = usePageVisibility();
+  
+  // CRITICAL FIX: Depend on primitive ID string, not the full user object
+  const userId = user?.id;
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Core Data
@@ -104,24 +107,29 @@ const TeacherDashboard = () => {
 
   // --- Main Data Fetching Logic ---
 
+  // 1. Fetch Classes (Optimized: Specific columns only)
   const fetchClasses = useCallback(async () => {
-    if (!user) return;
+    if (!userId) return;
+    
     const { data } = await supabase
       .from('classes')
-      .select('*')
-      .eq('teacher_id', user.id)
+      .select('id, name, period_order, join_code')
+      .eq('teacher_id', userId)
       .order('period_order');
 
     if (data && data.length > 0) {
       setClasses(data);
-      if (!selectedClassId || !data.find(c => c.id === selectedClassId)) {
-        setSelectedClassId(data[0].id);
-      }
+      // Logic to prevent resetting selection on every re-fetch
+      setSelectedClassId(prev => {
+        if (prev && data.find(c => c.id === prev)) return prev;
+        return data[0].id;
+      });
     } else {
       setClasses([]);
     }
-  }, [user, selectedClassId]);
+  }, [userId]);
 
+  // 2. Fetch Roster
   const fetchRoster = useCallback(async (classId: string) => {
     const { data: enrollments } = await supabase
       .from('class_enrollments')
@@ -145,42 +153,44 @@ const TeacherDashboard = () => {
     }
   }, []);
 
-  // --- ROBUST FETCH PASSES FUNCTION ---
+  // 3. Fetch Passes (Robust & 400 Error Safe)
   const fetchPasses = useCallback(async (classId: string) => {
-    if (!user || !classId) return;
-    console.log("💸 DATA COST: Fetching passes from Supabase...");
+    if (!userId || !classId) return;
+
     try {
-      // 1. Get Weekly Limit (Fail-safe: defaults to 4)
-      let limit = 4;
-      try {
-        const { data: settings } = await supabase.from('weekly_quota_settings').select('weekly_limit').single();
-        if (settings) limit = settings.weekly_limit;
-      } catch (e) {
-        console.log("Using default weekly limit");
-      }
+      // A. Settings (Use maybeSingle to prevent 406 errors)
+      const { data: settings } = await supabase
+        .from('weekly_quota_settings')
+        .select('weekly_limit')
+        .maybeSingle();
+      
+      const limit = settings?.weekly_limit ?? 4;
       setWeeklyLimit(limit);
 
-      // 2. Fetch Pending Passes (Based on Class ID)
-      const { data: pendingData } = await supabase
+      // B. Pending Passes (Corrected Syntax)
+      // We remove the alias (profiles:student_id) to let Supabase auto-detect the relationship
+      const { data: pendingData, error: pendingError } = await supabase
         .from('passes')
         .select(`
-          id, student_id, destination, status, requested_at, approved_at,
-          profiles:student_id ( full_name )
+          id, student_id, destination, status, requested_at,
+          profiles ( full_name )
         `)
         .eq('class_id', classId)
         .eq('status', 'pending');
 
+      if (pendingError) {
+        console.error("Error fetching pending:", pendingError);
+      }
+
       const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString();
 
-      // Process Pending (Check Quotas)
       const pendingMapped = pendingData ? await Promise.all(pendingData.map(async (p: any) => {
         let isExceeded = false;
-        
-        // Only check quota if it's a Restroom pass
         if (p.destination === 'Restroom') {
+           // HEAD request for count is much lighter on data
            const { count } = await supabase
             .from('passes')
-            .select('*', { count: 'exact', head: true })
+            .select('id', { count: 'exact', head: true })
             .eq('student_id', p.student_id)
             .eq('destination', 'Restroom')
             .in('status', ['approved', 'pending_return', 'returned'])
@@ -188,11 +198,14 @@ const TeacherDashboard = () => {
            
            isExceeded = (count || 0) >= limit;
         }
+        
+        // Handle if profiles is returned as array or object
+        const sName = Array.isArray(p.profiles) ? p.profiles[0]?.full_name : p.profiles?.full_name;
 
         return {
           id: p.id,
           student_id: p.student_id,
-          student_name: p.profiles?.full_name || 'Unknown Student',
+          student_name: sName || 'Unknown',
           destination: p.destination,
           status: p.status,
           requested_at: p.requested_at,
@@ -202,8 +215,7 @@ const TeacherDashboard = () => {
 
       setPendingPasses(pendingMapped);
 
-      // 3. Fetch Active Passes (For enrolled students)
-      // First get IDs of students in this class
+      // C. Active Passes
       const { data: enrollments } = await supabase
         .from('class_enrollments')
         .select('student_id')
@@ -212,27 +224,34 @@ const TeacherDashboard = () => {
       const studentIds = enrollments?.map(e => e.student_id) || [];
 
       if (studentIds.length > 0) {
-        const { data: activeData } = await supabase
+        const { data: activeData, error: activeError } = await supabase
           .from('passes')
           .select(`
             id, student_id, destination, status, requested_at, approved_at,
-            profiles:student_id ( full_name ),
-            classes:class_id ( name )
+            profiles ( full_name ),
+            classes ( name )
           `)
           .in('student_id', studentIds)
           .in('status', ['approved', 'pending_return']);
 
-        const activeMapped = activeData?.map((p: any) => ({
-          id: p.id,
-          student_id: p.student_id,
-          student_name: p.profiles?.full_name || 'Unknown Student',
-          destination: p.destination,
-          status: p.status,
-          requested_at: p.requested_at,
-          approved_at: p.approved_at,
-          is_quota_exceeded: false,
-          from_class_name: p.classes?.name
-        })) || [];
+        if (activeError) console.error("Error fetching active:", activeError);
+
+        const activeMapped = activeData?.map((p: any) => {
+          const sName = Array.isArray(p.profiles) ? p.profiles[0]?.full_name : p.profiles?.full_name;
+          const cName = Array.isArray(p.classes) ? p.classes[0]?.name : p.classes?.name;
+
+          return {
+            id: p.id,
+            student_id: p.student_id,
+            student_name: sName || 'Unknown',
+            destination: p.destination,
+            status: p.status,
+            requested_at: p.requested_at,
+            approved_at: p.approved_at,
+            is_quota_exceeded: false,
+            from_class_name: cName
+          };
+        }) || [];
 
         setActivePasses(activeMapped);
       } else {
@@ -240,37 +259,49 @@ const TeacherDashboard = () => {
       }
 
     } catch (error) {
-      console.error("Critical error fetching passes:", error);
-      toast({ title: "Sync Error", description: "Could not refresh passes.", variant: "destructive" });
+      console.error("Critical Fetch Error:", error);
     }
-  }, [user, toast]);
+  }, [userId]);
 
   // --- Effects ---
 
-  // Initial load
-  useEffect(() => { fetchClasses(); }, [fetchClasses]);
+  // Initial Data Load
+  useEffect(() => { 
+    if(userId) fetchClasses(); 
+  }, [userId, fetchClasses]);
 
-  // When class changes
+  // Realtime Subscription (The Filter Fix)
   useEffect(() => {
-    if (selectedClassId) {
-      fetchRoster(selectedClassId);
-      fetchPasses(selectedClassId);
-      console.log("🔄 useEffect fired! Timestamp:", new Date().toISOString());
-      
-      // Realtime subscription
-      if (isVisible) {
-        channelRef.current = supabase.channel(`teacher-view-${selectedClassId}`)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'passes' }, 
-            () => fetchPasses(selectedClassId))
-          .subscribe();
-      }
+    if (!selectedClassId || !userId) return;
+
+    fetchRoster(selectedClassId);
+    fetchPasses(selectedClassId);
+
+    if (isVisible) {
+      const channel = supabase.channel(`teacher-${selectedClassId}`)
+        .on(
+          'postgres_changes',
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'passes',
+            // IMPORTANT: This filter prevents receiving events for other classes
+            // This massively reduces data usage and re-renders
+            filter: `class_id=eq.${selectedClassId}` 
+          }, 
+          () => fetchPasses(selectedClassId)
+        )
+        .subscribe();
+
+      channelRef.current = channel;
     }
+
     return () => {
       if (channelRef.current) supabase.removeChannel(channelRef.current);
     };
-  }, [selectedClassId, isVisible, fetchPasses, fetchRoster]);
+  }, [selectedClassId, isVisible, fetchPasses, fetchRoster, userId]);
 
-  // Check quota for Quick Pass Dialog
+  // Quota Check
   useEffect(() => {
     if (!selectedStudentForPass || !createPassDialogOpen) {
       setQuickPassQuota(null);
@@ -281,7 +312,7 @@ const TeacherDashboard = () => {
       const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString();
       const { count } = await supabase
         .from('passes')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('student_id', selectedStudentForPass)
         .eq('destination', 'Restroom')
         .in('status', ['approved', 'pending_return', 'returned'])
@@ -297,35 +328,36 @@ const TeacherDashboard = () => {
   // --- Actions ---
 
   const handleApprove = async (id: string, override: boolean) => {
+    if (!userId) return;
     await supabase.from('passes').update({
       status: 'approved',
       approved_at: new Date().toISOString(),
-      approved_by: user!.id,
+      approved_by: userId,
       is_quota_override: override
     }).eq('id', id);
-    fetchPasses(selectedClassId); // Force immediate refresh
+    // Realtime will handle the UI update
   };
 
   const handleDeny = async (id: string) => {
+    if (!userId) return;
     await supabase.from('passes').update({ 
       status: 'denied', 
       denied_at: new Date().toISOString(), 
-      denied_by: user!.id 
+      denied_by: userId 
     }).eq('id', id);
-    fetchPasses(selectedClassId);
   };
 
   const handleCheckIn = async (id: string) => {
+    if (!userId) return;
     await supabase.from('passes').update({ 
       status: 'returned', 
       returned_at: new Date().toISOString(), 
-      confirmed_by: user!.id 
+      confirmed_by: userId 
     }).eq('id', id);
-    fetchPasses(selectedClassId);
   };
 
   const handleQuickPass = async () => {
-    if (!selectedStudentForPass || !selectedDestination || isActionLoading) return;
+    if (!selectedStudentForPass || !selectedDestination || isActionLoading || !userId) return;
     setIsActionLoading(true);
     const dest = selectedDestination === 'Other' ? customDestination : selectedDestination;
     const isOverride = (dest === 'Restroom' && quickPassQuota?.exceeded) || false;
@@ -336,7 +368,7 @@ const TeacherDashboard = () => {
       destination: dest,
       status: 'approved',
       approved_at: new Date().toISOString(),
-      approved_by: user!.id,
+      approved_by: userId,
       is_quota_override: isOverride
     });
 
@@ -348,20 +380,24 @@ const TeacherDashboard = () => {
       setCustomDestination('');
       setQuickPassQuota(null);
       toast({ title: 'Pass Issued' });
-      fetchPasses(selectedClassId);
     } else {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
 
-  // --- History Logic ---
+  // --- History ---
   const fetchStudentHistory = useCallback(async (studentId: string) => {
     setLoadingHistory(true);
     const { data } = await supabase
       .from('passes')
-      .select(`*, classes (name, period_order)`)
+      .select(`
+        id, destination, requested_at, approved_at, returned_at, class_id,
+        classes (name, period_order)
+      `)
       .eq('student_id', studentId)
-      .order('requested_at', { ascending: false });
+      .order('requested_at', { ascending: false })
+      .limit(50); // Hard limit to save bandwidth
+      
     setStudentHistory(data || []);
     setLoadingHistory(false);
   }, []);
@@ -576,13 +612,12 @@ const TeacherDashboard = () => {
                   ))}
                 </div>
              </div>
-
              <div className="space-y-2">
                <Button onClick={handleQuickPass} className="w-full h-12 rounded-xl font-bold" disabled={isActionLoading || !selectedStudentForPass || !selectedDestination}>
                  {isActionLoading ? <Loader2 className="animate-spin h-4 w-4" /> : "Issue Pass"}
                </Button>
                {selectedStudentForPass && (selectedDestination === 'Restroom' || !selectedDestination) && (
-                 <div className="text-center text-xs font-medium transition-all duration-300">
+                 <div className="text-center text-xs font-medium">
                     {loadingQuotaCheck ? (
                       <span className="text-muted-foreground flex items-center justify-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Checking limits...</span>
                     ) : quickPassQuota?.exceeded ? (
@@ -600,14 +635,10 @@ const TeacherDashboard = () => {
         </DialogContent>
       </Dialog>
       
-      {/* HISTORY DIALOG (Simplified for brevity but fully functional) */}
+      {/* HISTORY DIALOG */}
       <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
         <DialogContent className="rounded-3xl max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-              <History className="h-5 w-5 text-primary" /> {selectedStudent?.name}'s History
-            </DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle className="flex items-center gap-2 text-xl font-bold"><History className="h-5 w-5 text-primary" /> {selectedStudent?.name}'s History</DialogTitle></DialogHeader>
           <div className="flex gap-2 mb-2 mt-4">
             <Select value={historyFilterLocation} onValueChange={setHistoryFilterLocation}>
               <SelectTrigger className="rounded-xl bg-muted/50 border-none font-bold"><SelectValue placeholder="All Locations" /></SelectTrigger>
@@ -635,7 +666,7 @@ const TeacherDashboard = () => {
         </DialogContent>
       </Dialog>
       
-      <ClassManagementDialog open={classDialogOpen} onOpenChange={setClassDialogOpen} editingClass={editingClass} userId={user?.id || ''} onSaved={fetchClasses} />
+      <ClassManagementDialog open={classDialogOpen} onOpenChange={setClassDialogOpen} editingClass={editingClass} userId={userId || ''} onSaved={fetchClasses} />
       <StudentManagementDialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen} student={selectedStudent} currentClassId={selectedClassId} teacherClasses={classes} onUpdated={() => fetchRoster(selectedClassId)} />
     </div>
   );
