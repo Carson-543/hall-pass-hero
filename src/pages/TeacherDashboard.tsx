@@ -37,7 +37,7 @@ interface PendingPass {
   requested_at: string;
   approved_at?: string;
   is_quota_exceeded: boolean;
-  from_class_name?: string; // For global visibility
+  from_class_name?: string;
 }
 
 interface Student {
@@ -76,6 +76,7 @@ const TeacherDashboard = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const [weeklyLimit, setWeeklyLimit] = useState<number>(4); // Store limit globally
 
   // Dialog States
   const [createPassDialogOpen, setCreatePassDialogOpen] = useState(false);
@@ -83,9 +84,13 @@ const TeacherDashboard = () => {
   const [editingClass, setEditingClass] = useState<ClassInfo | null>(null);
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  
+  // Quick Pass Specific States
   const [selectedStudentForPass, setSelectedStudentForPass] = useState('');
   const [selectedDestination, setSelectedDestination] = useState('');
   const [customDestination, setCustomDestination] = useState('');
+  const [quickPassQuota, setQuickPassQuota] = useState<{ count: number; exceeded: boolean } | null>(null);
+  const [loadingQuotaCheck, setLoadingQuotaCheck] = useState(false);
 
   // History & Filter States
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
@@ -145,15 +150,23 @@ const TeacherDashboard = () => {
   const fetchPasses = useCallback(async (classId: string) => {
     if (!user) return;
 
-    // 1. Fetch current class requests (Pending)
+    // 1. Fetch Dynamic Quota Settings
+    const { data: settings } = await supabase
+      .from('weekly_quota_settings')
+      .select('weekly_limit')
+      .single();
+    
+    const limit = settings?.weekly_limit ?? 4;
+    setWeeklyLimit(limit); // Update global state
+
+    // 2. Fetch current class requests (Pending)
     const { data: currentRequests } = await supabase
       .from('passes')
       .select('id, student_id, destination, status, requested_at, approved_at, profiles:student_id(full_name)')
       .eq('class_id', classId)
       .eq('status', 'pending');
 
-    // 2. Fetch GLOBAL Active Passes for any student in THIS class
-    // This allows you to see if your student is currently out from another teacher's class
+    // 3. Fetch GLOBAL Active Passes
     const studentIds = students.map(s => s.id);
     const { data: allActiveForMyStudents } = await supabase
       .from('passes')
@@ -163,16 +176,19 @@ const TeacherDashboard = () => {
 
     const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString();
     
-    // Process Requests
     const processedPending = currentRequests ? await Promise.all(currentRequests.map(async (p: any) => {
-      const { count } = await supabase
-        .from('passes')
-        .select('*', { count: 'exact', head: true })
-        .eq('student_id', p.student_id)
-        .eq('destination', 'Restroom')
-        .in('status', ['approved', 'pending_return', 'returned'])
-        .gte('requested_at', weekStart);
-      
+      let isExceeded = false;
+      if (p.destination === 'Restroom') {
+        const { count } = await supabase
+          .from('passes')
+          .select('*', { count: 'exact', head: true })
+          .eq('student_id', p.student_id)
+          .eq('destination', 'Restroom')
+          .in('status', ['approved', 'pending_return', 'returned'])
+          .gte('requested_at', weekStart);
+        
+        isExceeded = (count ?? 0) >= limit;
+      }
       return {
         id: p.id,
         student_id: p.student_id,
@@ -180,11 +196,10 @@ const TeacherDashboard = () => {
         destination: p.destination,
         status: p.status,
         requested_at: p.requested_at,
-        is_quota_exceeded: (count ?? 0) >= 4
+        is_quota_exceeded: isExceeded
       };
     })) : [];
 
-    // Process Active (including those from other classes)
     const processedActive = allActiveForMyStudents?.map((p: any) => ({
       id: p.id,
       student_id: p.student_id,
@@ -200,6 +215,36 @@ const TeacherDashboard = () => {
     setPendingPasses(processedPending);
     setActivePasses(processedActive);
   }, [user, students]);
+
+  // NEW: Check quota for specific student in Quick Pass Dialog
+  useEffect(() => {
+    if (!selectedStudentForPass || !createPassDialogOpen) {
+      setQuickPassQuota(null);
+      return;
+    }
+
+    const checkQuota = async () => {
+      setLoadingQuotaCheck(true);
+      const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString();
+      
+      const { count } = await supabase
+        .from('passes')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_id', selectedStudentForPass)
+        .eq('destination', 'Restroom')
+        .in('status', ['approved', 'pending_return', 'returned'])
+        .gte('requested_at', weekStart);
+      
+      const currentCount = count ?? 0;
+      setQuickPassQuota({
+        count: currentCount,
+        exceeded: currentCount >= weeklyLimit
+      });
+      setLoadingQuotaCheck(false);
+    };
+
+    checkQuota();
+  }, [selectedStudentForPass, createPassDialogOpen, weeklyLimit]);
 
   const fetchStudentHistory = useCallback(async (studentId: string) => {
     setLoadingHistory(true);
@@ -235,14 +280,9 @@ const TeacherDashboard = () => {
     }
   }, [selectedClassId, fetchRoster]);
 
-  // Real-time subscription with tab visibility optimization
   useEffect(() => {
     if (!selectedClassId || students.length < 0) return;
-
-    // Always fetch on mount or class change
     fetchPasses(selectedClassId);
-
-    // Only subscribe to real-time when tab is visible
     if (isVisible) {
       channelRef.current = supabase.channel(`teacher-view-${selectedClassId}`)
         .on('postgres_changes', { 
@@ -252,7 +292,6 @@ const TeacherDashboard = () => {
         }, () => fetchPasses(selectedClassId))
         .subscribe();
     }
-
     return () => { 
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
@@ -261,7 +300,6 @@ const TeacherDashboard = () => {
     };
   }, [selectedClassId, students.length, fetchPasses, isVisible]);
 
-  // Refresh data when tab becomes visible again
   useEffect(() => {
     if (isVisible && selectedClassId) {
       fetchPasses(selectedClassId);
@@ -279,7 +317,7 @@ const TeacherDashboard = () => {
       status: 'approved',
       approved_at: new Date().toISOString(),
       approved_by: user!.id,
-      is_quota_override: override // Fix: Correct column name
+      is_quota_override: override
     }).eq('id', id);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
   };
@@ -305,14 +343,17 @@ const TeacherDashboard = () => {
     setIsActionLoading(true);
     const dest = selectedDestination === 'Other' ? customDestination : selectedDestination;
     
+    // Check override if restroom and limit exceeded
+    const isOverride = (dest === 'Restroom' && quickPassQuota?.exceeded) || false;
+
     const { error } = await supabase.from('passes').insert({
       student_id: selectedStudentForPass,
       class_id: selectedClassId,
       destination: dest,
       status: 'approved',
       approved_at: new Date().toISOString(),
-      approved_by: user!.id, // Fix: Added required field
-      is_quota_override: false
+      approved_by: user!.id,
+      is_quota_override: isOverride
     });
 
     setIsActionLoading(false);
@@ -321,6 +362,7 @@ const TeacherDashboard = () => {
       setSelectedStudentForPass('');
       setSelectedDestination('');
       setCustomDestination('');
+      setQuickPassQuota(null); // Reset quota state
       toast({ title: 'Pass Issued' });
     } else {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -345,14 +387,9 @@ const TeacherDashboard = () => {
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Pass Management</p>
           </div>
         </div>
-       <Button 
-      variant="ghost" 
-      size="sm" 
-      onClick={signOut} 
-      className="text-muted-foreground hover:text-destructive"
-    >
-      <LogOut className="h-4 w-4 mr-2" /> Sign Out
-    </Button>
+       <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground hover:text-destructive">
+          <LogOut className="h-4 w-4 mr-2" /> Sign Out
+        </Button>
       </header>
 
       <div className="space-y-6">
@@ -609,9 +646,32 @@ const TeacherDashboard = () => {
                   ))}
                 </div>
              </div>
-             <Button onClick={handleQuickPass} className="w-full h-12 rounded-xl font-bold" disabled={isActionLoading || !selectedStudentForPass || !selectedDestination}>
-               {isActionLoading ? <Loader2 className="animate-spin h-4 w-4" /> : "Issue Pass"}
-             </Button>
+
+             <div className="space-y-2">
+               <Button onClick={handleQuickPass} className="w-full h-12 rounded-xl font-bold" disabled={isActionLoading || !selectedStudentForPass || !selectedDestination}>
+                 {isActionLoading ? <Loader2 className="animate-spin h-4 w-4" /> : "Issue Pass"}
+               </Button>
+
+               {/* QUOTA WARNING MESSAGE */}
+               {selectedStudentForPass && (selectedDestination === 'Restroom' || !selectedDestination) && (
+                 <div className="text-center text-xs font-medium transition-all duration-300">
+                    {loadingQuotaCheck ? (
+                      <span className="text-muted-foreground flex items-center justify-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Checking limits...
+                      </span>
+                    ) : quickPassQuota?.exceeded ? (
+                      <div className="text-destructive flex items-center justify-center gap-1.5 p-2 bg-destructive/10 rounded-lg animate-in fade-in slide-in-from-top-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        <span>Weekly limit reached ({quickPassQuota.count}/{weeklyLimit})</span>
+                      </div>
+                    ) : quickPassQuota && (
+                      <span className="text-muted-foreground">
+                        Weekly usage: {quickPassQuota.count}/{weeklyLimit}
+                      </span>
+                    )}
+                 </div>
+               )}
+             </div>
           </div>
         </DialogContent>
       </Dialog>
