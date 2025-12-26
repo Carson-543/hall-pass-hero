@@ -148,7 +148,7 @@ const TeacherDashboard = () => {
   // --- ROBUST FETCH PASSES FUNCTION ---
   const fetchPasses = useCallback(async (classId: string) => {
     if (!user || !classId) return;
-
+    console.log("💸 DATA COST: Fetching passes from Supabase...");
     try {
       // 1. Get Weekly Limit (Fail-safe: defaults to 4)
       let limit = 4;
@@ -255,7 +255,8 @@ const TeacherDashboard = () => {
     if (selectedClassId) {
       fetchRoster(selectedClassId);
       fetchPasses(selectedClassId);
-
+      console.log("🔄 useEffect fired! Timestamp:", new Date().toISOString());
+      
       // Realtime subscription
       if (isVisible) {
         channelRef.current = supabase.channel(`teacher-view-${selectedClassId}`)
