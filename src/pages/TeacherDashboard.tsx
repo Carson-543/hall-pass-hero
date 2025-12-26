@@ -345,9 +345,14 @@ const TeacherDashboard = () => {
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Pass Management</p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={signOut} className="rounded-full bg-card shadow-sm border">
-          <LogOut className="h-5 w-5 text-muted-foreground" />
-        </Button>
+       <Button 
+      variant="ghost" 
+      size="sm" 
+      onClick={signOut} 
+      className="text-muted-foreground hover:text-destructive"
+    >
+      <LogOut className="h-4 w-4 mr-2" /> Sign Out
+    </Button>
       </header>
 
       <div className="space-y-6">
