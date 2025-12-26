@@ -141,6 +141,8 @@ const AdminDashboard = () => {
       return;
     }
 
+    console.log("Fetching Active Passes");
+    
     const studentIds = [...new Set(passes.map(p => p.student_id))];
     const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', studentIds);
     const profileMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
