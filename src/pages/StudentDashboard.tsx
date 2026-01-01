@@ -165,7 +165,8 @@ const StudentDashboard = () => {
           filter: `student_id=eq.${user.id}`
         },
         (payload) => {
-          console.log("%c⚡ REALTIME EVENT: Pass changed", "color: #a855f7; font-weight: bold;", payload.eventType, payload.new?.status);
+          const newRecord = payload.new as { status?: string } | undefined;
+          console.log("%c⚡ REALTIME EVENT: Pass changed", "color: #a855f7; font-weight: bold;", payload.eventType, newRecord?.status);
           fetchActivePass();
 
           if (payload.eventType === 'UPDATE') {

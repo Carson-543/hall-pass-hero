@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_deletion_requests: {
+        Row: {
+          id: string
+          organization_id: string | null
+          reason: string | null
+          requested_at: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          organization_id?: string | null
+          reason?: string | null
+          requested_at?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string | null
+          reason?: string | null
+          requested_at?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_deletion_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       class_enrollments: {
         Row: {
           class_id: string
@@ -49,6 +90,7 @@ export type Database = {
           id: string
           join_code: string
           name: string
+          organization_id: string | null
           period_order: number
           teacher_id: string
         }
@@ -57,6 +99,7 @@ export type Database = {
           id?: string
           join_code: string
           name: string
+          organization_id?: string | null
           period_order: number
           teacher_id: string
         }
@@ -65,23 +108,173 @@ export type Database = {
           id?: string
           join_code?: string
           name?: string
+          organization_id?: string | null
           period_order?: number
           teacher_id?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "classes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_memberships: {
+        Row: {
+          id: string
+          joined_at: string | null
+          organization_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string | null
+          organization_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string | null
+          organization_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_memberships_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_settings: {
+        Row: {
+          bathroom_expected_minutes: number | null
+          default_period_count: number | null
+          id: string
+          locker_expected_minutes: number | null
+          max_concurrent_bathroom: number | null
+          office_expected_minutes: number | null
+          organization_id: string
+          require_deletion_approval: boolean | null
+          updated_at: string | null
+          weekly_bathroom_limit: number | null
+        }
+        Insert: {
+          bathroom_expected_minutes?: number | null
+          default_period_count?: number | null
+          id?: string
+          locker_expected_minutes?: number | null
+          max_concurrent_bathroom?: number | null
+          office_expected_minutes?: number | null
+          organization_id: string
+          require_deletion_approval?: boolean | null
+          updated_at?: string | null
+          weekly_bathroom_limit?: number | null
+        }
+        Update: {
+          bathroom_expected_minutes?: number | null
+          default_period_count?: number | null
+          id?: string
+          locker_expected_minutes?: number | null
+          max_concurrent_bathroom?: number | null
+          office_expected_minutes?: number | null
+          organization_id?: string
+          require_deletion_approval?: boolean | null
+          updated_at?: string | null
+          weekly_bathroom_limit?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          name: string
+          slug: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          name?: string
+          slug?: string
+        }
         Relationships: []
+      }
+      pass_freezes: {
+        Row: {
+          class_id: string
+          ends_at: string | null
+          freeze_type: string
+          id: string
+          is_active: boolean | null
+          started_at: string | null
+          teacher_id: string
+        }
+        Insert: {
+          class_id: string
+          ends_at?: string | null
+          freeze_type: string
+          id?: string
+          is_active?: boolean | null
+          started_at?: string | null
+          teacher_id: string
+        }
+        Update: {
+          class_id?: string
+          ends_at?: string | null
+          freeze_type?: string
+          id?: string
+          is_active?: boolean | null
+          started_at?: string | null
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pass_freezes_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: true
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       passes: {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          auto_approved: boolean | null
           checked_in_at: string | null
           class_id: string
           confirmed_by: string | null
           denied_at: string | null
           denied_by: string | null
           destination: string
+          expected_return_at: string | null
           id: string
           is_quota_override: boolean | null
+          queue_position: number | null
           requested_at: string | null
           returned_at: string | null
           status: Database["public"]["Enums"]["pass_status"] | null
@@ -90,14 +283,17 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          auto_approved?: boolean | null
           checked_in_at?: string | null
           class_id: string
           confirmed_by?: string | null
           denied_at?: string | null
           denied_by?: string | null
           destination: string
+          expected_return_at?: string | null
           id?: string
           is_quota_override?: boolean | null
+          queue_position?: number | null
           requested_at?: string | null
           returned_at?: string | null
           status?: Database["public"]["Enums"]["pass_status"] | null
@@ -106,14 +302,17 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          auto_approved?: boolean | null
           checked_in_at?: string | null
           class_id?: string
           confirmed_by?: string | null
           denied_at?: string | null
           denied_by?: string | null
           destination?: string
+          expected_return_at?: string | null
           id?: string
           is_quota_override?: boolean | null
+          queue_position?: number | null
           requested_at?: string | null
           returned_at?: string | null
           status?: Database["public"]["Enums"]["pass_status"] | null
@@ -177,6 +376,7 @@ export type Database = {
           full_name: string
           id: string
           is_approved: boolean | null
+          organization_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -185,6 +385,7 @@ export type Database = {
           full_name: string
           id: string
           is_approved?: boolean | null
+          organization_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -193,9 +394,18 @@ export type Database = {
           full_name?: string
           id?: string
           is_approved?: boolean | null
+          organization_id?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       schedule_assignments: {
         Row: {
@@ -233,6 +443,7 @@ export type Database = {
           id: string
           is_school_day: boolean | null
           name: string
+          organization_id: string | null
         }
         Insert: {
           color?: string | null
@@ -240,6 +451,7 @@ export type Database = {
           id?: string
           is_school_day?: boolean | null
           name: string
+          organization_id?: string | null
         }
         Update: {
           color?: string | null
@@ -247,8 +459,65 @@ export type Database = {
           id?: string
           is_school_day?: boolean | null
           name?: string
+          organization_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "schedules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      substitute_assignments: {
+        Row: {
+          class_id: string
+          created_at: string | null
+          created_by: string | null
+          date: string
+          id: string
+          organization_id: string
+          original_teacher_id: string
+          substitute_teacher_id: string
+        }
+        Insert: {
+          class_id: string
+          created_at?: string | null
+          created_by?: string | null
+          date: string
+          id?: string
+          organization_id: string
+          original_teacher_id: string
+          substitute_teacher_id: string
+        }
+        Update: {
+          class_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          date?: string
+          id?: string
+          organization_id?: string
+          original_teacher_id?: string
+          substitute_teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "substitute_assignments_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "substitute_assignments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -297,8 +566,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_sub_for_class: {
+        Args: { _class_id: string; _user_id: string }
+        Returns: boolean
+      }
       delete_user_and_data: { Args: { _user_id: string }; Returns: undefined }
       generate_join_code: { Args: never; Returns: string }
+      get_bathroom_queue_position: {
+        Args: { _class_id: string; _pass_id: string }
+        Returns: number
+      }
+      get_expected_return_time: {
+        Args: { _class_id: string; _destination: string }
+        Returns: string
+      }
+      get_user_organization: { Args: { _user_id: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -313,6 +595,7 @@ export type Database = {
       }
       is_class_teacher: { Args: { _class_id: string }; Returns: boolean }
       is_enrolled_in_class: { Args: { _class_id: string }; Returns: boolean }
+      is_same_organization: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "student" | "teacher" | "admin"
