@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
-import { Loader2 } from 'lucide-react';
+// Added Eye and EyeOff icons
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 const emailSchema = z.string().email('Invalid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
@@ -25,6 +26,9 @@ const Auth = () => {
   const { organization, organizationId, loading: orgLoading } = useOrganization();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+
+  // Added state for password visibility
+  const [showPassword, setShowPassword] = useState(false);
 
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -46,7 +50,6 @@ const Auth = () => {
 
   const { signIn, signUp } = useAuth();
 
-  // Check if user needs to select organization
   useEffect(() => {
     if (user && role && !orgLoading && !organizationId) {
       setShowOrgSelector(true);
@@ -99,7 +102,6 @@ const Auth = () => {
     );
   }
 
-  // Show organization selector if user is logged in but has no organization
   if (showOrgSelector && user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -108,7 +110,6 @@ const Auth = () => {
             userId={user.id}
             isAdmin={role === 'admin'}
             onComplete={() => {
-              // Reload to fetch organization context
               window.location.reload();
             }}
           />
@@ -146,7 +147,6 @@ const Auth = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     try {
       emailSchema.parse(loginEmail);
       passwordSchema.parse(loginPassword);
@@ -176,30 +176,14 @@ const Auth = () => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-
     try {
       emailSchema.parse(signupEmail);
       passwordSchema.parse(signupPassword);
-      if (!signupName.trim()) {
-        throw new Error('Name is required');
-      }
+      if (!signupName.trim()) throw new Error('Name is required');
     } catch (err) {
-      if (err instanceof z.ZodError) {
-        toast({
-          title: 'Validation Error',
-          description: err.errors[0].message,
-          variant: 'destructive'
-        });
-        return;
-      }
-      if (err instanceof Error) {
-        toast({
-          title: 'Validation Error',
-          description: err.message,
-          variant: 'destructive'
-        });
-        return;
-      }
+      const msg = err instanceof z.ZodError ? err.errors[0].message : (err as Error).message;
+      toast({ title: 'Validation Error', description: msg, variant: 'destructive' });
+      return;
     }
 
     setIsLoading(true);
@@ -211,17 +195,11 @@ const Auth = () => {
       if (message.includes('already registered')) {
         message = 'An account with this email already exists. Please log in instead.';
       }
-      toast({
-        title: 'Signup Failed',
-        description: message,
-        variant: 'destructive'
-      });
+      toast({ title: 'Signup Failed', description: message, variant: 'destructive' });
     } else {
       toast({
         title: 'Account Created',
-        description: signupRole === 'student' 
-          ? 'You can now log in!' 
-          : 'Your account is pending admin approval.',
+        description: signupRole === 'student' ? 'You can now log in!' : 'Your account is pending admin approval.',
       });
     }
   };
@@ -265,14 +243,25 @@ const Auth = () => {
                       Forgot password?
                     </Button>
                   </div>
-                  <Input
-                    id="login-password"
-                    type="password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                  />
+                  {/* Password Input with Eye Toggle */}
+                  <div className="relative">
+                    <Input
+                      id="login-password"
+                      type={showPassword ? "text" : "password"}
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="pr-10"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? 'Signing in...' : 'Sign In'}
@@ -306,14 +295,25 @@ const Auth = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Password</Label>
-                  <Input
-                    id="signup-password"
-                    type="password"
-                    value={signupPassword}
-                    onChange={(e) => setSignupPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                  />
+                  {/* Password Input with Eye Toggle */}
+                  <div className="relative">
+                    <Input
+                      id="signup-password"
+                      type={showPassword ? "text" : "password"}
+                      value={signupPassword}
+                      onChange={(e) => setSignupPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="pr-10"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-role">Role</Label>
