@@ -190,7 +190,7 @@ export const FreezeControls = ({ classId, teacherId }: FreezeControlsProps) => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="bathroom">Bathroom Only</SelectItem>
+                <SelectItem value="bathroom">Restroom Only</SelectItem>
                 <SelectItem value="all">All Passes</SelectItem>
               </SelectContent>
             </Select>
