@@ -152,7 +152,7 @@ const StudentDashboard = () => {
             <span className="text-primary-foreground font-black text-xl">S</span>
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Dashboard</h1>
+            <h1 className="text-2xl font-bold">Student Dashboard</h1>
             <p className="text-sm text-muted-foreground">{organization?.name}</p>
           </div>
         </div>
