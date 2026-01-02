@@ -60,7 +60,6 @@ const TeacherDashboard = () => {
   const { organization, settings } = useOrganization();
   const { toast } = useToast();
   const isVisible = usePageVisibility();
-  
   const userId = user?.id;
 
   // Core Data
@@ -90,8 +89,6 @@ const TeacherDashboard = () => {
   const [selectedStudentForPass, setSelectedStudentForPass] = useState('');
   const [selectedDestination, setSelectedDestination] = useState('');
   const [customDestination, setCustomDestination] = useState('');
-  const [loadingQuotaCheck, setLoadingQuotaCheck] = useState(false);
-  const [quickPassQuota, setQuickPassQuota] = useState<{ count: number; exceeded: boolean } | null>(null);
 
   // History State
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
@@ -112,7 +109,7 @@ const TeacherDashboard = () => {
     }
   };
 
-  // --- Database Actions ---
+  // --- Actions ---
   const fetchFreezeStatus = useCallback(async (classId: string) => {
     if (!classId) return;
     const { data } = await supabase.from('pass_freezes').select('id, freeze_type, ends_at').eq('class_id', classId).eq('is_active', true).maybeSingle();
@@ -150,9 +147,6 @@ const TeacherDashboard = () => {
 
   const fetchPasses = useCallback(async (classId: string) => {
     if (!userId || !classId) return;
-    const limit = settings?.weekly_bathroom_limit ?? 4;
-    setWeeklyLimit(limit);
-
     const { data: rawPending } = await supabase.from('passes').select('id, student_id, destination, status, requested_at').eq('class_id', classId).eq('status', 'pending').order('requested_at', { ascending: true });
     if (rawPending) {
       const pIds = rawPending.map(p => p.student_id);
@@ -161,12 +155,8 @@ const TeacherDashboard = () => {
       const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString();
 
       const pendingMapped = await Promise.all(rawPending.map(async (p: any) => {
-        let isExceeded = false;
-        if (p.destination === 'Restroom') {
-          const { count } = await supabase.from('passes').select('id', { count: 'exact', head: true }).eq('student_id', p.student_id).eq('destination', 'Restroom').in('status', ['approved', 'pending_return', 'returned']).gte('requested_at', weekStart);
-          isExceeded = (count || 0) >= limit;
-        }
-        return { id: p.id, student_id: p.student_id, student_name: nameMap.get(p.student_id) || 'Unknown', destination: p.destination, status: p.status, requested_at: p.requested_at, is_quota_exceeded: isExceeded };
+        const { count } = await supabase.from('passes').select('id', { count: 'exact', head: true }).eq('student_id', p.student_id).eq('destination', 'Restroom').in('status', ['approved', 'pending_return', 'returned']).gte('requested_at', weekStart);
+        return { id: p.id, student_id: p.student_id, student_name: nameMap.get(p.student_id) || 'Unknown', destination: p.destination, status: p.status, requested_at: p.requested_at, is_quota_exceeded: (count || 0) >= (settings?.weekly_bathroom_limit ?? 4) };
       }));
       setPendingPasses(pendingMapped);
     }
@@ -191,6 +181,22 @@ const TeacherDashboard = () => {
     if (profiles) setStudents(profiles.map(p => ({ id: p.id, name: p.full_name, email: p.email })));
   }, []);
 
+  const handleApprove = async (id: string, override: boolean) => {
+    if (!userId) return;
+    await supabase.from('passes').update({ status: 'approved', approved_at: new Date().toISOString(), approved_by: userId, is_quota_override: override }).eq('id', id);
+    toast({ title: "Pass Approved" });
+  };
+
+  const handleDeny = async (id: string) => {
+    await supabase.from('passes').update({ status: 'denied', denied_at: new Date().toISOString(), denied_by: userId }).eq('id', id);
+    toast({ title: "Pass Denied", variant: "destructive" });
+  };
+
+  const handleCheckIn = async (id: string) => {
+    await supabase.from('passes').update({ status: 'returned', returned_at: new Date().toISOString(), confirmed_by: userId }).eq('id', id);
+    toast({ title: "Student Returned" });
+  };
+
   const handleQuickPass = async () => {
     if (!selectedStudentForPass || !selectedDestination || !userId) return;
     const dest = selectedDestination === 'Other' ? customDestination : selectedDestination;
@@ -201,16 +207,9 @@ const TeacherDashboard = () => {
     if (!error) { setCreatePassDialogOpen(false); setSelectedStudentForPass(''); setSelectedDestination(''); toast({ title: 'Pass Issued' }); }
   };
 
-  // --- HISTORY LOGIC ---
   const fetchStudentHistory = useCallback(async (studentId: string) => {
     setLoadingHistory(true);
-    const { data: rawHistory } = await supabase
-      .from('passes')
-      .select('id, destination, requested_at, approved_at, returned_at, class_id')
-      .eq('student_id', studentId)
-      .order('requested_at', { ascending: false })
-      .limit(50);
-    
+    const { data: rawHistory } = await supabase.from('passes').select('id, destination, requested_at, approved_at, returned_at, class_id').eq('student_id', studentId).order('requested_at', { ascending: false }).limit(50);
     if (rawHistory) {
       const { data: cData } = await supabase.from('classes').select('id, name, period_order').in('id', rawHistory.map(p => p.class_id));
       const cMap = new Map(cData?.map(c => [c.id, c]));
@@ -219,27 +218,12 @@ const TeacherDashboard = () => {
     setLoadingHistory(false);
   }, []);
 
-  useEffect(() => {
-    if (historyDialogOpen && selectedStudent) fetchStudentHistory(selectedStudent.id);
-  }, [historyDialogOpen, selectedStudent, fetchStudentHistory]);
+  useEffect(() => { if (historyDialogOpen && selectedStudent) fetchStudentHistory(selectedStudent.id); }, [historyDialogOpen, selectedStudent, fetchStudentHistory]);
 
-  const filteredHistory = useMemo(() => {
-    return studentHistory.filter(pass => {
-      const matchesLoc = historyFilterLocation === 'all' || pass.destination === historyFilterLocation;
-      const matchesClass = historyFilterClass === 'all' || pass.class_id === historyFilterClass;
-      return matchesLoc && matchesClass;
-    });
-  }, [studentHistory, historyFilterLocation, historyFilterClass]);
+  const filteredHistory = useMemo(() => studentHistory.filter(pass => (historyFilterLocation === 'all' || pass.destination === historyFilterLocation) && (historyFilterClass === 'all' || pass.class_id === historyFilterClass)), [studentHistory, historyFilterLocation, historyFilterClass]);
 
-  const totalMinutes = useMemo(() => {
-    return filteredHistory.reduce((acc, pass) => {
-      if (!pass.returned_at || !pass.approved_at) return acc;
-      const diff = new Date(pass.returned_at).getTime() - new Date(pass.approved_at).getTime();
-      return acc + (diff / 60000);
-    }, 0);
-  }, [filteredHistory]);
+  const totalMinutes = useMemo(() => filteredHistory.reduce((acc, pass) => (pass.returned_at && pass.approved_at) ? acc + ((new Date(pass.returned_at).getTime() - new Date(pass.approved_at).getTime()) / 60000) : acc, 0), [filteredHistory]);
 
-  // Lifecycle
   useEffect(() => { if (userId) fetchClasses(); }, [userId, fetchClasses]);
   useEffect(() => {
     if (!selectedClassId || !userId) return;
@@ -270,68 +254,131 @@ const TeacherDashboard = () => {
 
       <div className="space-y-6">
         <PeriodDisplay />
+        
         <div className="flex gap-2">
           <Select value={selectedClassId} onValueChange={setSelectedClassId}>
             <SelectTrigger className="h-14 rounded-2xl bg-card border-none shadow-sm text-lg font-bold px-6 flex-1"><SelectValue placeholder="Select Class" /></SelectTrigger>
             <SelectContent>{classes.map(c => <SelectItem key={c.id} value={c.id}>Period {c.period_order}: {c.name}</SelectItem>)}</SelectContent>
           </Select>
+          <Button size="icon" variant="outline" className="h-14 w-14 rounded-2xl border-dashed" onClick={() => { setEditingClass(null); setClassDialogOpen(true); }}><Plus className="h-5 w-5" /></Button>
         </div>
 
         {selectedClassId && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center justify-between p-4 bg-card rounded-2xl shadow-sm border">
-                <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Queue Freeze</span>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant={!!activeFreeze ? "destructive" : "outline"} className={`group relative overflow-hidden transition-all duration-300 h-8 w-8 hover:w-44 rounded-full border shadow-sm ${!!activeFreeze ? 'bg-destructive text-destructive-foreground' : 'bg-background text-blue-500'}`} disabled={isFreezeLoading}>
-                      <div className="absolute left-0 flex items-center justify-center w-8 h-8">{isFreezeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Snowflake className={`h-4 w-4 ${activeFreeze ? 'animate-pulse' : ''}`} />}</div>
-                      <span className="ml-6 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-xs font-bold pl-1">{activeFreeze ? "Unfreeze Requests" : "Freeze Options"}</span>
+            <BathroomQueueStatus pendingCount={bathroomPending} activeCount={bathroomActive} maxConcurrent={settings?.max_concurrent_bathroom ?? 2} />
+
+            <div className="flex flex-col gap-8">
+              {/* REQUESTS SECTION */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <h2 className="text-sm font-black uppercase tracking-[0.2em] text-yellow-600">Class Requests ({pendingPasses.length})</h2>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant={!!activeFreeze ? "destructive" : "outline"} className={`group relative overflow-hidden transition-all duration-300 h-9 w-9 hover:w-44 rounded-full border shadow-sm ${!!activeFreeze ? 'bg-destructive text-destructive-foreground' : 'bg-background text-blue-500 hover:border-blue-300'}`} disabled={isFreezeLoading}>
+                        <div className="absolute left-0 flex items-center justify-center w-9 h-9">{isFreezeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Snowflake className={`h-4 w-4 ${activeFreeze ? 'animate-pulse' : ''}`} />}</div>
+                        <span className="ml-6 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-xs font-bold pl-1 uppercase tracking-tighter">{activeFreeze ? "Unfreeze Queue" : "Freeze Controls"}</span>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 rounded-3xl" align="end">
+                      {activeFreeze ? (
+                        <div className="space-y-3 text-center p-2"><p className="font-bold text-destructive">{activeFreeze.freeze_type === 'bathroom' ? 'Bathroom' : 'All'} Passes are Frozen</p><Button variant="destructive" className="w-full rounded-xl font-bold" onClick={handleUnfreeze}>Unfreeze Now</Button></div>
+                      ) : (
+                        <div className="space-y-4 p-2">
+                          <div className="space-y-2"><Label className="text-[10px] font-bold uppercase text-muted-foreground">Freeze Type</Label><Select value={freezeType} onValueChange={(v) => setFreezeType(v as 'bathroom' | 'all')}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="bathroom">Bathroom Only</SelectItem><SelectItem value="all">All Passes</SelectItem></SelectContent></Select></div>
+                          <div className="space-y-2"><Label className="text-[10px] font-bold uppercase text-muted-foreground">Timer (Minutes)</Label><Input type="number" placeholder="Stay frozen until manually cleared" value={timerMinutes} onChange={(e) => setTimerMinutes(e.target.value)} className="rounded-xl" /></div>
+                          <Button className="w-full font-bold rounded-xl" onClick={handleFreeze}>Freeze Pass Queue</Button>
+                        </div>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                
+                {pendingPasses.length === 0 ? (
+                  <div className="py-8 text-center bg-muted/20 rounded-2xl border-2 border-dashed"><p className="text-sm font-bold text-muted-foreground">No active requests</p></div>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingPasses.map(pass => (
+                      <Card key={pass.id} className={`rounded-2xl border-l-[6px] ${pass.is_quota_exceeded ? 'border-l-destructive shadow-destructive/5' : 'border-l-yellow-500'} shadow-sm`}>
+                        <CardContent className="p-5 flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-lg font-bold">{pass.student_name}</h3>
+                                {pass.is_quota_exceeded && <div className="bg-destructive/10 text-destructive text-[10px] px-2 py-0.5 rounded-full font-black flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> LIMIT REACHED</div>}
+                            </div>
+                            <span className={`inline-block mt-1 px-3 py-1 text-xs font-black rounded-full border tracking-wider uppercase ${getDestinationColor(pass.destination)}`}>{pass.destination}</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="icon" variant="secondary" className="h-12 w-12 rounded-xl bg-muted" onClick={() => handleDeny(pass.id)}><X className="h-5 w-5" /></Button>
+                            <Button size="icon" className="h-12 w-12 rounded-xl shadow-lg bg-primary text-primary-foreground" onClick={() => handleApprove(pass.id, pass.is_quota_exceeded)}><Check className="h-5 w-5" /></Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ACTIVE HALLWAY SECTION */}
+              <div className="space-y-4">
+                <h2 className="text-sm font-black uppercase tracking-[0.2em] text-green-600 border-b pb-2">Active Hallway ({activePasses.length})</h2>
+                {activePasses.length === 0 ? (
+                  <div className="py-8 text-center bg-muted/20 rounded-2xl border-2 border-dashed"><p className="text-sm font-bold text-muted-foreground">Hallway is empty</p></div>
+                ) : (
+                  <div className="space-y-3">
+                    {activePasses.map(pass => (
+                      <Card key={pass.id} className="rounded-2xl border-l-[6px] border-l-green-500 shadow-sm">
+                        <CardContent className="p-5 flex items-center justify-between">
+                          <div>
+                            <h3 className="text-lg font-bold">{pass.student_name}</h3>
+                            <div className="flex flex-wrap items-center gap-2 mt-2">
+                              {pass.from_class_name && <span className="text-[10px] font-black uppercase text-muted-foreground bg-muted px-2 py-1 rounded-md">{pass.from_class_name}</span>}
+                              <span className={`inline-block px-3 py-1 text-xs font-black rounded-full border tracking-wider uppercase ${getDestinationColor(pass.destination)}`}>{pass.destination}</span>
+                              {pass.approved_at && <div className="bg-green-500/10 text-green-600 px-3 py-1 rounded-full"><ElapsedTimer startTime={pass.approved_at} destination={pass.destination} /></div>}
+                            </div>
+                          </div>
+                          <Button onClick={() => handleCheckIn(pass.id)} className="rounded-xl h-12 px-6 shadow-md font-bold uppercase tracking-tight">Check In</Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ROSTER SECTION */}
+            <div className="space-y-4 pt-12 border-t mt-12">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="relative w-full sm:max-w-md">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input placeholder="Search class roster..." className="h-14 pl-12 rounded-2xl border-none shadow-inner bg-muted/40 font-medium" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                </div>
+                {currentClass && (
+                  <div className="flex items-center gap-4 bg-primary/5 border-2 border-primary/20 p-2 pl-6 rounded-2xl group w-full sm:w-auto justify-between">
+                    <div>
+                        <p className="text-[10px] font-black text-primary/60 uppercase leading-none mb-1">Join Code</p>
+                        <span className="text-2xl font-black tracking-[0.15em] text-primary">{currentClass.join_code}</span>
+                    </div>
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-12 w-12 rounded-xl bg-white shadow-sm hover:bg-primary hover:text-white transition-colors"
+                        onClick={() => {
+                            navigator.clipboard.writeText(currentClass.join_code);
+                            toast({ title: "Code Copied", description: "Copied to clipboard" });
+                        }}
+                    >
+                        <Copy className="h-5 w-5" />
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-72" align="end">
-                    {activeFreeze ? (
-                      <div className="space-y-3 text-center"><p className="font-bold text-destructive">{activeFreeze.freeze_type === 'bathroom' ? 'Bathroom' : 'All'} Passes are Frozen</p><Button variant="destructive" className="w-full" onClick={handleUnfreeze}>Unfreeze Now</Button></div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="space-y-2"><Label className="text-[10px] font-bold uppercase text-muted-foreground">Freeze Type</Label><Select value={freezeType} onValueChange={(v) => setFreezeType(v as 'bathroom' | 'all')}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="bathroom">Bathroom Only</SelectItem><SelectItem value="all">All Passes</SelectItem></SelectContent></Select></div>
-                        <div className="space-y-2"><Label className="text-[10px] font-bold uppercase text-muted-foreground">Timer (Minutes)</Label><Input type="number" placeholder="Manual Unfreeze" value={timerMinutes} onChange={(e) => setTimerMinutes(e.target.value)} className="rounded-xl" /></div>
-                        <Button className="w-full font-bold rounded-xl" onClick={handleFreeze}>Start Freeze</Button>
-                      </div>
-                    )}
-                  </PopoverContent>
-                </Popover>
+                  </div>
+                )}
               </div>
-              <BathroomQueueStatus pendingCount={bathroomPending} activeCount={bathroomActive} maxConcurrent={settings?.max_concurrent_bathroom ?? 2} />
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <h2 className="text-sm font-bold uppercase tracking-wider text-yellow-600">Requests ({pendingPasses.length})</h2>
-                {pendingPasses.map(pass => (
-                  <Card key={pass.id} className={`rounded-2xl border-l-4 ${pass.is_quota_exceeded ? 'border-l-destructive' : 'border-l-yellow-500'} shadow-sm`}><CardContent className="p-4 flex items-center justify-between"><div><h3 className="font-bold">{pass.student_name}</h3><span className={`inline-block mt-1 px-2 py-0.5 text-xs font-bold rounded-full border ${getDestinationColor(pass.destination)}`}>{pass.destination}</span></div></CardContent></Card>
-                ))}
-              </div>
-              <div className="space-y-3">
-                <h2 className="text-sm font-bold uppercase tracking-wider text-green-600">Active Hallway ({activePasses.length})</h2>
-                {activePasses.map(pass => (
-                  <Card key={pass.id} className="rounded-2xl border-l-4 border-l-green-500 shadow-sm"><CardContent className="p-4 flex items-center justify-between"><div><h3 className="font-bold">{pass.student_name}</h3><span className={`inline-block px-2 py-0.5 text-xs font-bold rounded-full border ${getDestinationColor(pass.destination)}`}>{pass.destination}</span></div><Button size="sm" className="rounded-xl font-bold">Check In</Button></CardContent></Card>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-4 pt-4 border-t mt-6">
-              <div className="flex items-center justify-between">
-                <Input placeholder="Search students..." className="h-12 rounded-2xl bg-card max-w-sm" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-                {currentClass && <div className="text-xs font-black bg-primary/10 text-primary px-4 py-2 rounded-xl">CODE: {currentClass.join_code}</div>}
-              </div>
-              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {filteredStudents.map(student => (
-                  <div key={student.id} className="bg-card p-3 rounded-xl border flex items-center justify-between">
-                    <p className="font-bold">{student.name}</p>
-                    <div className="flex gap-1">
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setSelectedStudent(student); setHistoryDialogOpen(true); }}><History className="h-4 w-4" /></Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setSelectedStudent(student); setStudentDialogOpen(true); }}><UserMinus className="h-4 w-4" /></Button>
+                  <div key={student.id} className="bg-card p-4 rounded-2xl shadow-sm border flex items-center justify-between group hover:border-primary/50 transition-colors">
+                    <p className="font-bold text-lg">{student.name}</p>
+                    <div className="flex gap-2">
+                      <Button size="icon" variant="ghost" className="h-10 w-10 rounded-xl bg-muted/50 opacity-50 group-hover:opacity-100" onClick={() => { setSelectedStudent(student); setHistoryDialogOpen(true); }}><History className="h-5 w-5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-10 w-10 rounded-xl bg-muted/50 opacity-50 group-hover:opacity-100" onClick={() => { setSelectedStudent(student); setStudentDialogOpen(true); }}><UserMinus className="h-5 w-5" /></Button>
                     </div>
                   </div>
                 ))}
@@ -341,47 +388,65 @@ const TeacherDashboard = () => {
         )}
       </div>
 
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-md px-4"><Button onClick={() => setCreatePassDialogOpen(true)} className="w-full h-14 rounded-2xl shadow-2xl text-lg font-bold flex items-center justify-center gap-3"><Plus className="h-5 w-5" /> QUICK PASS</Button></div>
+      {/* FAB - QUICK PASS */}
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-md px-4">
+        <Button onClick={() => setCreatePassDialogOpen(true)} className="w-full h-16 rounded-3xl shadow-2xl text-xl font-black flex items-center justify-center gap-4 border-t-4 border-white/20">
+            <Plus className="h-6 w-6" /> ISSUE QUICK PASS
+        </Button>
+      </div>
 
       {/* QUICK PASS DIALOG */}
       <Dialog open={createPassDialogOpen} onOpenChange={setCreatePassDialogOpen}>
-        <DialogContent className="rounded-3xl max-w-sm">
-          <DialogHeader><DialogTitle className="font-bold">Quick Pass</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-             <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase">Student</Label>
-                <Select value={selectedStudentForPass} onValueChange={setSelectedStudentForPass}><SelectTrigger className="rounded-xl"><SelectValue placeholder="Select Student" /></SelectTrigger><SelectContent>{students.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>
+        <DialogContent className="rounded-[2.5rem] max-w-sm p-8">
+          <DialogHeader><DialogTitle className="font-black text-2xl text-center">Quick Pass</DialogTitle></DialogHeader>
+          <div className="space-y-6 py-4">
+             <div className="space-y-3">
+                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Student</Label>
+                <Select value={selectedStudentForPass} onValueChange={setSelectedStudentForPass}>
+                    <SelectTrigger className="h-14 rounded-2xl bg-muted/30 border-none text-lg font-bold"><SelectValue placeholder="Who is leaving?" /></SelectTrigger>
+                    <SelectContent className="rounded-2xl">{students.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+                </Select>
              </div>
-             <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase">Location</Label>
-                <div className="grid grid-cols-2 gap-2">{DESTINATIONS.map(d => <Button key={d} variant={selectedDestination === d ? 'default' : 'outline'} className="rounded-xl font-bold" onClick={() => setSelectedDestination(d)}>{d}</Button>)}</div>
+             <div className="space-y-3">
+                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Destination</Label>
+                <div className="grid grid-cols-2 gap-2">
+                    {DESTINATIONS.map(d => (
+                        <Button 
+                            key={d} 
+                            variant={selectedDestination === d ? 'default' : 'outline'} 
+                            className={`h-14 rounded-2xl font-bold border-2 ${selectedDestination === d ? 'border-primary' : 'border-transparent bg-muted/20'}`} 
+                            onClick={() => setSelectedDestination(d)}
+                        >{d}</Button>
+                    ))}
+                </div>
              </div>
-             <Button onClick={handleQuickPass} className="w-full h-12 rounded-xl font-bold" disabled={!selectedStudentForPass || !selectedDestination}>Issue Pass</Button>
+             <Button onClick={handleQuickPass} className="w-full h-16 rounded-2xl font-black text-lg shadow-xl mt-4" disabled={!selectedStudentForPass || !selectedDestination}>Confirm & Issue</Button>
           </div>
         </DialogContent>
       </Dialog>
       
-      {/* HISTORY DIALOG - RESTORED */}
+      {/* HISTORY DIALOG */}
       <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-        <DialogContent className="rounded-3xl max-w-lg">
-          <DialogHeader><DialogTitle className="flex items-center gap-2 text-xl font-bold"><History className="h-5 w-5 text-primary" /> {selectedStudent?.name}'s History</DialogTitle></DialogHeader>
-          <div className="flex gap-2 mb-2 mt-4">
-            <Select value={historyFilterLocation} onValueChange={setHistoryFilterLocation}><SelectTrigger className="rounded-xl bg-muted/50 border-none font-bold"><SelectValue placeholder="All Locations" /></SelectTrigger><SelectContent><SelectItem value="all">All Locations</SelectItem>{DESTINATIONS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select>
-            <Select value={historyFilterClass} onValueChange={setHistoryFilterClass}><SelectTrigger className="rounded-xl bg-muted/50 border-none font-bold"><SelectValue placeholder="All Classes" /></SelectTrigger><SelectContent><SelectItem value="all">All Classes</SelectItem>{classes.map(c => <SelectItem key={c.id} value={c.id}>P{c.period_order}</SelectItem>)}</SelectContent></Select>
+        <DialogContent className="rounded-[2.5rem] max-w-lg p-8">
+          <DialogHeader><DialogTitle className="flex items-center gap-3 text-2xl font-black"><History className="h-6 w-6 text-primary" /> {selectedStudent?.name}</DialogTitle></DialogHeader>
+          <div className="flex gap-2 mb-2 mt-6">
+            <Select value={historyFilterLocation} onValueChange={setHistoryFilterLocation}><SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none font-bold"><SelectValue placeholder="Location" /></SelectTrigger><SelectContent className="rounded-xl"><SelectItem value="all">All Locations</SelectItem>{DESTINATIONS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select>
+            <Select value={historyFilterClass} onValueChange={setHistoryFilterClass}><SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none font-bold"><SelectValue placeholder="Class" /></SelectTrigger><SelectContent className="rounded-xl"><SelectItem value="all">All Periods</SelectItem>{classes.map(c => <SelectItem key={c.id} value={c.id}>P{c.period_order}</SelectItem>)}</SelectContent></Select>
           </div>
-          <div className="space-y-2 py-4 max-h-[50vh] overflow-y-auto pr-2">
-            {loadingHistory ? <div className="flex justify-center py-8"><Loader2 className="animate-spin text-muted-foreground" /></div> : filteredHistory.length === 0 ? <p className="text-center text-muted-foreground py-8">No records found.</p> : filteredHistory.map(pass => (
-              <div key={pass.id} className="p-4 rounded-2xl bg-muted/30 border border-muted/50 flex flex-col gap-2">
+          <div className="space-y-3 py-6 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+            {loadingHistory ? <div className="flex justify-center py-8"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div> : filteredHistory.length === 0 ? <p className="text-center text-muted-foreground py-8 font-bold">No history recorded.</p> : filteredHistory.map(pass => (
+              <div key={pass.id} className="p-4 rounded-2xl bg-muted/20 border border-muted/50 flex flex-col gap-2">
                 <div className="flex justify-between items-start">
-                  <div><span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border ${getDestinationColor(pass.destination)}`}>{pass.destination}</span><p className="text-xs font-bold mt-1 text-muted-foreground">{pass.classes?.name}</p></div>
-                  <div className="text-right"><p className="text-[10px] font-bold text-muted-foreground">{new Date(pass.requested_at).toLocaleDateString()}</p></div>
+                  <div><span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full border ${getDestinationColor(pass.destination)}`}>{pass.destination}</span><p className="text-xs font-bold mt-2 text-muted-foreground">{pass.classes?.name || 'Unknown Class'}</p></div>
+                  <div className="text-right"><p className="text-[10px] font-black text-muted-foreground uppercase">{new Date(pass.requested_at).toLocaleDateString()}</p><p className="font-bold text-sm">{new Date(pass.requested_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p></div>
                 </div>
               </div>
             ))}
           </div>
-          <div className="mt-2 pt-4 border-t flex justify-between items-center"><div className="flex items-center gap-2"><Timer className="h-5 w-5 text-primary" /><p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Total Time</p></div><p className="text-2xl font-black text-primary leading-none">{Math.round(totalMinutes)}m</p></div>
+          <div className="mt-4 pt-6 border-t flex justify-between items-center"><div className="flex items-center gap-3"><Timer className="h-6 w-6 text-primary" /><p className="text-sm font-black text-muted-foreground uppercase tracking-[0.2em]">Weekly Airtime</p></div><p className="text-4xl font-black text-primary leading-none">{Math.round(totalMinutes)}<span className="text-sm ml-1 text-muted-foreground">m</span></p></div>
         </DialogContent>
       </Dialog>
+
       <ClassManagementDialog open={classDialogOpen} onOpenChange={setClassDialogOpen} editingClass={editingClass} userId={userId || ''} onSaved={fetchClasses} />
       <StudentManagementDialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen} student={selectedStudent} currentClassId={selectedClassId} teacherClasses={classes} onUpdated={() => fetchRoster(selectedClassId)} />
     </div>
