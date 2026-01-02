@@ -116,6 +116,7 @@ const TeacherDashboard = () => {
   // Use org settings for weekly limit
   useEffect(() => {
     if (settings?.weekly_bathroom_limit) {
+      console.log("⚙️ Setting weekly limit from organization settings:", settings.weekly_bathroom_limit);
       setWeeklyLimit(settings.weekly_bathroom_limit);
     }
   }, [settings]);
@@ -124,27 +125,36 @@ const TeacherDashboard = () => {
   const fetchSubAssignments = useCallback(async () => {
     if (!userId) return;
     
+    console.log("🔄 Fetching substitute assignments for teacher:", userId);
     const today = new Date().toISOString().split('T')[0];
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('substitute_assignments')
       .select('*, classes(id, name, period_order, join_code)')
       .eq('substitute_teacher_id', userId)
       .eq('date', today);
     
-    if (data) setSubAssignments(data);
+    if (error) console.error("❌ Error fetching sub assignments:", error);
+    if (data) {
+        console.log("📥 Sub assignments fetched:", data);
+        setSubAssignments(data);
+    }
   }, [userId]);
 
   // Fetch Classes 
   const fetchClasses = useCallback(async () => {
     if (!userId) return;
     
-    const { data } = await supabase
+    console.log("🔄 Fetching classes for teacher:", userId);
+    const { data, error } = await supabase
       .from('classes')
       .select('id, name, period_order, join_code')
       .eq('teacher_id', userId)
       .order('period_order');
 
+    if (error) console.error("❌ Error fetching classes:", error);
+
     if (data && data.length > 0) {
+      console.log("📥 Classes fetched:", data);
       setClasses(data);
       setSelectedClassId(prev => {
         if (prev && data.find(c => c.id === prev)) return prev;
@@ -157,24 +167,31 @@ const TeacherDashboard = () => {
 
   // Fetch Roster
   const fetchRoster = useCallback(async (classId: string) => {
-    const { data: enrollments } = await supabase
+    console.log(`🔄 Fetching roster for class: ${classId}`);
+    const { data: enrollments, error: enrollError } = await supabase
       .from('class_enrollments')
       .select('student_id')
       .eq('class_id', classId);
 
+    if (enrollError) console.error("❌ Error fetching enrollments:", enrollError);
+
     if (!enrollments || enrollments.length === 0) {
+      console.log("ℹ️ No students found in this class.");
       setStudents([]);
       return;
     }
 
     const studentIds = enrollments.map(e => e.student_id);
-    const { data: profiles } = await supabase
+    const { data: profiles, error: profileError } = await supabase
       .from('profiles')
       .select('id, full_name, email')
       .in('id', studentIds)
       .order('full_name');
 
+    if (profileError) console.error("❌ Error fetching student profiles:", profileError);
+
     if (profiles) {
+      console.log(`📥 ${profiles.length} student profiles fetched.`);
       setStudents(profiles.map(p => ({ id: p.id, name: p.full_name, email: p.email })));
     }
   }, []);
@@ -184,6 +201,7 @@ const TeacherDashboard = () => {
     if (!userId || !classId) return;
     
     try {
+      console.log(`🔄 Fetching pending and active passes for class: ${classId}`);
       const limit = settings?.weekly_bathroom_limit ?? 4;
       setWeeklyLimit(limit);
 
@@ -196,8 +214,9 @@ const TeacherDashboard = () => {
         .order('requested_at', { ascending: true }); // Oldest first
 
       if (pendingError) {
-        console.error("Error fetching pending:", pendingError);
+        console.error("❌ Error fetching pending passes:", pendingError);
       } else {
+        console.log(`📥 ${rawPending.length} pending requests found.`);
         const pIds = rawPending.map(p => p.student_id);
         const { data: pNames } = await supabase
            .from('profiles')
@@ -249,9 +268,10 @@ const TeacherDashboard = () => {
           .in('status', ['approved', 'pending_return'])
           .order('approved_at', { ascending: true }); // Oldest first
 
-        if (activeError) console.error("Error fetching active:", activeError);
+        if (activeError) console.error("❌ Error fetching active passes:", activeError);
 
         if (rawActive && rawActive.length > 0) {
+            console.log(`📥 ${rawActive.length} active hallway passes found.`);
             const activeSIds = rawActive.map(p => p.student_id);
             const activeCIds = rawActive.map(p => p.class_id);
             
@@ -283,7 +303,7 @@ const TeacherDashboard = () => {
       }
 
     } catch (error) {
-      console.error("Critical Fetch Error:", error);
+      console.error("❌ Critical Fetch Error:", error);
     }
   }, [userId, settings]);
 
@@ -303,6 +323,7 @@ const TeacherDashboard = () => {
     fetchPasses(selectedClassId);
     
     if (isVisible) {
+      console.log(`📡 Opening realtime channel for class: ${selectedClassId}`);
       const channel = supabase.channel(`teacher-${selectedClassId}`)
         .on(
           'postgres_changes',
@@ -312,15 +333,23 @@ const TeacherDashboard = () => {
             table: 'passes',
             filter: `class_id=eq.${selectedClassId}` 
           }, 
-          () => fetchPasses(selectedClassId)
+          (payload) => {
+            console.log("🔔 Realtime pass update received:", payload);
+            fetchPasses(selectedClassId);
+          }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log(`📡 Channel status for ${selectedClassId}:`, status);
+        });
 
       channelRef.current = channel;
     }
 
     return () => {
-      if (channelRef.current) supabase.removeChannel(channelRef.current);
+      if (channelRef.current) {
+          console.log(`📡 Closing realtime channel for class: ${selectedClassId}`);
+          supabase.removeChannel(channelRef.current);
+      }
     };
   }, [selectedClassId, isVisible, fetchPasses, fetchRoster, userId]);
 
@@ -331,9 +360,10 @@ const TeacherDashboard = () => {
       return;
     }
     const checkQuota = async () => {
+      console.log(`🔄 Checking weekly quota for student: ${selectedStudentForPass}`);
       setLoadingQuotaCheck(true);
       const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString();
-      const { count } = await supabase
+      const { count, error } = await supabase
         .from('passes')
         .select('id', { count: 'exact', head: true })
         .eq('student_id', selectedStudentForPass)
@@ -341,7 +371,10 @@ const TeacherDashboard = () => {
         .in('status', ['approved', 'pending_return', 'returned'])
         .gte('requested_at', weekStart);
       
+      if (error) console.error("❌ Error checking quota:", error);
+      
       const currentCount = count || 0;
+      console.log(`📥 Quota count: ${currentCount}/${weeklyLimit}`);
       setQuickPassQuota({ count: currentCount, exceeded: currentCount >= weeklyLimit });
       setLoadingQuotaCheck(false);
     };
@@ -352,6 +385,7 @@ const TeacherDashboard = () => {
 
   const handleApprove = async (id: string, override: boolean) => {
     if (!userId) return;
+    console.log(`🔄 Approving pass ${id} (Override: ${override})`);
     
     // Get expected return time
     const { data: passData } = await supabase
@@ -362,38 +396,52 @@ const TeacherDashboard = () => {
     
     let expectedReturnAt = null;
     if (passData) {
-      const { data: timeData } = await supabase.rpc('get_expected_return_time', {
+      console.log(`🔄 Calculating expected return time for ${passData.destination}...`);
+      const { data: timeData, error: rpcError } = await supabase.rpc('get_expected_return_time', {
         _class_id: passData.class_id,
         _destination: passData.destination
       });
+      if (rpcError) console.error("❌ RPC Error:", rpcError);
       expectedReturnAt = timeData;
     }
 
-    await supabase.from('passes').update({
+    const { error } = await supabase.from('passes').update({
       status: 'approved',
       approved_at: new Date().toISOString(),
       approved_by: userId,
       is_quota_override: override,
       expected_return_at: expectedReturnAt
     }).eq('id', id);
+
+    if (error) {
+        console.error("❌ Error approving pass:", error);
+    } else {
+        console.log("✅ Pass approved successfully.");
+    }
   };
 
   const handleDeny = async (id: string) => {
     if (!userId) return;
-    await supabase.from('passes').update({ 
+    console.log(`🔄 Denying pass ${id}`);
+    const { error } = await supabase.from('passes').update({ 
       status: 'denied', 
       denied_at: new Date().toISOString(), 
       denied_by: userId 
     }).eq('id', id);
+
+    if (error) console.error("❌ Error denying pass:", error);
   };
 
   const handleCheckIn = async (id: string) => {
     if (!userId) return;
-    await supabase.from('passes').update({ 
+    console.log(`🔄 Checking in pass ${id}`);
+    const { error } = await supabase.from('passes').update({ 
       status: 'returned', 
       returned_at: new Date().toISOString(), 
       confirmed_by: userId 
     }).eq('id', id);
+
+    if (error) console.error("❌ Error checking in pass:", error);
   };
 
   const handleQuickPass = async () => {
@@ -402,11 +450,14 @@ const TeacherDashboard = () => {
     const dest = selectedDestination === 'Other' ? customDestination : selectedDestination;
     const isOverride = (dest === 'Restroom' && quickPassQuota?.exceeded) || false;
 
+    console.log(`🔄 Issuing quick pass to ${dest} for student ${selectedStudentForPass}`);
+
     // Get expected return time
-    const { data: timeData } = await supabase.rpc('get_expected_return_time', {
+    const { data: timeData, error: rpcError } = await supabase.rpc('get_expected_return_time', {
       _class_id: selectedClassId,
       _destination: dest
     });
+    if (rpcError) console.error("❌ RPC Error:", rpcError);
 
     const { error } = await supabase.from('passes').insert({
       student_id: selectedStudentForPass,
@@ -421,6 +472,7 @@ const TeacherDashboard = () => {
 
     setIsActionLoading(false);
     if (!error) {
+      console.log("✅ Quick pass issued successfully.");
       setCreatePassDialogOpen(false);
       setSelectedStudentForPass('');
       setSelectedDestination('');
@@ -428,22 +480,27 @@ const TeacherDashboard = () => {
       setQuickPassQuota(null);
       toast({ title: 'Pass Issued' });
     } else {
+      console.error("❌ Error issuing quick pass:", error);
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
 
   // History
   const fetchStudentHistory = useCallback(async (studentId: string) => {
+    console.log(`🔄 Fetching history for student: ${studentId}`);
     setLoadingHistory(true);
     
-    const { data: rawHistory } = await supabase
+    const { data: rawHistory, error: historyError } = await supabase
       .from('passes')
       .select('id, destination, requested_at, approved_at, returned_at, class_id')
       .eq('student_id', studentId)
       .order('requested_at', { ascending: false })
       .limit(50);
+    
+    if (historyError) console.error("❌ Error fetching history:", historyError);
       
     if (rawHistory && rawHistory.length > 0) {
+        console.log(`📥 ${rawHistory.length} history records fetched.`);
         const classIds = rawHistory.map(p => p.class_id);
         const { data: cData } = await supabase.from('classes').select('id, name, period_order').in('id', classIds);
         const cMap = new Map(cData?.map(c => [c.id, c]));
@@ -507,11 +564,17 @@ const TeacherDashboard = () => {
           {subAssignments.length > 0 && (
             <SubModeToggle 
               isSubMode={isSubMode} 
-              onToggle={() => setIsSubMode(!isSubMode)}
+              onToggle={() => {
+                  console.log(`🔄 Toggling Sub Mode to: ${!isSubMode}`);
+                  setIsSubMode(!isSubMode);
+              }}
               assignments={subAssignments}
             />
           )}
-          <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground hover:text-destructive">
+          <Button variant="ghost" size="sm" onClick={() => {
+              console.log("🚪 Signing out...");
+              signOut();
+          }} className="text-muted-foreground hover:text-destructive">
             <LogOut className="h-4 w-4 mr-2" /> Sign Out
           </Button>
         </div>
@@ -521,7 +584,10 @@ const TeacherDashboard = () => {
         <PeriodDisplay />
 
         <div className="flex gap-2">
-          <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+          <Select value={selectedClassId} onValueChange={(val) => {
+              console.log(`📍 Selected class changed to: ${val}`);
+              setSelectedClassId(val);
+          }}>
             <SelectTrigger className="h-14 rounded-2xl bg-card border-none shadow-sm text-lg font-bold px-6 flex-1">
               <SelectValue placeholder="Select Class" />
             </SelectTrigger>
@@ -751,8 +817,27 @@ const TeacherDashboard = () => {
         </DialogContent>
       </Dialog>
       
-      <ClassManagementDialog open={classDialogOpen} onOpenChange={setClassDialogOpen} editingClass={editingClass} userId={userId || ''} onSaved={fetchClasses} />
-      <StudentManagementDialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen} student={selectedStudent} currentClassId={selectedClassId} teacherClasses={classes} onUpdated={() => fetchRoster(selectedClassId)} />
+      <ClassManagementDialog 
+        open={classDialogOpen} 
+        onOpenChange={setClassDialogOpen} 
+        editingClass={editingClass} 
+        userId={userId || ''} 
+        onSaved={() => {
+            console.log("💾 Class management saved.");
+            fetchClasses();
+        }} 
+      />
+      <StudentManagementDialog 
+        open={studentDialogOpen} 
+        onOpenChange={setStudentDialogOpen} 
+        student={selectedStudent} 
+        currentClassId={selectedClassId} 
+        teacherClasses={classes} 
+        onUpdated={() => {
+            console.log("💾 Student management updated.");
+            fetchRoster(selectedClassId);
+        }} 
+      />
     </div>
   );
 };
