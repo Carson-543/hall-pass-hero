@@ -44,19 +44,22 @@ const StudentDashboard = () => {
   const [todayPeriods, setTodayPeriods] = useState<any[]>([]);
   const [activeFreeze, setActiveFreeze] = useState<any | null>(null);
 
+  /**
+   * FETCH ENROLLED CLASSES
+   * Dependency fix: Removed selectedClassId from dependencies to prevent circular loops.
+   */
   const fetchEnrolledClasses = useCallback(async () => {
     if (!user?.id) return;
     
-    console.log("🔄 Fetching enrolled classes...");
+    console.log("🔄 [Student] Fetching enrolled classes...");
 
     const { data: enrollments } = await supabase
       .from('class_enrollments')
       .select('class_id')
       .eq('student_id', user.id);
 
-    console.log("📥 Raw enrollments fetched:", enrollments);
-
     if (!enrollments || enrollments.length === 0) {
+      console.log("ℹ️ No enrollments found.");
       setEnrolledClasses([]);
       return;
     }
@@ -68,8 +71,6 @@ const StudentDashboard = () => {
       .in('id', classIds)
       .order('period_order');
 
-    console.log("📥 Classes data fetched:", classesData);
-
     if (!classesData) return;
 
     const teacherIds = [...new Set(classesData.map(c => c.teacher_id))];
@@ -78,8 +79,6 @@ const StudentDashboard = () => {
       .select('id, full_name')
       .in('id', teacherIds);
     
-    console.log("📥 Teacher profiles fetched:", teacherProfiles);
-
     const teacherMap: Record<string, string> = {};
     teacherProfiles?.forEach(p => { teacherMap[p.id] = p.full_name; });
 
@@ -90,17 +89,17 @@ const StudentDashboard = () => {
       teacher_name: teacherMap[c.teacher_id] ?? 'Unknown Teacher'
     }));
 
+    console.log(`📥 Found ${classes.length} classes.`);
     setEnrolledClasses(classes);
-    if (currentPeriod && !selectedClassId) {
-      const currentClass = classes.find(c => c.period_order === currentPeriod.period_order);
-      if (currentClass) setSelectedClassId(currentClass.id);
-    }
-  }, [user?.id, currentPeriod, selectedClassId]);
+  }, [user?.id]); // Only depends on user ID
 
+  /**
+   * FETCH ACTIVE PASS
+   */
   const fetchActivePass = useCallback(async () => {
     if (!user?.id) return;
     
-    console.log("🔄 Fetching active pass...");
+    console.log("🔄 [Student] Checking for active passes...");
 
     const { data, error } = await supabase
       .from('passes')
@@ -116,9 +115,8 @@ const StudentDashboard = () => {
       return;
     }
 
-    console.log("📥 Active pass data fetched:", data);
-
     if (data) {
+      console.log("📥 Active pass found:", data.destination);
       const { data: classData } = await supabase
         .from('classes')
         .select('name')
@@ -140,11 +138,13 @@ const StudentDashboard = () => {
     }
   }, [user?.id]);
 
+  /**
+   * FETCH ACTIVE FREEZE
+   */
   const fetchActiveFreeze = useCallback(async (classId: string) => {
     if (!classId) return;
     
-    console.log(`🔄 Fetching active freeze for class ID: ${classId}...`);
-
+    console.log(`🔄 [Student] Checking freeze status for class ${classId}`);
     const { data } = await supabase
       .from('pass_freezes')
       .select('*')
@@ -152,22 +152,20 @@ const StudentDashboard = () => {
       .eq('is_active', true)
       .maybeSingle();
 
-    console.log("📥 Freeze data fetched:", data);
     setActiveFreeze(data);
   }, []);
 
+  /**
+   * FETCH TODAY'S SCHEDULE
+   */
   const fetchTodaySchedule = useCallback(async () => {
     const today = format(new Date(), 'yyyy-MM-dd');
-    console.log(`🔄 Fetching schedule assignment for date: ${today}...`);
-
     const { data: assignment } = await supabase
       .from('schedule_assignments')
       .select('schedule_id')
       .eq('date', today)
       .maybeSingle();
     
-    console.log("📥 Schedule assignment fetched:", assignment);
-
     if (assignment) {
       const { data: periods } = await supabase
         .from('periods')
@@ -175,11 +173,13 @@ const StudentDashboard = () => {
         .eq('schedule_id', assignment.schedule_id)
         .order('period_order');
       
-      console.log("📥 Periods fetched:", periods);
       if (periods) setTodayPeriods(periods);
     }
   }, []);
 
+  /**
+   * INITIAL LOAD & REALTIME SUBSCRIPTION
+   */
   useEffect(() => {
     if (!user?.id) return;
     
@@ -198,13 +198,12 @@ const StudentDashboard = () => {
           filter: `student_id=eq.${user.id}`
         },
         (payload) => {
-          console.log("🔔 Realtime update received for passes:", payload);
+          console.log("🔔 Realtime pass update:", payload.eventType);
           fetchActivePass();
 
           if (payload.eventType === 'UPDATE') {
             const newStatus = (payload.new as any).status;
             if (['returned', 'completed', 'denied'].includes(newStatus)) {
-              console.log("🔄 Status change detected, refreshing quota...");
               refreshQuota(); 
             }
           }
@@ -217,37 +216,46 @@ const StudentDashboard = () => {
     };
   }, [user?.id, fetchEnrolledClasses, fetchActivePass, fetchTodaySchedule, refreshQuota]);
 
-  // Fetch freeze status when class changes
+  /**
+   * SYNC SELECTED CLASS WITH CURRENT PERIOD
+   * This is separated from the fetch to prevent infinite loops.
+   */
+  useEffect(() => {
+    if (currentPeriod && enrolledClasses.length > 0 && !selectedClassId) {
+      const currentClass = enrolledClasses.find(c => c.period_order === currentPeriod.period_order);
+      if (currentClass) {
+        console.log("📍 Auto-selecting class for Period:", currentPeriod.period_order);
+        setSelectedClassId(currentClass.id);
+      }
+    }
+  }, [currentPeriod, enrolledClasses, selectedClassId]);
+
+  /**
+   * FREEZE STATUS HANDLERS
+   */
   useEffect(() => {
     if (selectedClassId) {
       fetchActiveFreeze(selectedClassId);
+
+      const channel = supabase
+        .channel(`freeze-${selectedClassId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'pass_freezes',
+            filter: `class_id=eq.${selectedClassId}`
+          },
+          (payload) => {
+              console.log("🔔 Realtime freeze change detected");
+              fetchActiveFreeze(selectedClassId);
+          }
+        )
+        .subscribe();
+
+      return () => { supabase.removeChannel(channel); };
     }
-  }, [selectedClassId, fetchActiveFreeze]);
-
-  // Real-time freeze updates
-  useEffect(() => {
-    if (!selectedClassId) return;
-
-    const channel = supabase
-      .channel(`freeze-${selectedClassId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'pass_freezes',
-          filter: `class_id=eq.${selectedClassId}`
-        },
-        (payload) => {
-            console.log("🔔 Realtime freeze update received:", payload);
-            fetchActiveFreeze(selectedClassId);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [selectedClassId, fetchActiveFreeze]);
 
   const isDestinationFrozen = (destination: string) => {
@@ -262,7 +270,7 @@ const StudentDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background p-4 max-w-4xl mx-auto pb-24">
-       <header className="flex items-center justify-between mb-8">
+      <header className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
             <span className="text-primary-foreground font-black text-xl">S</span>
@@ -286,7 +294,6 @@ const StudentDashboard = () => {
         <PeriodDisplay />
         <QuotaDisplay />
 
-        {/* Freeze Indicator */}
         {activeFreeze && (
           <FreezeIndicator 
             freezeType={activeFreeze.freeze_type} 
@@ -295,7 +302,7 @@ const StudentDashboard = () => {
         )}
 
         {activePass && (
-          <Card className="border-2 border-primary bg-primary/5 shadow-xl animate-in fade-in zoom-in duration-300">
+          <Card className="border-2 border-primary bg-primary/5 shadow-xl">
             <CardHeader className="pb-2 border-b border-primary/10">
               <CardTitle className="text-sm font-bold flex justify-between items-center uppercase tracking-wider text-primary">
                 <div className="flex items-center gap-2">
@@ -324,12 +331,10 @@ const StudentDashboard = () => {
                 </div>
               </div>
 
-              {/* Queue Position for pending bathroom passes */}
               {activePass.status === 'pending' && activePass.destination === 'Restroom' && (
                 <QueuePosition classId={activePass.class_id} passId={activePass.id} />
               )}
 
-              {/* Expected Return Timer */}
               {activePass.status === 'approved' && activePass.expected_return_at && (
                 <ExpectedReturnTimer expectedReturnAt={activePass.expected_return_at} />
               )}
@@ -343,17 +348,11 @@ const StudentDashboard = () => {
 
               {activePass.status === 'approved' && (
                 <Button onClick={async () => {
-                  console.log("🔄 Attempting to check back in...");
                   const { error } = await supabase
                     .from('passes')
                     .update({ status: 'pending_return', returned_at: new Date().toISOString() })
                     .eq('id', activePass.id);
-                  if (error) {
-                    console.error("❌ Error checking in:", error);
-                    toast({ title: "Error checking in", variant: "destructive" });
-                  } else {
-                    console.log("✅ Successfully checked in");
-                  }
+                  if (error) toast({ title: "Error checking in", variant: "destructive" });
                 }} size="lg" className="w-full text-lg font-bold shadow-lg shadow-primary/20">
                   Check Back In
                 </Button>
@@ -405,14 +404,16 @@ const StudentDashboard = () => {
                 className="w-full h-14 text-lg font-bold" 
                 onClick={async () => {
                   setRequestLoading(true);
-                  console.log("🔄 Submitting pass request...");
                   const dest = selectedDestination === 'Other' ? customDestination : selectedDestination;
-                  const { error } = await supabase.from('passes').insert({ student_id: user.id, class_id: selectedClassId, destination: dest });
+                  const { error } = await supabase.from('passes').insert({ 
+                    student_id: user.id, 
+                    class_id: selectedClassId, 
+                    destination: dest 
+                  });
                   setRequestLoading(false);
                   if (error) {
-                     console.error("❌ Error submitting pass:", error);
+                     toast({ title: "Failed to submit request", variant: "destructive" });
                   } else {
-                     console.log("✅ Pass submitted successfully");
                      fetchActivePass();
                   }
                 }} 
