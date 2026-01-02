@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { PeriodDisplay } from '@/components/PeriodDisplay';
-import { Settings } from '@/pages/Settings';
+import Settings from '@/pages/Settings';
 import { QuotaDisplay } from '@/components/QuotaDisplay';
 import { useCurrentPeriod } from '@/hooks/useCurrentPeriod';
 import { useWeeklyQuota } from '@/hooks/useWeeklyQuota';
