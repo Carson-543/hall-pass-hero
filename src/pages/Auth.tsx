@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/integrations/supabase/client';
+import { OrganizationSelector } from '@/components/organization/OrganizationSelector';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,7 +21,8 @@ const passwordSchema = z.string().min(6, 'Password must be at least 6 characters
 type AppRole = 'student' | 'teacher' | 'admin';
 
 const Auth = () => {
-  const { user, role, isApproved, loading } = useAuth();
+  const { user, role, isApproved, loading, signOut } = useAuth();
+  const { organization, organizationId, loading: orgLoading } = useOrganization();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -38,7 +41,19 @@ const Auth = () => {
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
   const [isSendingReset, setIsSendingReset] = useState(false);
 
+  // Organization selection state (post-signup)
+  const [showOrgSelector, setShowOrgSelector] = useState(false);
+
   const { signIn, signUp } = useAuth();
+
+  // Check if user needs to select organization
+  useEffect(() => {
+    if (user && role && !orgLoading && !organizationId) {
+      setShowOrgSelector(true);
+    } else {
+      setShowOrgSelector(false);
+    }
+  }, [user, role, orgLoading, organizationId]);
 
   const handleForgotPassword = async () => {
     try {
@@ -76,7 +91,7 @@ const Auth = () => {
     }
   };
 
-  if (loading) {
+  if (loading || orgLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-pulse text-foreground">Loading...</div>
@@ -84,7 +99,28 @@ const Auth = () => {
     );
   }
 
-  if (user && role) {
+  // Show organization selector if user is logged in but has no organization
+  if (showOrgSelector && user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="w-full max-w-md space-y-4">
+          <OrganizationSelector
+            userId={user.id}
+            isAdmin={role === 'admin'}
+            onComplete={() => {
+              // Reload to fetch organization context
+              window.location.reload();
+            }}
+          />
+          <Button variant="ghost" className="w-full" onClick={signOut}>
+            Sign Out
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (user && role && organizationId) {
     if (!isApproved && role !== 'student') {
       return (
         <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -92,12 +128,12 @@ const Auth = () => {
             <CardHeader>
               <CardTitle>Awaiting Approval</CardTitle>
               <CardDescription>
-                Your account is pending approval from an administrator. 
+                Your account is pending approval from an administrator at {organization?.name}. 
                 You'll be able to access the system once approved.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button onClick={() => useAuth().signOut()} variant="outline" className="w-full">
+              <Button onClick={signOut} variant="outline" className="w-full">
                 Sign Out
               </Button>
             </CardContent>
