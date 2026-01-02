@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,6 +15,9 @@ import { PeriodDisplay } from '@/components/PeriodDisplay';
 import { ElapsedTimer } from '@/components/ElapsedTimer';
 import { ClassManagementDialog } from '@/components/teacher/ClassManagementDialog';
 import { StudentManagementDialog } from '@/components/teacher/StudentManagementDialog';
+import { FreezeControls } from '@/components/teacher/FreezeControls';
+import { BathroomQueueStatus } from '@/components/teacher/BathroomQueueStatus';
+import { SubModeToggle } from '@/components/teacher/SubModeToggle';
 import { 
   LogOut, Plus, AlertTriangle, Check, X, 
   Copy, Search, Loader2, History, Timer, UserMinus 
@@ -65,10 +69,10 @@ const getPassCardColor = (pass: PendingPass) => {
 
 const TeacherDashboard = () => {
   const { user, role, signOut, loading: authLoading } = useAuth();
+  const { organization, settings } = useOrganization();
   const { toast } = useToast();
   const isVisible = usePageVisibility();
   
-  // Safe dependency
   const userId = user?.id;
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
@@ -80,6 +84,10 @@ const TeacherDashboard = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [weeklyLimit, setWeeklyLimit] = useState<number>(4);
+
+  // Sub Mode
+  const [isSubMode, setIsSubMode] = useState(false);
+  const [subAssignments, setSubAssignments] = useState<any[]>([]);
 
   // UI States
   const [isActionLoading, setIsActionLoading] = useState(false);
@@ -105,9 +113,28 @@ const TeacherDashboard = () => {
 
   const DESTINATIONS = ['Restroom', 'Locker', 'Office', 'Other'];
 
-  // --- Main Data Fetching Logic ---
+  // Use org settings for weekly limit
+  useEffect(() => {
+    if (settings?.weekly_bathroom_limit) {
+      setWeeklyLimit(settings.weekly_bathroom_limit);
+    }
+  }, [settings]);
 
-  // 1. Fetch Classes 
+  // Fetch sub assignments
+  const fetchSubAssignments = useCallback(async () => {
+    if (!userId) return;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const { data } = await supabase
+      .from('substitute_assignments')
+      .select('*, classes(id, name, period_order, join_code)')
+      .eq('substitute_teacher_id', userId)
+      .eq('date', today);
+    
+    if (data) setSubAssignments(data);
+  }, [userId]);
+
+  // Fetch Classes 
   const fetchClasses = useCallback(async () => {
     if (!userId) return;
     
@@ -128,7 +155,7 @@ const TeacherDashboard = () => {
     }
   }, [userId]);
 
-  // 2. Fetch Roster
+  // Fetch Roster
   const fetchRoster = useCallback(async (classId: string) => {
     const { data: enrollments } = await supabase
       .from('class_enrollments')
@@ -152,33 +179,25 @@ const TeacherDashboard = () => {
     }
   }, []);
 
-  // 3. Fetch Passes (FIXED: Manual Join Strategy)
+  // Fetch Passes
   const fetchPasses = useCallback(async (classId: string) => {
     if (!userId || !classId) return;
-
-    console.log("💸 DATA COST: Fetching passes from Supabase...");
     
     try {
-      // A. Settings
-      const { data: settings } = await supabase
-        .from('weekly_quota_settings')
-        .select('weekly_limit')
-        .maybeSingle();
-      
-      const limit = settings?.weekly_limit ?? 4;
+      const limit = settings?.weekly_bathroom_limit ?? 4;
       setWeeklyLimit(limit);
 
-      // --- B. PENDING PASSES (No Joins) ---
+      // Pending passes
       const { data: rawPending, error: pendingError } = await supabase
         .from('passes')
         .select('id, student_id, destination, status, requested_at')
         .eq('class_id', classId)
-        .eq('status', 'pending');
+        .eq('status', 'pending')
+        .order('requested_at', { ascending: true }); // Oldest first
 
       if (pendingError) {
         console.error("Error fetching pending:", pendingError);
       } else {
-        // Fetch Names Manually to avoid 400 Error
         const pIds = rawPending.map(p => p.student_id);
         const { data: pNames } = await supabase
            .from('profiles')
@@ -214,7 +233,7 @@ const TeacherDashboard = () => {
         setPendingPasses(pendingMapped);
       }
 
-      // --- C. ACTIVE PASSES (No Joins) ---
+      // Active passes
       const { data: enrollments } = await supabase
         .from('class_enrollments')
         .select('student_id')
@@ -227,12 +246,12 @@ const TeacherDashboard = () => {
           .from('passes')
           .select('id, student_id, class_id, destination, status, requested_at, approved_at')
           .in('student_id', studentIds)
-          .in('status', ['approved', 'pending_return']);
+          .in('status', ['approved', 'pending_return'])
+          .order('approved_at', { ascending: true }); // Oldest first
 
         if (activeError) console.error("Error fetching active:", activeError);
 
         if (rawActive && rawActive.length > 0) {
-            // Manual Joins for Active
             const activeSIds = rawActive.map(p => p.student_id);
             const activeCIds = rawActive.map(p => p.class_id);
             
@@ -266,14 +285,15 @@ const TeacherDashboard = () => {
     } catch (error) {
       console.error("Critical Fetch Error:", error);
     }
-  }, [userId]);
+  }, [userId, settings]);
 
-  // --- Effects ---
-
-  // Initial Class Load
+  // Initial Load
   useEffect(() => { 
-    if(userId) fetchClasses(); 
-  }, [userId, fetchClasses]);
+    if(userId) {
+      fetchClasses(); 
+      fetchSubAssignments();
+    }
+  }, [userId, fetchClasses, fetchSubAssignments]);
 
   // Realtime Subscription
   useEffect(() => {
@@ -281,7 +301,6 @@ const TeacherDashboard = () => {
 
     fetchRoster(selectedClassId);
     fetchPasses(selectedClassId);
-    console.log("🔄 useEffect fired! Timestamp:", new Date().toISOString());
     
     if (isVisible) {
       const channel = supabase.channel(`teacher-${selectedClassId}`)
@@ -333,11 +352,29 @@ const TeacherDashboard = () => {
 
   const handleApprove = async (id: string, override: boolean) => {
     if (!userId) return;
+    
+    // Get expected return time
+    const { data: passData } = await supabase
+      .from('passes')
+      .select('destination, class_id')
+      .eq('id', id)
+      .single();
+    
+    let expectedReturnAt = null;
+    if (passData) {
+      const { data: timeData } = await supabase.rpc('get_expected_return_time', {
+        _class_id: passData.class_id,
+        _destination: passData.destination
+      });
+      expectedReturnAt = timeData;
+    }
+
     await supabase.from('passes').update({
       status: 'approved',
       approved_at: new Date().toISOString(),
       approved_by: userId,
-      is_quota_override: override
+      is_quota_override: override,
+      expected_return_at: expectedReturnAt
     }).eq('id', id);
   };
 
@@ -365,6 +402,12 @@ const TeacherDashboard = () => {
     const dest = selectedDestination === 'Other' ? customDestination : selectedDestination;
     const isOverride = (dest === 'Restroom' && quickPassQuota?.exceeded) || false;
 
+    // Get expected return time
+    const { data: timeData } = await supabase.rpc('get_expected_return_time', {
+      _class_id: selectedClassId,
+      _destination: dest
+    });
+
     const { error } = await supabase.from('passes').insert({
       student_id: selectedStudentForPass,
       class_id: selectedClassId,
@@ -372,7 +415,8 @@ const TeacherDashboard = () => {
       status: 'approved',
       approved_at: new Date().toISOString(),
       approved_by: userId,
-      is_quota_override: isOverride
+      is_quota_override: isOverride,
+      expected_return_at: timeData
     });
 
     setIsActionLoading(false);
@@ -388,11 +432,10 @@ const TeacherDashboard = () => {
     }
   };
 
-  // --- History (Fix 400 for History too) ---
+  // History
   const fetchStudentHistory = useCallback(async (studentId: string) => {
     setLoadingHistory(true);
     
-    // Manual Join for History
     const { data: rawHistory } = await supabase
       .from('passes')
       .select('id, destination, requested_at, approved_at, returned_at, class_id')
@@ -444,6 +487,10 @@ const TeacherDashboard = () => {
   const currentClass = classes.find(c => c.id === selectedClassId);
   const filteredStudents = students.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
+  // Count bathroom passes for queue status
+  const bathroomPending = pendingPasses.filter(p => p.destination === 'Restroom').length;
+  const bathroomActive = activePasses.filter(p => p.destination === 'Restroom').length;
+
   return (
     <div className="min-h-screen bg-background p-4 max-w-6xl mx-auto pb-32">
       <header className="flex items-center justify-between mb-6 pt-4">
@@ -453,12 +500,21 @@ const TeacherDashboard = () => {
           </div>
           <div>
             <h1 className="text-xl font-bold">Teacher Central</h1>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Pass Management</p>
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{organization?.name || 'Pass Management'}</p>
           </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground hover:text-destructive">
-          <LogOut className="h-4 w-4 mr-2" /> Sign Out
-        </Button>
+        <div className="flex items-center gap-2">
+          {subAssignments.length > 0 && (
+            <SubModeToggle 
+              isSubMode={isSubMode} 
+              onToggle={() => setIsSubMode(!isSubMode)}
+              assignments={subAssignments}
+            />
+          )}
+          <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground hover:text-destructive">
+            <LogOut className="h-4 w-4 mr-2" /> Sign Out
+          </Button>
+        </div>
       </header>
 
       <div className="space-y-6">
@@ -473,6 +529,11 @@ const TeacherDashboard = () => {
               {classes.map(c => (
                 <SelectItem key={c.id} value={c.id}>Period {c.period_order}: {c.name}</SelectItem>
               ))}
+              {isSubMode && subAssignments.map(sa => (
+                <SelectItem key={sa.class_id} value={sa.class_id}>
+                  [SUB] Period {sa.classes?.period_order}: {sa.classes?.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Button size="icon" className="h-14 w-14 rounded-2xl shadow-lg" onClick={() => { setEditingClass(null); setClassDialogOpen(true); }}>
@@ -482,6 +543,16 @@ const TeacherDashboard = () => {
 
         {selectedClassId && (
           <>
+            {/* Freeze Controls & Bathroom Queue Status */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FreezeControls classId={selectedClassId} teacherId={userId || ''} />
+              <BathroomQueueStatus 
+                pendingCount={bathroomPending} 
+                activeCount={bathroomActive}
+                maxConcurrent={settings?.max_concurrent_bathroom ?? 2}
+              />
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               
               {/* PENDING REQUESTS */}

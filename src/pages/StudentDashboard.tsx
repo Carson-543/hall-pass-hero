@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +17,9 @@ import { useWeeklyQuota } from '@/hooks/useWeeklyQuota';
 import { PassHistory } from '@/components/PassHistory';
 import { ElapsedTimer } from '@/components/ElapsedTimer';
 import { FloatingPassButton } from '@/components/FloatingPassButton';
+import { FreezeIndicator } from '@/components/student/FreezeIndicator';
+import { QueuePosition } from '@/components/student/QueuePosition';
+import { ExpectedReturnTimer } from '@/components/student/ExpectedReturnTimer';
 import { LogOut, Plus, Clock, BookOpen, Calendar, MapPin, CheckCircle2, Settings, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -23,6 +27,7 @@ const DESTINATIONS = ['Restroom', 'Locker', 'Office', 'Other'];
 
 const StudentDashboard = () => {
   const { user, role, signOut, loading: authLoading } = useAuth();
+  const { organization, settings } = useOrganization();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { currentPeriod } = useCurrentPeriod();
@@ -37,11 +42,10 @@ const StudentDashboard = () => {
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [requestLoading, setRequestLoading] = useState(false);
   const [todayPeriods, setTodayPeriods] = useState<any[]>([]);
+  const [activeFreeze, setActiveFreeze] = useState<any | null>(null);
 
-  // --- 1. ENROLLED CLASSES LOGGING ---
   const fetchEnrolledClasses = useCallback(async () => {
     if (!user?.id) return;
-    console.log("%c📡 DATABASE FETCH: Enrolled Classes", "color: #3b82f6; font-weight: bold;");
     
     const { data: enrollments } = await supabase
       .from('class_enrollments')
@@ -85,14 +89,12 @@ const StudentDashboard = () => {
     }
   }, [user?.id, currentPeriod, selectedClassId]);
 
-  // --- 2. ACTIVE PASS LOGGING ---
   const fetchActivePass = useCallback(async () => {
     if (!user?.id) return;
-    console.log("%c📡 DATABASE FETCH: Active Pass Status", "color: #10b981; font-weight: bold;");
     
     const { data, error } = await supabase
       .from('passes')
-      .select(`id, destination, status, requested_at, approved_at, class_id`)
+      .select(`id, destination, status, requested_at, approved_at, expected_return_at, class_id`)
       .eq('student_id', user.id)
       .in('status', ['pending', 'approved', 'pending_return'])
       .order('requested_at', { ascending: false })
@@ -100,7 +102,7 @@ const StudentDashboard = () => {
       .maybeSingle();
 
     if (error) {
-      console.error("❌ Error fetching pass:", error);
+      console.error("Error fetching pass:", error);
       return;
     }
 
@@ -117,6 +119,8 @@ const StudentDashboard = () => {
         status: data.status ?? 'pending',
         requested_at: data.requested_at ?? '',
         approved_at: data.approved_at,
+        expected_return_at: data.expected_return_at,
+        class_id: data.class_id,
         class_name: classData?.name ?? 'Unknown Class'
       });
     } else {
@@ -124,9 +128,20 @@ const StudentDashboard = () => {
     }
   }, [user?.id]);
 
-  // --- 3. SCHEDULE LOGGING ---
+  const fetchActiveFreeze = useCallback(async (classId: string) => {
+    if (!classId) return;
+    
+    const { data } = await supabase
+      .from('pass_freezes')
+      .select('*')
+      .eq('class_id', classId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    setActiveFreeze(data);
+  }, []);
+
   const fetchTodaySchedule = useCallback(async () => {
-    console.log("%c📡 DATABASE FETCH: Today's Schedule", "color: #f59e0b; font-weight: bold;");
     const today = format(new Date(), 'yyyy-MM-dd');
     const { data: assignment } = await supabase
       .from('schedule_assignments')
@@ -144,11 +159,8 @@ const StudentDashboard = () => {
     }
   }, []);
 
-  // --- 4. REALTIME LOGGING ---
   useEffect(() => {
     if (!user?.id) return;
-
-    console.log("%c🚀 MOUNT: Initializing Student Dashboard", "color: #ffffff; background: #3b82f6; padding: 2px 4px; border-radius: 2px;");
     
     fetchEnrolledClasses();
     fetchActivePass();
@@ -165,34 +177,64 @@ const StudentDashboard = () => {
           filter: `student_id=eq.${user.id}`
         },
         (payload) => {
-          const newRecord = payload.new as { status?: string } | undefined;
-          console.log("%c⚡ REALTIME EVENT: Pass changed", "color: #a855f7; font-weight: bold;", payload.eventType, newRecord?.status);
           fetchActivePass();
 
           if (payload.eventType === 'UPDATE') {
-            const newStatus = payload.new.status;
+            const newStatus = (payload.new as any).status;
             if (['returned', 'completed', 'denied'].includes(newStatus)) {
-              console.log("🔄 Pass finalized, refreshing quota...");
               refreshQuota(); 
             }
           }
         }
       )
-      .subscribe((status) => {
-        console.log(`%c🔌 Realtime Status: ${status}`, "font-style: italic; color: #6b7280;");
-      });
+      .subscribe();
 
     return () => {
-      console.log("%c🛑 UNMOUNT: Cleaning up dashboard", "color: #ef4444;");
       supabase.removeChannel(channel);
     };
-  }, [user?.id, fetchEnrolledClasses, fetchActivePass, fetchTodaySchedule]);
+  }, [user?.id, fetchEnrolledClasses, fetchActivePass, fetchTodaySchedule, refreshQuota]);
+
+  // Fetch freeze status when class changes
+  useEffect(() => {
+    if (selectedClassId) {
+      fetchActiveFreeze(selectedClassId);
+    }
+  }, [selectedClassId, fetchActiveFreeze]);
+
+  // Real-time freeze updates
+  useEffect(() => {
+    if (!selectedClassId) return;
+
+    const channel = supabase
+      .channel(`freeze-${selectedClassId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'pass_freezes',
+          filter: `class_id=eq.${selectedClassId}`
+        },
+        () => fetchActiveFreeze(selectedClassId)
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedClassId, fetchActiveFreeze]);
+
+  const isDestinationFrozen = (destination: string) => {
+    if (!activeFreeze) return false;
+    if (activeFreeze.freeze_type === 'all') return true;
+    if (activeFreeze.freeze_type === 'bathroom' && destination === 'Restroom') return true;
+    return false;
+  };
 
   if (authLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
   if (!user || role !== 'student') return <Navigate to="/auth" replace />;
 
   return (
-    // ... JSX stays exactly the same as the previous fix ...
     <div className="min-h-screen bg-background p-4 max-w-4xl mx-auto pb-24">
        <header className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
@@ -201,7 +243,7 @@ const StudentDashboard = () => {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Student Dashboard</h1>
-            <p className="text-sm text-muted-foreground">{user.email}</p>
+            <p className="text-sm text-muted-foreground">{organization?.name || user.email}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -217,6 +259,14 @@ const StudentDashboard = () => {
       <div className="grid gap-6">
         <PeriodDisplay />
         <QuotaDisplay />
+
+        {/* Freeze Indicator */}
+        {activeFreeze && (
+          <FreezeIndicator 
+            freezeType={activeFreeze.freeze_type} 
+            endsAt={activeFreeze.ends_at} 
+          />
+        )}
 
         {activePass && (
           <Card className="border-2 border-primary bg-primary/5 shadow-xl animate-in fade-in zoom-in duration-300">
@@ -248,6 +298,16 @@ const StudentDashboard = () => {
                 </div>
               </div>
 
+              {/* Queue Position for pending bathroom passes */}
+              {activePass.status === 'pending' && activePass.destination === 'Restroom' && (
+                <QueuePosition classId={activePass.class_id} passId={activePass.id} />
+              )}
+
+              {/* Expected Return Timer */}
+              {activePass.status === 'approved' && activePass.expected_return_at && (
+                <ExpectedReturnTimer expectedReturnAt={activePass.expected_return_at} />
+              )}
+
               {activePass.status === 'pending' && (
                 <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg flex items-center gap-3 text-amber-800">
                   <Clock className="h-5 w-5 animate-spin-slow" />
@@ -257,7 +317,6 @@ const StudentDashboard = () => {
 
               {activePass.status === 'approved' && (
                 <Button onClick={async () => {
-                  console.log("🖱️ CLICK: Check-in clicked");
                   const { error } = await supabase
                     .from('passes')
                     .update({ status: 'pending_return', returned_at: new Date().toISOString() })
@@ -288,17 +347,38 @@ const StudentDashboard = () => {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase text-muted-foreground tracking-widest">Destination</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {DESTINATIONS.map(d => {
+                    const isFrozen = isDestinationFrozen(d);
+                    return (
+                      <Button
+                        key={d}
+                        variant={selectedDestination === d ? 'default' : 'outline'}
+                        className="h-12"
+                        onClick={() => setSelectedDestination(d)}
+                        disabled={isFrozen}
+                      >
+                        {d}
+                        {isFrozen && <span className="ml-1 text-xs">(Frozen)</span>}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <Button 
                 className="w-full h-14 text-lg font-bold" 
                 onClick={async () => {
-                  console.log("🖱️ CLICK: Request Pass clicked");
                   setRequestLoading(true);
                   const dest = selectedDestination === 'Other' ? customDestination : selectedDestination;
                   const { error } = await supabase.from('passes').insert({ student_id: user.id, class_id: selectedClassId, destination: dest });
                   setRequestLoading(false);
                   if (!error) fetchActivePass();
                 }} 
-                disabled={requestLoading || !selectedClassId || !selectedDestination}
+                disabled={requestLoading || !selectedClassId || !selectedDestination || isDestinationFrozen(selectedDestination)}
               >
                 {requestLoading ? 'Processing...' : 'Submit Pass Request'}
               </Button>
