@@ -56,7 +56,6 @@ const TeacherDashboard = () => {
   const isVisible = usePageVisibility();
   
   const userId = user?.id;
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const freezeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Core Data
@@ -93,8 +92,6 @@ const TeacherDashboard = () => {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [studentHistory, setStudentHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [historyFilterLocation, setHistoryFilterLocation] = useState<string>('all');
-  const [historyFilterClass, setHistoryFilterClass] = useState<string>('all');
 
   const DESTINATIONS = ['Restroom', 'Locker', 'Office', 'Other'];
 
@@ -207,31 +204,24 @@ const TeacherDashboard = () => {
     }
 
     // Active
-    const { data: enrollments } = await supabase.from('class_enrollments').select('student_id').eq('class_id', classId);
-    const studentIds = enrollments?.map(e => e.student_id) || [];
+    const { data: rawActive } = await supabase.from('passes').select('id, student_id, class_id, destination, status, requested_at, approved_at')
+        .in('status', ['approved', 'pending_return']).order('approved_at', { ascending: true });
 
-    if (studentIds.length > 0) {
-      const { data: rawActive } = await supabase.from('passes').select('id, student_id, class_id, destination, status, requested_at, approved_at')
-        .in('student_id', studentIds).in('status', ['approved', 'pending_return']).order('approved_at', { ascending: true });
+    if (rawActive) {
+      const activeSIds = rawActive.map(p => p.student_id);
+      const activeCIds = rawActive.map(p => p.class_id);
+      const [profilesRes, classesRes] = await Promise.all([
+        supabase.from('profiles').select('id, full_name').in('id', activeSIds),
+        supabase.from('classes').select('id, name').in('id', activeCIds)
+      ]);
+      const pMap = new Map(profilesRes.data?.map(p => [p.id, p.full_name]));
+      const cMap = new Map(classesRes.data?.map(c => [c.id, c.name]));
 
-      if (rawActive) {
-        const activeSIds = rawActive.map(p => p.student_id);
-        const activeCIds = rawActive.map(p => p.class_id);
-        const [profilesRes, classesRes] = await Promise.all([
-          supabase.from('profiles').select('id, full_name').in('id', activeSIds),
-          supabase.from('classes').select('id, name').in('id', activeCIds)
-        ]);
-        const pMap = new Map(profilesRes.data?.map(p => [p.id, p.full_name]));
-        const cMap = new Map(classesRes.data?.map(c => [c.id, c.name]));
-
-        setActivePasses(rawActive.map(p => ({
-          id: p.id, student_id: p.student_id, student_name: pMap.get(p.student_id) || 'Unknown',
-          destination: p.destination, status: p.status, requested_at: p.requested_at, approved_at: p.approved_at,
-          is_quota_exceeded: false, from_class_name: cMap.get(p.class_id)
-        })));
-      }
-    } else {
-      setActivePasses([]);
+      setActivePasses(rawActive.map(p => ({
+        id: p.id, student_id: p.student_id, student_name: pMap.get(p.student_id) || 'Unknown',
+        destination: p.destination, status: p.status, requested_at: p.requested_at, approved_at: p.approved_at,
+        is_quota_exceeded: false, from_class_name: cMap.get(p.class_id)
+      })));
     }
   }, [userId, settings]);
 
@@ -259,28 +249,11 @@ const TeacherDashboard = () => {
     };
   }, [selectedClassId, userId, fetchFreezeStatus, fetchRoster, fetchPasses]);
 
-  // Quota Check Logic
-  useEffect(() => {
-    if (!selectedStudentForPass || !createPassDialogOpen) return;
-    const checkQuota = async () => {
-      setLoadingQuotaCheck(true);
-      const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString();
-      const { count } = await supabase.from('passes').select('id', { count: 'exact', head: true })
-        .eq('student_id', selectedStudentForPass).eq('destination', 'Restroom').in('status', ['approved', 'pending_return', 'returned']).gte('requested_at', weekStart);
-      setQuickPassQuota({ count: count || 0, exceeded: (count || 0) >= weeklyLimit });
-      setLoadingQuotaCheck(false);
-    };
-    checkQuota();
-  }, [selectedStudentForPass, createPassDialogOpen, weeklyLimit]);
-
-  // --- Pass Actions ---
+  // Pass Actions
   const handleApprove = async (id: string, override: boolean) => {
     if (!userId) return;
     await supabase.from('passes').update({
-      status: 'approved',
-      approved_at: new Date().toISOString(),
-      approved_by: userId,
-      is_quota_override: override
+      status: 'approved', approved_at: new Date().toISOString(), approved_by: userId, is_quota_override: override
     }).eq('id', id);
   };
 
@@ -296,18 +269,10 @@ const TeacherDashboard = () => {
     if (!selectedStudentForPass || !selectedDestination || isActionLoading || !userId) return;
     setIsActionLoading(true);
     const dest = selectedDestination === 'Other' ? customDestination : selectedDestination;
-    const isOverride = (dest === 'Restroom' && quickPassQuota?.exceeded) || false;
-
     const { error } = await supabase.from('passes').insert({
-      student_id: selectedStudentForPass,
-      class_id: selectedClassId,
-      destination: dest,
-      status: 'approved',
-      approved_at: new Date().toISOString(),
-      approved_by: userId,
-      is_quota_override: isOverride
+      student_id: selectedStudentForPass, class_id: selectedClassId, destination: dest,
+      status: 'approved', approved_at: new Date().toISOString(), approved_by: userId
     });
-
     setIsActionLoading(false);
     if (!error) {
       setCreatePassDialogOpen(false);
@@ -320,6 +285,8 @@ const TeacherDashboard = () => {
   if (authLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
   if (!user || role !== 'teacher') return <Navigate to="/auth" replace />;
 
+  // --- THESE CONSTANTS ARE CRITICAL TO PREVENT THE REFERENCE ERROR ---
+  const currentClass = classes.find(c => c.id === selectedClassId);
   const filteredStudents = students.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
   const bathroomPending = pendingPasses.filter(p => p.destination === 'Restroom').length;
   const bathroomActive = activePasses.filter(p => p.destination === 'Restroom').length;
@@ -336,11 +303,9 @@ const TeacherDashboard = () => {
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{organization?.name || 'Pass Management'}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => signOut()} className="text-muted-foreground hover:text-destructive">
-            <LogOut className="h-4 w-4 mr-2" /> Sign Out
-          </Button>
-        </div>
+        <Button variant="ghost" size="sm" onClick={() => signOut()} className="text-muted-foreground hover:text-destructive">
+          <LogOut className="h-4 w-4 mr-2" /> Sign Out
+        </Button>
       </header>
 
       <div className="space-y-6">
@@ -352,9 +317,7 @@ const TeacherDashboard = () => {
               <SelectValue placeholder="Select Class" />
             </SelectTrigger>
             <SelectContent>
-              {classes.map(c => (
-                <SelectItem key={c.id} value={c.id}>Period {c.period_order}: {c.name}</SelectItem>
-              ))}
+              {classes.map(c => <SelectItem key={c.id} value={c.id}>Period {c.period_order}: {c.name}</SelectItem>)}
             </SelectContent>
           </Select>
           <Button size="icon" className="h-14 w-14 rounded-2xl shadow-lg" onClick={() => { setEditingClass(null); setClassDialogOpen(true); }}>
@@ -374,8 +337,6 @@ const TeacherDashboard = () => {
               <div className="space-y-3">
                 <div className="flex items-center justify-between mb-1">
                   <h2 className="text-sm font-bold uppercase tracking-wider text-yellow-600">Requests ({pendingPasses.length})</h2>
-                  
-                  {/* ANIMATED FREEZE BUTTON */}
                   <Button
                     variant={isFrozen ? "destructive" : "outline"}
                     className={`group relative overflow-hidden transition-all duration-300 ease-in-out h-8 w-8 hover:w-40 rounded-full border shadow-sm ${isFrozen ? 'bg-destructive text-destructive-foreground' : 'bg-background hover:bg-blue-50 text-blue-500 hover:border-blue-200'}`}
@@ -432,7 +393,6 @@ const TeacherDashboard = () => {
               </div>
             </div>
 
-            {/* ROSTER */}
             <div className="space-y-4 pt-4 border-t mt-6">
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
@@ -469,30 +429,6 @@ const TeacherDashboard = () => {
           </Button>
         </div>
       )}
-
-      {/* DIALOGS */}
-      <Dialog open={createPassDialogOpen} onOpenChange={setCreatePassDialogOpen}>
-        <DialogContent className="rounded-3xl max-w-sm">
-          <DialogHeader><DialogTitle className="font-bold">Quick Pass</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <Label className="text-xs font-bold uppercase text-muted-foreground">Student</Label>
-            <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-              {students.map(s => (
-                <Button key={s.id} size="sm" variant={selectedStudentForPass === s.id ? 'default' : 'outline'} className="rounded-xl font-bold" onClick={() => setSelectedStudentForPass(s.id)}>{s.name.split(' ')[0]}</Button>
-              ))}
-            </div>
-            <Label className="text-xs font-bold uppercase text-muted-foreground">Location</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {DESTINATIONS.map(d => (
-                <Button key={d} variant={selectedDestination === d ? 'default' : 'outline'} className="rounded-xl font-bold" onClick={() => setSelectedDestination(d)}>{d}</Button>
-              ))}
-            </div>
-            <Button onClick={handleQuickPass} className="w-full h-12 rounded-xl font-bold" disabled={isActionLoading || !selectedStudentForPass || !selectedDestination}>
-              {isActionLoading ? <Loader2 className="animate-spin h-4 w-4" /> : "Issue Pass"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <ClassManagementDialog open={classDialogOpen} onOpenChange={setClassDialogOpen} editingClass={editingClass} userId={userId || ''} onSaved={fetchClasses} />
       <StudentManagementDialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen} student={selectedStudent} currentClassId={selectedClassId} teacherClasses={classes} onUpdated={() => fetchRoster(selectedClassId)} />
