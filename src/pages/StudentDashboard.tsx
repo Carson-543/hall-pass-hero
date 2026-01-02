@@ -157,7 +157,7 @@ const StudentDashboard = () => {
           </div>
         </div>
         <div>
-        <Button variant="ghost" onClick={() => navigate('/settings')}><Settings className="h-4 w-4 mr-2" /> Settings</Button>
+        <Button variant="ghost" onClick={() => navigate('/settings')}><SettingsIcon className="h-4 w-4 mr-2" /> Settings</Button>
         <Button variant="ghost" onClick={signOut}><LogOut className="h-4 w-4 mr-2" /> Sign Out</Button>
         </div>
       </header>
