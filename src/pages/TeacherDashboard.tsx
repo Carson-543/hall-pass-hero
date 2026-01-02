@@ -15,12 +15,12 @@ import { PeriodDisplay } from '@/components/PeriodDisplay';
 import { ElapsedTimer } from '@/components/ElapsedTimer';
 import { ClassManagementDialog } from '@/components/teacher/ClassManagementDialog';
 import { StudentManagementDialog } from '@/components/teacher/StudentManagementDialog';
-import { FreezeControls } from '@/components/teacher/FreezeControls';
+// Removed imported FreezeControls to implement custom UI locally
 import { BathroomQueueStatus } from '@/components/teacher/BathroomQueueStatus';
 import { SubModeToggle } from '@/components/teacher/SubModeToggle';
 import { 
   LogOut, Plus, AlertTriangle, Check, X, 
-  Copy, Search, Loader2, History, Timer, UserMinus 
+  Copy, Search, Loader2, History, Timer, UserMinus, Snowflake 
 } from 'lucide-react';
 import { startOfWeek } from 'date-fns';
 
@@ -30,6 +30,7 @@ interface ClassInfo {
   name: string;
   period_order: number;
   join_code: string;
+  is_queue_frozen: boolean; // Added to track freeze status
 }
 
 interface PendingPass {
@@ -96,6 +97,7 @@ const TeacherDashboard = () => {
   const [editingClass, setEditingClass] = useState<ClassInfo | null>(null);
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [isFreezeLoading, setIsFreezeLoading] = useState(false);
 
   // Quick Pass Logic
   const [selectedStudentForPass, setSelectedStudentForPass] = useState('');
@@ -147,7 +149,7 @@ const TeacherDashboard = () => {
     console.log("🔄 Fetching classes for teacher:", userId);
     const { data, error } = await supabase
       .from('classes')
-      .select('id, name, period_order, join_code')
+      .select('id, name, period_order, join_code, is_queue_frozen')
       .eq('teacher_id', userId)
       .order('period_order');
 
@@ -444,6 +446,43 @@ const TeacherDashboard = () => {
     if (error) console.error("❌ Error checking in pass:", error);
   };
 
+  const handleToggleFreeze = async () => {
+    if (!selectedClassId || !currentClass || isFreezeLoading) return;
+    
+    setIsFreezeLoading(true);
+    const newStatus = !currentClass.is_queue_frozen;
+    
+    try {
+      const { error } = await supabase
+        .from('classes')
+        .update({ is_queue_frozen: newStatus })
+        .eq('id', selectedClassId);
+
+      if (error) throw error;
+
+      // Optimistically update local state
+      setClasses(prev => prev.map(c => 
+        c.id === selectedClassId ? { ...c, is_queue_frozen: newStatus } : c
+      ));
+
+      toast({
+        title: newStatus ? "Queue Frozen" : "Queue Unfrozen",
+        description: newStatus 
+          ? "Students can no longer request passes." 
+          : "Students can now request passes."
+      });
+    } catch (error) {
+      console.error("Error toggling freeze:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update queue status",
+        variant: "destructive"
+      });
+    } finally {
+      setIsFreezeLoading(false);
+    }
+  };
+
   const handleQuickPass = async () => {
     if (!selectedStudentForPass || !selectedDestination || isActionLoading || !userId) return;
     setIsActionLoading(true);
@@ -609,21 +648,38 @@ const TeacherDashboard = () => {
 
         {selectedClassId && (
           <>
-            {/* Freeze Controls & Bathroom Queue Status */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FreezeControls classId={selectedClassId} teacherId={userId || ''} />
-              <BathroomQueueStatus 
-                pendingCount={bathroomPending} 
-                activeCount={bathroomActive}
-                maxConcurrent={settings?.max_concurrent_bathroom ?? 2}
-              />
+            {/* Stats Status Bar */}
+            <div className="w-full">
+               <BathroomQueueStatus 
+                 pendingCount={bathroomPending} 
+                 activeCount={bathroomActive}
+                 maxConcurrent={settings?.max_concurrent_bathroom ?? 2}
+               />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               
               {/* PENDING REQUESTS */}
               <div className="space-y-3">
-                <h2 className="text-sm font-bold uppercase tracking-wider text-yellow-600">Requests ({pendingPasses.length})</h2>
+                <div className="flex items-center justify-between mb-1">
+                  <h2 className="text-sm font-bold uppercase tracking-wider text-yellow-600">Requests ({pendingPasses.length})</h2>
+                  
+                  {/* Freeze Controls Button */}
+                  <Button
+                    variant={currentClass?.is_queue_frozen ? "destructive" : "outline"}
+                    className={`group relative overflow-hidden transition-all duration-300 ease-in-out h-8 w-8 hover:w-40 rounded-full border shadow-sm ${currentClass?.is_queue_frozen ? 'bg-destructive text-destructive-foreground' : 'bg-background hover:bg-blue-50 text-blue-500 hover:border-blue-200'}`}
+                    onClick={handleToggleFreeze}
+                    disabled={isFreezeLoading}
+                  >
+                    <div className="absolute left-0 flex items-center justify-center w-8 h-8">
+                       {isFreezeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Snowflake className="h-4 w-4" />}
+                    </div>
+                    <span className="ml-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap text-xs font-bold pl-1">
+                      {currentClass?.is_queue_frozen ? "Unfreeze Requests" : "Freeze Requests"}
+                    </span>
+                  </Button>
+                </div>
+                
                 {pendingPasses.map(pass => (
                   <Card key={pass.id} className={`rounded-2xl border-l-4 ${getPassCardColor(pass)} shadow-sm`}>
                     <CardContent className="p-4 flex items-center justify-between">
@@ -648,7 +704,9 @@ const TeacherDashboard = () => {
 
               {/* ACTIVE PASSES */}
               <div className="space-y-3">
-                <h2 className="text-sm font-bold uppercase tracking-wider text-green-600">Active Hallway ({activePasses.length})</h2>
+                <div className="h-8 flex items-center">
+                  <h2 className="text-sm font-bold uppercase tracking-wider text-green-600">Active Hallway ({activePasses.length})</h2>
+                </div>
                 {activePasses.map(pass => (
                   <Card key={pass.id} className="rounded-2xl border-l-4 border-l-green-500 shadow-sm">
                     <CardContent className="p-4 flex items-center justify-between">
