@@ -155,6 +155,7 @@ const StudentDashboard = () => {
             <p className="text-sm text-muted-foreground">{organization?.name}</p>
           </div>
         </div>
+        <Button variant="ghost" onClick={settings}><Settings className="h-4 w-4 mr-2" /> Settings</Button>
         <Button variant="ghost" onClick={signOut}><LogOut className="h-4 w-4 mr-2" /> Sign Out</Button>
       </header>
 
