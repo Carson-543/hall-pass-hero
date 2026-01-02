@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { PeriodDisplay } from '@/components/PeriodDisplay';
@@ -21,7 +22,7 @@ import {
   LogOut, Plus, AlertTriangle, Check, X, 
   Copy, Search, Loader2, History, Timer, UserMinus, Snowflake 
 } from 'lucide-react';
-import { startOfWeek } from 'date-fns';
+import { startOfWeek, addMinutes, differenceInSeconds } from 'date-fns';
 
 // --- Interfaces ---
 interface ClassInfo {
@@ -49,6 +50,12 @@ interface Student {
   email: string;
 }
 
+interface ActiveFreeze {
+  id: string;
+  freeze_type: 'bathroom' | 'all';
+  ends_at: string | null;
+}
+
 const TeacherDashboard = () => {
   const { user, role, signOut, loading: authLoading } = useAuth();
   const { organization, settings } = useOrganization();
@@ -56,7 +63,6 @@ const TeacherDashboard = () => {
   const isVisible = usePageVisibility();
   
   const userId = user?.id;
-  const freezeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Core Data
   const [classes, setClasses] = useState<ClassInfo[]>([]);
@@ -68,49 +74,21 @@ const TeacherDashboard = () => {
   const [weeklyLimit, setWeeklyLimit] = useState<number>(4);
 
   // Freeze State (Synced with pass_freezes table)
-  const [isFrozen, setIsFrozen] = useState(false);
+  const [activeFreeze, setActiveFreeze] = useState<ActiveFreeze | null>(null);
+  const [freezeType, setFreezeType] = useState<'bathroom' | 'all'>('bathroom');
+  const [timerMinutes, setTimerMinutes] = useState<string>('');
   const [isFreezeLoading, setIsFreezeLoading] = useState(false);
-
-  // Sub Mode
-  const [isSubMode, setIsSubMode] = useState(false);
-  const [subAssignments, setSubAssignments] = useState<any[]>([]);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
 
   // UI States
-  const [isActionLoading, setIsActionLoading] = useState(false);
   const [createPassDialogOpen, setCreatePassDialogOpen] = useState(false);
   const [classDialogOpen, setClassDialogOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<ClassInfo | null>(null);
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-
-  // Quick Pass & History Logic
-  const [selectedStudentForPass, setSelectedStudentForPass] = useState('');
-  const [selectedDestination, setSelectedDestination] = useState('');
-  const [customDestination, setCustomDestination] = useState('');
-  const [quickPassQuota, setQuickPassQuota] = useState<{ count: number; exceeded: boolean } | null>(null);
-  const [loadingQuotaCheck, setLoadingQuotaCheck] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
-  const [studentHistory, setStudentHistory] = useState<any[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const DESTINATIONS = ['Restroom', 'Locker', 'Office', 'Other'];
-
-  // --- Helper Functions ---
-  const getDestinationColor = (destination: string) => {
-    switch (destination?.toLowerCase()) {
-      case 'restroom': return 'bg-green-500/10 text-green-700 border-green-500/20';
-      case 'locker': return 'bg-blue-500/10 text-blue-700 border-blue-500/20';
-      case 'office': return 'bg-purple-500/10 text-purple-700 border-purple-500/20';
-      default: return 'bg-gray-100 text-gray-700 border-gray-200';
-    }
-  };
-
-  const getPassCardColor = (pass: PendingPass) => {
-    if (pass.status === 'pending') {
-      return pass.is_quota_exceeded ? 'border-l-destructive' : 'border-l-yellow-500';
-    }
-    return 'border-l-green-500';
-  };
 
   // --- Database Actions ---
 
@@ -118,35 +96,72 @@ const TeacherDashboard = () => {
     if (!classId) return;
     const { data } = await supabase
       .from('pass_freezes')
-      .select('is_active')
+      .select('id, freeze_type, ends_at')
       .eq('class_id', classId)
       .eq('is_active', true)
       .maybeSingle();
-    setIsFrozen(!!data);
+    
+    if (data) {
+        setActiveFreeze({
+            id: data.id,
+            freeze_type: data.freeze_type as 'bathroom' | 'all',
+            ends_at: data.ends_at
+        });
+    } else {
+        setActiveFreeze(null);
+    }
   }, []);
 
-  const handleToggleFreeze = async () => {
-    if (!selectedClassId || !userId || isFreezeLoading) return;
+  const handleFreeze = async () => {
+    if (!selectedClassId || !userId) return;
     setIsFreezeLoading(true);
-    try {
-      if (isFrozen) {
-        await supabase.from('pass_freezes').delete().eq('class_id', selectedClassId);
-        toast({ title: "Queue Unfrozen", description: "Students can now request passes." });
-      } else {
-        await supabase.from('pass_freezes').upsert({
-          class_id: selectedClassId,
-          teacher_id: userId,
-          freeze_type: 'all',
-          is_active: true,
-        }, { onConflict: 'class_id' });
-        toast({ title: "Queue Frozen", description: "All requests are blocked.", variant: "destructive" });
-      }
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    } finally {
-      setIsFreezeLoading(false);
+    
+    const endsAt = timerMinutes 
+      ? addMinutes(new Date(), parseInt(timerMinutes)).toISOString()
+      : null;
+
+    const { error } = await supabase
+      .from('pass_freezes')
+      .upsert({
+        class_id: selectedClassId,
+        teacher_id: userId,
+        freeze_type: freezeType,
+        ends_at: endsAt,
+        is_active: true,
+      }, { onConflict: 'class_id' });
+
+    if (!error) {
+        toast({ title: freezeType === 'bathroom' ? 'Bathroom Frozen' : 'Queue Frozen' });
+        setTimerMinutes('');
     }
+    setIsFreezeLoading(false);
   };
+
+  const handleUnfreeze = async () => {
+    if (!selectedClassId) return;
+    setIsFreezeLoading(true);
+    await supabase.from('pass_freezes').delete().eq('class_id', selectedClassId);
+    toast({ title: "Queue Unfrozen" });
+    setIsFreezeLoading(false);
+  };
+
+  // Timer Logic for Auto-Unfreeze Countdown
+  useEffect(() => {
+    if (!activeFreeze?.ends_at) {
+      setTimeRemaining(null);
+      return;
+    }
+    const interval = setInterval(() => {
+      const remaining = differenceInSeconds(new Date(activeFreeze.ends_at!), new Date());
+      if (remaining <= 0) {
+        handleUnfreeze();
+        clearInterval(interval);
+      } else {
+        setTimeRemaining(remaining);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [activeFreeze?.ends_at]);
 
   const fetchClasses = useCallback(async () => {
     if (!userId) return;
@@ -249,7 +264,6 @@ const TeacherDashboard = () => {
     };
   }, [selectedClassId, userId, fetchFreezeStatus, fetchRoster, fetchPasses]);
 
-  // Pass Actions
   const handleApprove = async (id: string, override: boolean) => {
     if (!userId) return;
     await supabase.from('passes').update({
@@ -265,27 +279,15 @@ const TeacherDashboard = () => {
     await supabase.from('passes').update({ status: 'returned', returned_at: new Date().toISOString(), confirmed_by: userId }).eq('id', id);
   };
 
-  const handleQuickPass = async () => {
-    if (!selectedStudentForPass || !selectedDestination || isActionLoading || !userId) return;
-    setIsActionLoading(true);
-    const dest = selectedDestination === 'Other' ? customDestination : selectedDestination;
-    const { error } = await supabase.from('passes').insert({
-      student_id: selectedStudentForPass, class_id: selectedClassId, destination: dest,
-      status: 'approved', approved_at: new Date().toISOString(), approved_by: userId
-    });
-    setIsActionLoading(false);
-    if (!error) {
-      setCreatePassDialogOpen(false);
-      setSelectedStudentForPass('');
-      setSelectedDestination('');
-      toast({ title: 'Pass Issued' });
-    }
+  const formatTimeRemaining = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   if (authLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
   if (!user || role !== 'teacher') return <Navigate to="/auth" replace />;
 
-  // --- THESE CONSTANTS ARE CRITICAL TO PREVENT THE REFERENCE ERROR ---
   const currentClass = classes.find(c => c.id === selectedClassId);
   const filteredStudents = students.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
   const bathroomPending = pendingPasses.filter(p => p.destination === 'Restroom').length;
@@ -337,30 +339,62 @@ const TeacherDashboard = () => {
               <div className="space-y-3">
                 <div className="flex items-center justify-between mb-1">
                   <h2 className="text-sm font-bold uppercase tracking-wider text-yellow-600">Requests ({pendingPasses.length})</h2>
-                  <Button
-                    variant={isFrozen ? "destructive" : "outline"}
-                    className={`group relative overflow-hidden transition-all duration-300 ease-in-out h-8 w-8 hover:w-40 rounded-full border shadow-sm ${isFrozen ? 'bg-destructive text-destructive-foreground' : 'bg-background hover:bg-blue-50 text-blue-500 hover:border-blue-200'}`}
-                    onClick={handleToggleFreeze}
-                    disabled={isFreezeLoading}
-                  >
-                    <div className="absolute left-0 flex items-center justify-center w-8 h-8">
-                       {isFreezeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Snowflake className={`h-4 w-4 ${isFrozen ? 'animate-pulse' : ''}`} />}
-                    </div>
-                    <span className="ml-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap text-xs font-bold pl-1">
-                      {isFrozen ? "Unfreeze Requests" : "Freeze Requests"}
-                    </span>
-                  </Button>
+                  
+                  {/* WRAP THE BUTTON IN THE POPOVER MENU */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={!!activeFreeze ? "destructive" : "outline"}
+                        className={`group relative overflow-hidden transition-all duration-300 ease-in-out h-8 w-8 hover:w-44 rounded-full border shadow-sm ${!!activeFreeze ? 'bg-destructive text-destructive-foreground' : 'bg-background hover:bg-blue-50 text-blue-500 hover:border-blue-200'}`}
+                        disabled={isFreezeLoading}
+                      >
+                        <div className="absolute left-0 flex items-center justify-center w-8 h-8">
+                           {isFreezeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Snowflake className={`h-4 w-4 ${activeFreeze ? 'animate-pulse' : ''}`} />}
+                        </div>
+                        <span className="ml-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap text-xs font-bold pl-1">
+                          {activeFreeze ? (timeRemaining ? `Unfreeze (${formatTimeRemaining(timeRemaining)})` : "Unfreeze Requests") : "Freeze Options"}
+                        </span>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72" align="end">
+                      {activeFreeze ? (
+                        <div className="space-y-3 text-center">
+                          <p className="font-bold text-destructive">{activeFreeze.freeze_type === 'bathroom' ? 'Bathroom' : 'All'} Passes are Frozen</p>
+                          {timeRemaining && <p className="text-xs text-muted-foreground">Auto-unfreezes in {formatTimeRemaining(timeRemaining)}</p>}
+                          <Button variant="destructive" className="w-full" onClick={handleUnfreeze}>Unfreeze Now</Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label className="text-[10px] font-bold uppercase text-muted-foreground">Freeze Type</Label>
+                            <Select value={freezeType} onValueChange={(v) => setFreezeType(v as 'bathroom' | 'all')}>
+                              <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="bathroom">Bathroom Only</SelectItem>
+                                <SelectItem value="all">All Passes</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-[10px] font-bold uppercase text-muted-foreground">Timer (Minutes - Optional)</Label>
+                            <Input type="number" placeholder="Manual Unfreeze" value={timerMinutes} onChange={(e) => setTimerMinutes(e.target.value)} className="rounded-xl" />
+                          </div>
+                          <Button className="w-full font-bold rounded-xl" onClick={handleFreeze}>Start Freeze</Button>
+                        </div>
+                      )}
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 
                 {pendingPasses.map(pass => (
-                  <Card key={pass.id} className={`rounded-2xl border-l-4 ${getPassCardColor(pass)} shadow-sm`}>
+                  <Card key={pass.id} className={`rounded-2xl border-l-4 ${pass.status === 'pending' ? (pass.is_quota_exceeded ? 'border-l-destructive' : 'border-l-yellow-500') : 'border-l-green-500'} shadow-sm`}>
                     <CardContent className="p-4 flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <h3 className="font-bold">{pass.student_name}</h3>
                           {pass.is_quota_exceeded && <AlertTriangle className="h-4 w-4 text-destructive" />}
                         </div>
-                        <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-bold rounded-full border ${getDestinationColor(pass.destination)}`}>
+                        <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-bold rounded-full border bg-gray-100`}>
                           {pass.destination}
                         </span>
                       </div>
@@ -382,7 +416,7 @@ const TeacherDashboard = () => {
                         <h3 className="font-bold">{pass.student_name}</h3>
                         <div className="flex flex-wrap items-center gap-2 mt-1">
                           {pass.from_class_name && <span className="text-[10px] font-black uppercase text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{pass.from_class_name}</span>}
-                          <span className={`inline-block px-2 py-0.5 text-xs font-bold rounded-full border ${getDestinationColor(pass.destination)}`}>{pass.destination}</span>
+                          <span className={`inline-block px-2 py-0.5 text-xs font-bold rounded-full border bg-green-50`}>{pass.destination}</span>
                           {pass.approved_at && <ElapsedTimer startTime={pass.approved_at} destination={pass.destination} />}
                         </div>
                       </div>
@@ -421,14 +455,6 @@ const TeacherDashboard = () => {
           </>
         )}
       </div>
-
-      {selectedClassId && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-md px-4">
-          <Button onClick={() => setCreatePassDialogOpen(true)} className="w-full h-14 rounded-2xl shadow-2xl text-lg font-bold flex items-center gap-3">
-            <Plus className="h-5 w-5" /> ISSUE QUICK PASS
-          </Button>
-        </div>
-      )}
 
       <ClassManagementDialog open={classDialogOpen} onOpenChange={setClassDialogOpen} editingClass={editingClass} userId={userId || ''} onSaved={fetchClasses} />
       <StudentManagementDialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen} student={selectedStudent} currentClassId={selectedClassId} teacherClasses={classes} onUpdated={() => fetchRoster(selectedClassId)} />
