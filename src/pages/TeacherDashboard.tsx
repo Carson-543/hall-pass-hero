@@ -17,7 +17,6 @@ import { ElapsedTimer } from '@/components/ElapsedTimer';
 import { ClassManagementDialog } from '@/components/teacher/ClassManagementDialog';
 import { StudentManagementDialog } from '@/components/teacher/StudentManagementDialog';
 import { BathroomQueueStatus } from '@/components/teacher/BathroomQueueStatus';
-import { SubModeToggle } from '@/components/teacher/SubModeToggle';
 import { 
   LogOut, Plus, AlertTriangle, Check, X, 
   Copy, Search, Loader2, History, Timer, UserMinus, Snowflake 
@@ -73,7 +72,7 @@ const TeacherDashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [weeklyLimit, setWeeklyLimit] = useState<number>(4);
 
-  // Freeze State (Synced with pass_freezes table)
+  // Freeze State
   const [activeFreeze, setActiveFreeze] = useState<ActiveFreeze | null>(null);
   const [freezeType, setFreezeType] = useState<'bathroom' | 'all'>('bathroom');
   const [timerMinutes, setTimerMinutes] = useState<string>('');
@@ -86,54 +85,49 @@ const TeacherDashboard = () => {
   const [editingClass, setEditingClass] = useState<ClassInfo | null>(null);
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+
+  // Quick Pass Logic
+  const [selectedStudentForPass, setSelectedStudentForPass] = useState('');
+  const [selectedDestination, setSelectedDestination] = useState('');
+  const [customDestination, setCustomDestination] = useState('');
+  const [loadingQuotaCheck, setLoadingQuotaCheck] = useState(false);
+  const [quickPassQuota, setQuickPassQuota] = useState<{ count: number; exceeded: boolean } | null>(null);
+
+  // History State
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [studentHistory, setStudentHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyFilterLocation, setHistoryFilterLocation] = useState<string>('all');
+  const [historyFilterClass, setHistoryFilterClass] = useState<string>('all');
 
   const DESTINATIONS = ['Restroom', 'Locker', 'Office', 'Other'];
 
-  // --- Database Actions ---
+  // --- Helpers ---
+  const getDestinationColor = (destination: string) => {
+    switch (destination?.toLowerCase()) {
+      case 'restroom': return 'bg-green-500/10 text-green-700 border-green-500/20';
+      case 'locker': return 'bg-blue-500/10 text-blue-700 border-blue-500/20';
+      case 'office': return 'bg-purple-500/10 text-purple-700 border-purple-500/20';
+      default: return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
+  };
 
+  // --- Database Actions ---
   const fetchFreezeStatus = useCallback(async (classId: string) => {
     if (!classId) return;
-    const { data } = await supabase
-      .from('pass_freezes')
-      .select('id, freeze_type, ends_at')
-      .eq('class_id', classId)
-      .eq('is_active', true)
-      .maybeSingle();
-    
-    if (data) {
-        setActiveFreeze({
-            id: data.id,
-            freeze_type: data.freeze_type as 'bathroom' | 'all',
-            ends_at: data.ends_at
-        });
-    } else {
-        setActiveFreeze(null);
-    }
+    const { data } = await supabase.from('pass_freezes').select('id, freeze_type, ends_at').eq('class_id', classId).eq('is_active', true).maybeSingle();
+    if (data) setActiveFreeze({ id: data.id, freeze_type: data.freeze_type as 'bathroom' | 'all', ends_at: data.ends_at });
+    else setActiveFreeze(null);
   }, []);
 
   const handleFreeze = async () => {
     if (!selectedClassId || !userId) return;
     setIsFreezeLoading(true);
-    
-    const endsAt = timerMinutes 
-      ? addMinutes(new Date(), parseInt(timerMinutes)).toISOString()
-      : null;
-
-    const { error } = await supabase
-      .from('pass_freezes')
-      .upsert({
-        class_id: selectedClassId,
-        teacher_id: userId,
-        freeze_type: freezeType,
-        ends_at: endsAt,
-        is_active: true,
-      }, { onConflict: 'class_id' });
-
-    if (!error) {
-        toast({ title: freezeType === 'bathroom' ? 'Bathroom Frozen' : 'Queue Frozen' });
-        setTimerMinutes('');
-    }
+    const endsAt = timerMinutes ? addMinutes(new Date(), parseInt(timerMinutes)).toISOString() : null;
+    const { error } = await supabase.from('pass_freezes').upsert({
+      class_id: selectedClassId, teacher_id: userId, freeze_type: freezeType, ends_at: endsAt, is_active: true,
+    }, { onConflict: 'class_id' });
+    if (!error) { toast({ title: freezeType === 'bathroom' ? 'Bathroom Frozen' : 'Queue Frozen' }); setTimerMinutes(''); }
     setIsFreezeLoading(false);
   };
 
@@ -145,58 +139,21 @@ const TeacherDashboard = () => {
     setIsFreezeLoading(false);
   };
 
-  // Timer Logic for Auto-Unfreeze Countdown
-  useEffect(() => {
-    if (!activeFreeze?.ends_at) {
-      setTimeRemaining(null);
-      return;
-    }
-    const interval = setInterval(() => {
-      const remaining = differenceInSeconds(new Date(activeFreeze.ends_at!), new Date());
-      if (remaining <= 0) {
-        handleUnfreeze();
-        clearInterval(interval);
-      } else {
-        setTimeRemaining(remaining);
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [activeFreeze?.ends_at]);
-
   const fetchClasses = useCallback(async () => {
     if (!userId) return;
-    const { data, error } = await supabase
-      .from('classes')
-      .select('id, name, period_order, join_code')
-      .eq('teacher_id', userId)
-      .order('period_order');
-
-    if (!error && data && data.length > 0) {
+    const { data } = await supabase.from('classes').select('id, name, period_order, join_code').eq('teacher_id', userId).order('period_order');
+    if (data && data.length > 0) {
       setClasses(data);
       if (!selectedClassId) setSelectedClassId(data[0].id);
     }
   }, [userId, selectedClassId]);
-
-  const fetchRoster = useCallback(async (classId: string) => {
-    const { data: enrollments } = await supabase.from('class_enrollments').select('student_id').eq('class_id', classId);
-    if (!enrollments || enrollments.length === 0) { setStudents([]); return; }
-    const { data: profiles } = await supabase.from('profiles').select('id, full_name, email').in('id', enrollments.map(e => e.student_id)).order('full_name');
-    if (profiles) setStudents(profiles.map(p => ({ id: p.id, name: p.full_name, email: p.email })));
-  }, []);
 
   const fetchPasses = useCallback(async (classId: string) => {
     if (!userId || !classId) return;
     const limit = settings?.weekly_bathroom_limit ?? 4;
     setWeeklyLimit(limit);
 
-    // Pending
-    const { data: rawPending } = await supabase
-      .from('passes')
-      .select('id, student_id, destination, status, requested_at')
-      .eq('class_id', classId)
-      .eq('status', 'pending')
-      .order('requested_at', { ascending: true });
-
+    const { data: rawPending } = await supabase.from('passes').select('id, student_id, destination, status, requested_at').eq('class_id', classId).eq('status', 'pending').order('requested_at', { ascending: true });
     if (rawPending) {
       const pIds = rawPending.map(p => p.student_id);
       const { data: pNames } = await supabase.from('profiles').select('id, full_name').in('id', pIds);
@@ -206,84 +163,92 @@ const TeacherDashboard = () => {
       const pendingMapped = await Promise.all(rawPending.map(async (p: any) => {
         let isExceeded = false;
         if (p.destination === 'Restroom') {
-          const { count } = await supabase.from('passes').select('id', { count: 'exact', head: true })
-            .eq('student_id', p.student_id).eq('destination', 'Restroom').in('status', ['approved', 'pending_return', 'returned']).gte('requested_at', weekStart);
+          const { count } = await supabase.from('passes').select('id', { count: 'exact', head: true }).eq('student_id', p.student_id).eq('destination', 'Restroom').in('status', ['approved', 'pending_return', 'returned']).gte('requested_at', weekStart);
           isExceeded = (count || 0) >= limit;
         }
-        return {
-          id: p.id, student_id: p.student_id, student_name: nameMap.get(p.student_id) || 'Unknown',
-          destination: p.destination, status: p.status, requested_at: p.requested_at, is_quota_exceeded: isExceeded
-        };
+        return { id: p.id, student_id: p.student_id, student_name: nameMap.get(p.student_id) || 'Unknown', destination: p.destination, status: p.status, requested_at: p.requested_at, is_quota_exceeded: isExceeded };
       }));
       setPendingPasses(pendingMapped);
     }
 
-    // Active
-    const { data: rawActive } = await supabase.from('passes').select('id, student_id, class_id, destination, status, requested_at, approved_at')
-        .in('status', ['approved', 'pending_return']).order('approved_at', { ascending: true });
-
+    const { data: rawActive } = await supabase.from('passes').select('id, student_id, class_id, destination, status, requested_at, approved_at').in('status', ['approved', 'pending_return']).order('approved_at', { ascending: true });
     if (rawActive) {
       const activeSIds = rawActive.map(p => p.student_id);
-      const activeCIds = rawActive.map(p => p.class_id);
       const [profilesRes, classesRes] = await Promise.all([
         supabase.from('profiles').select('id, full_name').in('id', activeSIds),
-        supabase.from('classes').select('id, name').in('id', activeCIds)
+        supabase.from('classes').select('id, name').in('id', rawActive.map(p => p.class_id))
       ]);
       const pMap = new Map(profilesRes.data?.map(p => [p.id, p.full_name]));
       const cMap = new Map(classesRes.data?.map(c => [c.id, c.name]));
-
-      setActivePasses(rawActive.map(p => ({
-        id: p.id, student_id: p.student_id, student_name: pMap.get(p.student_id) || 'Unknown',
-        destination: p.destination, status: p.status, requested_at: p.requested_at, approved_at: p.approved_at,
-        is_quota_exceeded: false, from_class_name: cMap.get(p.class_id)
-      })));
+      setActivePasses(rawActive.map(p => ({ id: p.id, student_id: p.student_id, student_name: pMap.get(p.student_id) || 'Unknown', destination: p.destination, status: p.status, requested_at: p.requested_at, approved_at: p.approved_at, is_quota_exceeded: false, from_class_name: cMap.get(p.class_id) })));
     }
   }, [userId, settings]);
 
-  // --- Subscriptions & Lifecycle ---
+  const fetchRoster = useCallback(async (classId: string) => {
+    const { data: enrollments } = await supabase.from('class_enrollments').select('student_id').eq('class_id', classId);
+    if (!enrollments || enrollments.length === 0) { setStudents([]); return; }
+    const { data: profiles } = await supabase.from('profiles').select('id, full_name, email').in('id', enrollments.map(e => e.student_id)).order('full_name');
+    if (profiles) setStudents(profiles.map(p => ({ id: p.id, name: p.full_name, email: p.email })));
+  }, []);
 
+  const handleQuickPass = async () => {
+    if (!selectedStudentForPass || !selectedDestination || !userId) return;
+    const dest = selectedDestination === 'Other' ? customDestination : selectedDestination;
+    const { error } = await supabase.from('passes').insert({
+      student_id: selectedStudentForPass, class_id: selectedClassId, destination: dest,
+      status: 'approved', approved_at: new Date().toISOString(), approved_by: userId
+    });
+    if (!error) { setCreatePassDialogOpen(false); setSelectedStudentForPass(''); setSelectedDestination(''); toast({ title: 'Pass Issued' }); }
+  };
+
+  // --- HISTORY LOGIC ---
+  const fetchStudentHistory = useCallback(async (studentId: string) => {
+    setLoadingHistory(true);
+    const { data: rawHistory } = await supabase
+      .from('passes')
+      .select('id, destination, requested_at, approved_at, returned_at, class_id')
+      .eq('student_id', studentId)
+      .order('requested_at', { ascending: false })
+      .limit(50);
+    
+    if (rawHistory) {
+      const { data: cData } = await supabase.from('classes').select('id, name, period_order').in('id', rawHistory.map(p => p.class_id));
+      const cMap = new Map(cData?.map(c => [c.id, c]));
+      setStudentHistory(rawHistory.map(p => ({ ...p, classes: cMap.get(p.class_id) })));
+    }
+    setLoadingHistory(false);
+  }, []);
+
+  useEffect(() => {
+    if (historyDialogOpen && selectedStudent) fetchStudentHistory(selectedStudent.id);
+  }, [historyDialogOpen, selectedStudent, fetchStudentHistory]);
+
+  const filteredHistory = useMemo(() => {
+    return studentHistory.filter(pass => {
+      const matchesLoc = historyFilterLocation === 'all' || pass.destination === historyFilterLocation;
+      const matchesClass = historyFilterClass === 'all' || pass.class_id === historyFilterClass;
+      return matchesLoc && matchesClass;
+    });
+  }, [studentHistory, historyFilterLocation, historyFilterClass]);
+
+  const totalMinutes = useMemo(() => {
+    return filteredHistory.reduce((acc, pass) => {
+      if (!pass.returned_at || !pass.approved_at) return acc;
+      const diff = new Date(pass.returned_at).getTime() - new Date(pass.approved_at).getTime();
+      return acc + (diff / 60000);
+    }, 0);
+  }, [filteredHistory]);
+
+  // Lifecycle
   useEffect(() => { if (userId) fetchClasses(); }, [userId, fetchClasses]);
-
   useEffect(() => {
     if (!selectedClassId || !userId) return;
     fetchFreezeStatus(selectedClassId);
     fetchRoster(selectedClassId);
     fetchPasses(selectedClassId);
-
-    const freezeChannel = supabase.channel(`freeze-${selectedClassId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pass_freezes', filter: `class_id=eq.${selectedClassId}` }, () => fetchFreezeStatus(selectedClassId))
-      .subscribe();
-
-    const passChannel = supabase.channel(`teacher-${selectedClassId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'passes' }, () => fetchPasses(selectedClassId))
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(freezeChannel);
-      supabase.removeChannel(passChannel);
-    };
+    const channel = supabase.channel(`teacher-${selectedClassId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'passes' }, () => fetchPasses(selectedClassId)).subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [selectedClassId, userId, fetchFreezeStatus, fetchRoster, fetchPasses]);
-
-  const handleApprove = async (id: string, override: boolean) => {
-    if (!userId) return;
-    await supabase.from('passes').update({
-      status: 'approved', approved_at: new Date().toISOString(), approved_by: userId, is_quota_override: override
-    }).eq('id', id);
-  };
-
-  const handleDeny = async (id: string) => {
-    await supabase.from('passes').update({ status: 'denied', denied_at: new Date().toISOString(), denied_by: userId }).eq('id', id);
-  };
-
-  const handleCheckIn = async (id: string) => {
-    await supabase.from('passes').update({ status: 'returned', returned_at: new Date().toISOString(), confirmed_by: userId }).eq('id', id);
-  };
-
-  const formatTimeRemaining = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   if (authLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
   if (!user || role !== 'teacher') return <Navigate to="/auth" replace />;
@@ -297,153 +262,73 @@ const TeacherDashboard = () => {
     <div className="min-h-screen bg-background p-4 max-w-6xl mx-auto pb-32">
       <header className="flex items-center justify-between mb-6 pt-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-            <span className="text-primary-foreground font-bold text-xl">T</span>
-          </div>
-          <div>
-            <h1 className="text-xl font-bold">Teacher Central</h1>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{organization?.name || 'Pass Management'}</p>
-          </div>
+          <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20"><span className="text-primary-foreground font-bold text-xl">T</span></div>
+          <h1 className="text-xl font-bold">Teacher Central</h1>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => signOut()} className="text-muted-foreground hover:text-destructive">
-          <LogOut className="h-4 w-4 mr-2" /> Sign Out
-        </Button>
+        <Button variant="ghost" size="sm" onClick={() => signOut()} className="text-muted-foreground hover:text-destructive"><LogOut className="h-4 w-4 mr-2" /> Sign Out</Button>
       </header>
 
       <div className="space-y-6">
         <PeriodDisplay />
-
         <div className="flex gap-2">
           <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-            <SelectTrigger className="h-14 rounded-2xl bg-card border-none shadow-sm text-lg font-bold px-6 flex-1">
-              <SelectValue placeholder="Select Class" />
-            </SelectTrigger>
-            <SelectContent>
-              {classes.map(c => <SelectItem key={c.id} value={c.id}>Period {c.period_order}: {c.name}</SelectItem>)}
-            </SelectContent>
+            <SelectTrigger className="h-14 rounded-2xl bg-card border-none shadow-sm text-lg font-bold px-6 flex-1"><SelectValue placeholder="Select Class" /></SelectTrigger>
+            <SelectContent>{classes.map(c => <SelectItem key={c.id} value={c.id}>Period {c.period_order}: {c.name}</SelectItem>)}</SelectContent>
           </Select>
-          <Button size="icon" className="h-14 w-14 rounded-2xl shadow-lg" onClick={() => { setEditingClass(null); setClassDialogOpen(true); }}>
-            <Plus className="h-5 w-5" />
-          </Button>
         </div>
 
         {selectedClassId && (
           <>
-            <BathroomQueueStatus 
-              pendingCount={bathroomPending} 
-              activeCount={bathroomActive}
-              maxConcurrent={settings?.max_concurrent_bathroom ?? 2}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center justify-between p-4 bg-card rounded-2xl shadow-sm border">
+                <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Queue Freeze</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant={!!activeFreeze ? "destructive" : "outline"} className={`group relative overflow-hidden transition-all duration-300 h-8 w-8 hover:w-44 rounded-full border shadow-sm ${!!activeFreeze ? 'bg-destructive text-destructive-foreground' : 'bg-background text-blue-500'}`} disabled={isFreezeLoading}>
+                      <div className="absolute left-0 flex items-center justify-center w-8 h-8">{isFreezeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Snowflake className={`h-4 w-4 ${activeFreeze ? 'animate-pulse' : ''}`} />}</div>
+                      <span className="ml-6 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-xs font-bold pl-1">{activeFreeze ? "Unfreeze Requests" : "Freeze Options"}</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72" align="end">
+                    {activeFreeze ? (
+                      <div className="space-y-3 text-center"><p className="font-bold text-destructive">{activeFreeze.freeze_type === 'bathroom' ? 'Bathroom' : 'All'} Passes are Frozen</p><Button variant="destructive" className="w-full" onClick={handleUnfreeze}>Unfreeze Now</Button></div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="space-y-2"><Label className="text-[10px] font-bold uppercase text-muted-foreground">Freeze Type</Label><Select value={freezeType} onValueChange={(v) => setFreezeType(v as 'bathroom' | 'all')}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="bathroom">Bathroom Only</SelectItem><SelectItem value="all">All Passes</SelectItem></SelectContent></Select></div>
+                        <div className="space-y-2"><Label className="text-[10px] font-bold uppercase text-muted-foreground">Timer (Minutes)</Label><Input type="number" placeholder="Manual Unfreeze" value={timerMinutes} onChange={(e) => setTimerMinutes(e.target.value)} className="rounded-xl" /></div>
+                        <Button className="w-full font-bold rounded-xl" onClick={handleFreeze}>Start Freeze</Button>
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <BathroomQueueStatus pendingCount={bathroomPending} activeCount={bathroomActive} maxConcurrent={settings?.max_concurrent_bathroom ?? 2} />
+            </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="space-y-3">
-                <div className="flex items-center justify-between mb-1">
-                  <h2 className="text-sm font-bold uppercase tracking-wider text-yellow-600">Requests ({pendingPasses.length})</h2>
-                  
-                  {/* WRAP THE BUTTON IN THE POPOVER MENU */}
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={!!activeFreeze ? "destructive" : "outline"}
-                        className={`group relative overflow-hidden transition-all duration-300 ease-in-out h-8 w-8 hover:w-44 rounded-full border shadow-sm ${!!activeFreeze ? 'bg-destructive text-destructive-foreground' : 'bg-background hover:bg-blue-50 text-blue-500 hover:border-blue-200'}`}
-                        disabled={isFreezeLoading}
-                      >
-                        <div className="absolute left-0 flex items-center justify-center w-8 h-8">
-                           {isFreezeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Snowflake className={`h-4 w-4 ${activeFreeze ? 'animate-pulse' : ''}`} />}
-                        </div>
-                        <span className="ml-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap text-xs font-bold pl-1">
-                          {activeFreeze ? (timeRemaining ? `Unfreeze (${formatTimeRemaining(timeRemaining)})` : "Unfreeze Requests") : "Freeze Options"}
-                        </span>
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-72" align="end">
-                      {activeFreeze ? (
-                        <div className="space-y-3 text-center">
-                          <p className="font-bold text-destructive">{activeFreeze.freeze_type === 'bathroom' ? 'Bathroom' : 'All'} Passes are Frozen</p>
-                          {timeRemaining && <p className="text-xs text-muted-foreground">Auto-unfreezes in {formatTimeRemaining(timeRemaining)}</p>}
-                          <Button variant="destructive" className="w-full" onClick={handleUnfreeze}>Unfreeze Now</Button>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label className="text-[10px] font-bold uppercase text-muted-foreground">Freeze Type</Label>
-                            <Select value={freezeType} onValueChange={(v) => setFreezeType(v as 'bathroom' | 'all')}>
-                              <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="bathroom">Restroom Only</SelectItem>
-                                <SelectItem value="all">All Passes</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-[10px] font-bold uppercase text-muted-foreground">Timer (Minutes - Optional)</Label>
-                            <Input type="number" placeholder="Manual Unfreeze" value={timerMinutes} onChange={(e) => setTimerMinutes(e.target.value)} className="rounded-xl" />
-                          </div>
-                          <Button className="w-full font-bold rounded-xl" onClick={handleFreeze}>Start Freeze</Button>
-                        </div>
-                      )}
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                
+                <h2 className="text-sm font-bold uppercase tracking-wider text-yellow-600">Requests ({pendingPasses.length})</h2>
                 {pendingPasses.map(pass => (
-                  <Card key={pass.id} className={`rounded-2xl border-l-4 ${pass.status === 'pending' ? (pass.is_quota_exceeded ? 'border-l-destructive' : 'border-l-yellow-500') : 'border-l-green-500'} shadow-sm`}>
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-bold">{pass.student_name}</h3>
-                          {pass.is_quota_exceeded && <AlertTriangle className="h-4 w-4 text-destructive" />}
-                        </div>
-                        <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-bold rounded-full border bg-gray-100`}>
-                          {pass.destination}
-                        </span>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button size="icon" variant="ghost" className="h-10 w-10 rounded-xl bg-muted" onClick={() => handleDeny(pass.id)}><X className="h-4 w-4" /></Button>
-                        <Button size="icon" className="h-10 w-10 rounded-xl shadow-md bg-white border" onClick={() => handleApprove(pass.id, pass.is_quota_exceeded)}><Check className="h-4 w-4" /></Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <Card key={pass.id} className={`rounded-2xl border-l-4 ${pass.is_quota_exceeded ? 'border-l-destructive' : 'border-l-yellow-500'} shadow-sm`}><CardContent className="p-4 flex items-center justify-between"><div><h3 className="font-bold">{pass.student_name}</h3><span className={`inline-block mt-1 px-2 py-0.5 text-xs font-bold rounded-full border ${getDestinationColor(pass.destination)}`}>{pass.destination}</span></div></CardContent></Card>
                 ))}
               </div>
-
               <div className="space-y-3">
                 <h2 className="text-sm font-bold uppercase tracking-wider text-green-600">Active Hallway ({activePasses.length})</h2>
                 {activePasses.map(pass => (
-                  <Card key={pass.id} className="rounded-2xl border-l-4 border-l-green-500 shadow-sm">
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div>
-                        <h3 className="font-bold">{pass.student_name}</h3>
-                        <div className="flex flex-wrap items-center gap-2 mt-1">
-                          {pass.from_class_name && <span className="text-[10px] font-black uppercase text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{pass.from_class_name}</span>}
-                          <span className={`inline-block px-2 py-0.5 text-xs font-bold rounded-full border bg-green-50`}>{pass.destination}</span>
-                          {pass.approved_at && <ElapsedTimer startTime={pass.approved_at} destination={pass.destination} />}
-                        </div>
-                      </div>
-                      <Button onClick={() => handleCheckIn(pass.id)} className="rounded-xl h-10 px-4 shadow-sm font-bold">Check In</Button>
-                    </CardContent>
-                  </Card>
+                  <Card key={pass.id} className="rounded-2xl border-l-4 border-l-green-500 shadow-sm"><CardContent className="p-4 flex items-center justify-between"><div><h3 className="font-bold">{pass.student_name}</h3><span className={`inline-block px-2 py-0.5 text-xs font-bold rounded-full border ${getDestinationColor(pass.destination)}`}>{pass.destination}</span></div><Button size="sm" className="rounded-xl font-bold">Check In</Button></CardContent></Card>
                 ))}
               </div>
             </div>
 
             <div className="space-y-4 pt-4 border-t mt-6">
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input placeholder="Search students..." className="h-12 pl-12 rounded-2xl border-none shadow-sm bg-card" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-                </div>
-                {currentClass && (
-                  <div className="h-12 px-6 rounded-2xl bg-primary/10 border border-primary/20 flex items-center gap-4">
-                    <span className="text-sm font-black tracking-widest uppercase">{currentClass.join_code}</span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { navigator.clipboard.writeText(currentClass.join_code); toast({ title: "Copied!" }); }}><Copy className="h-4 w-4" /></Button>
-                  </div>
-                )}
+              <div className="flex items-center justify-between">
+                <Input placeholder="Search students..." className="h-12 rounded-2xl bg-card max-w-sm" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                {currentClass && <div className="text-xs font-black bg-primary/10 text-primary px-4 py-2 rounded-xl">CODE: {currentClass.join_code}</div>}
               </div>
               <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {filteredStudents.map(student => (
-                  <div key={student.id} className="bg-card p-3 rounded-xl shadow-sm border flex items-center justify-between">
-                    <p className="font-bold truncate">{student.name}</p>
+                  <div key={student.id} className="bg-card p-3 rounded-xl border flex items-center justify-between">
+                    <p className="font-bold">{student.name}</p>
                     <div className="flex gap-1">
                       <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setSelectedStudent(student); setHistoryDialogOpen(true); }}><History className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setSelectedStudent(student); setStudentDialogOpen(true); }}><UserMinus className="h-4 w-4" /></Button>
@@ -456,6 +341,47 @@ const TeacherDashboard = () => {
         )}
       </div>
 
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-md px-4"><Button onClick={() => setCreatePassDialogOpen(true)} className="w-full h-14 rounded-2xl shadow-2xl text-lg font-bold flex items-center justify-center gap-3"><Plus className="h-5 w-5" /> QUICK PASS</Button></div>
+
+      {/* QUICK PASS DIALOG */}
+      <Dialog open={createPassDialogOpen} onOpenChange={setCreatePassDialogOpen}>
+        <DialogContent className="rounded-3xl max-w-sm">
+          <DialogHeader><DialogTitle className="font-bold">Quick Pass</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+             <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase">Student</Label>
+                <Select value={selectedStudentForPass} onValueChange={setSelectedStudentForPass}><SelectTrigger className="rounded-xl"><SelectValue placeholder="Select Student" /></SelectTrigger><SelectContent>{students.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>
+             </div>
+             <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase">Location</Label>
+                <div className="grid grid-cols-2 gap-2">{DESTINATIONS.map(d => <Button key={d} variant={selectedDestination === d ? 'default' : 'outline'} className="rounded-xl font-bold" onClick={() => setSelectedDestination(d)}>{d}</Button>)}</div>
+             </div>
+             <Button onClick={handleQuickPass} className="w-full h-12 rounded-xl font-bold" disabled={!selectedStudentForPass || !selectedDestination}>Issue Pass</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* HISTORY DIALOG - RESTORED */}
+      <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+        <DialogContent className="rounded-3xl max-w-lg">
+          <DialogHeader><DialogTitle className="flex items-center gap-2 text-xl font-bold"><History className="h-5 w-5 text-primary" /> {selectedStudent?.name}'s History</DialogTitle></DialogHeader>
+          <div className="flex gap-2 mb-2 mt-4">
+            <Select value={historyFilterLocation} onValueChange={setHistoryFilterLocation}><SelectTrigger className="rounded-xl bg-muted/50 border-none font-bold"><SelectValue placeholder="All Locations" /></SelectTrigger><SelectContent><SelectItem value="all">All Locations</SelectItem>{DESTINATIONS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select>
+            <Select value={historyFilterClass} onValueChange={setHistoryFilterClass}><SelectTrigger className="rounded-xl bg-muted/50 border-none font-bold"><SelectValue placeholder="All Classes" /></SelectTrigger><SelectContent><SelectItem value="all">All Classes</SelectItem>{classes.map(c => <SelectItem key={c.id} value={c.id}>P{c.period_order}</SelectItem>)}</SelectContent></Select>
+          </div>
+          <div className="space-y-2 py-4 max-h-[50vh] overflow-y-auto pr-2">
+            {loadingHistory ? <div className="flex justify-center py-8"><Loader2 className="animate-spin text-muted-foreground" /></div> : filteredHistory.length === 0 ? <p className="text-center text-muted-foreground py-8">No records found.</p> : filteredHistory.map(pass => (
+              <div key={pass.id} className="p-4 rounded-2xl bg-muted/30 border border-muted/50 flex flex-col gap-2">
+                <div className="flex justify-between items-start">
+                  <div><span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border ${getDestinationColor(pass.destination)}`}>{pass.destination}</span><p className="text-xs font-bold mt-1 text-muted-foreground">{pass.classes?.name}</p></div>
+                  <div className="text-right"><p className="text-[10px] font-bold text-muted-foreground">{new Date(pass.requested_at).toLocaleDateString()}</p></div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 pt-4 border-t flex justify-between items-center"><div className="flex items-center gap-2"><Timer className="h-5 w-5 text-primary" /><p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Total Time</p></div><p className="text-2xl font-black text-primary leading-none">{Math.round(totalMinutes)}m</p></div>
+        </DialogContent>
+      </Dialog>
       <ClassManagementDialog open={classDialogOpen} onOpenChange={setClassDialogOpen} editingClass={editingClass} userId={userId || ''} onSaved={fetchClasses} />
       <StudentManagementDialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen} student={selectedStudent} currentClassId={selectedClassId} teacherClasses={classes} onUpdated={() => fetchRoster(selectedClassId)} />
     </div>
