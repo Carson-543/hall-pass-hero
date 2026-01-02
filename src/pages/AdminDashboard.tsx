@@ -104,6 +104,7 @@ const AdminDashboard = () => {
   // Load settings from organization context
   useEffect(() => {
     if (settings) {
+      console.log("⚙️ Loading organization settings into admin state:", settings);
       setWeeklyQuota(settings.weekly_bathroom_limit);
       setDefaultPeriodCount(settings.default_period_count);
       setMaxConcurrentBathroom(settings.max_concurrent_bathroom);
@@ -118,53 +119,69 @@ const AdminDashboard = () => {
 
   const fetchSchedules = async () => {
     if (!organizationId) return;
-    const { data } = await supabase.from('schedules').select('*').eq('organization_id', organizationId).order('name');
-    if (data) setSchedules(data);
+    console.log(`🔄 Fetching schedules for organization: ${organizationId}`);
+    const { data, error } = await supabase.from('schedules').select('*').eq('organization_id', organizationId).order('name');
+    if (error) console.error("❌ Error fetching schedules:", error);
+    if (data) {
+      console.log(`📥 ${data.length} schedules fetched.`);
+      setSchedules(data);
+    }
   };
 
   const fetchPeriodsForStaging = async (scheduleId: string) => {
-    const { data } = await supabase
+    console.log(`🔄 Fetching periods for schedule: ${scheduleId}`);
+    const { data, error } = await supabase
       .from('periods')
       .select('*')
       .eq('schedule_id', scheduleId)
       .order('period_order');
-    if (data) setPeriods(data);
+    if (error) console.error("❌ Error fetching periods:", error);
+    if (data) {
+      console.log(`📥 ${data.length} periods fetched.`);
+      setPeriods(data);
+    }
   };
 
   const fetchActivePasses = async () => {
     if (!organizationId) return;
+    console.log(`🔄 Fetching active passes for organization: ${organizationId}`);
     
     // Get classes in this organization
-    const { data: orgClasses } = await supabase
+    const { data: orgClasses, error: classError } = await supabase
       .from('classes')
       .select('id')
       .eq('organization_id', organizationId);
     
+    if (classError) console.error("❌ Error fetching classes:", classError);
     if (!orgClasses || orgClasses.length === 0) {
+      console.log("ℹ️ No classes found for this organization.");
       setActivePasses([]);
       return;
     }
 
     const classIds = orgClasses.map(c => c.id);
     
-    const { data: passes } = await supabase
+    const { data: passes, error: passError } = await supabase
       .from('passes')
       .select('id, student_id, destination, status, approved_at, class_id')
       .in('class_id', classIds)
       .in('status', ['approved', 'pending_return'])
-      .order('approved_at', { ascending: true }); // Oldest first
+      .order('approved_at', { ascending: true });
 
+    if (passError) console.error("❌ Error fetching passes:", passError);
     if (!passes || passes.length === 0) {
+      console.log("ℹ️ No active hallway passes found.");
       setActivePasses([]);
       return;
     }
     
+    console.log(`📥 ${passes.length} active passes found. Resolving names...`);
     const studentIds = [...new Set(passes.map(p => p.student_id))];
     const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', studentIds);
     const profileMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
 
-    const { data: classes } = await supabase.from('classes').select('id, name').in('id', classIds);
-    const classMap = new Map(classes?.map(c => [c.id, c.name]) || []);
+    const { data: classesData } = await supabase.from('classes').select('id, name').in('id', classIds);
+    const classMap = new Map(classesData?.map(c => [c.id, c.name]) || []);
 
     setActivePasses(passes.map(p => ({
       id: p.id,
@@ -178,23 +195,30 @@ const AdminDashboard = () => {
 
   const fetchPendingUsers = async () => {
     if (!organizationId) return;
+    console.log(`🔄 Fetching pending user approvals for: ${organizationId}`);
     
-    const { data: profiles } = await supabase
+    const { data: profiles, error: profileError } = await supabase
       .from('profiles')
       .select('id, full_name, email')
       .eq('organization_id', organizationId)
       .eq('is_approved', false);
 
-    if (!profiles) return;
+    if (profileError) console.error("❌ Error fetching pending profiles:", profileError);
+    if (!profiles || profiles.length === 0) {
+      setPendingUsers([]);
+      return;
+    }
 
     const userIds = profiles.map(p => p.id);
-    const { data: roles } = await supabase
+    const { data: roles, error: rolesError } = await supabase
       .from('user_roles')
       .select('user_id, role')
       .in('user_id', userIds);
 
+    if (rolesError) console.error("❌ Error fetching user roles:", rolesError);
     const roleMap = new Map(roles?.map(r => [r.user_id, r.role]) || []);
 
+    console.log(`📥 ${profiles.length} pending users found.`);
     setPendingUsers(profiles.map(p => ({
       id: p.id,
       full_name: p.full_name,
@@ -208,8 +232,8 @@ const AdminDashboard = () => {
     
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
+    console.log(`🔄 Fetching schedule assignments for month: ${format(currentMonth, 'MMMM yyyy')}`);
 
-    // Get schedules for this org
     const { data: orgSchedules } = await supabase
       .from('schedules')
       .select('id')
@@ -219,14 +243,16 @@ const AdminDashboard = () => {
     
     const scheduleIds = orgSchedules.map(s => s.id);
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('schedule_assignments')
       .select('date, schedule_id')
       .in('schedule_id', scheduleIds)
       .gte('date', format(start, 'yyyy-MM-dd'))
       .lte('date', format(end, 'yyyy-MM-dd'));
 
+    if (error) console.error("❌ Error fetching assignments:", error);
     if (data) {
+      console.log(`📥 ${data.length} schedule assignments fetched for current view.`);
       setScheduleAssignments(data.map(a => ({
         date: a.date,
         schedule_id: a.schedule_id,
@@ -238,20 +264,26 @@ const AdminDashboard = () => {
   // --- Handlers ---
 
   const handleApproveUser = async (userId: string) => {
+    console.log(`🔄 Approving user: ${userId}`);
     const { error } = await supabase.from('profiles').update({ is_approved: true }).eq('id', userId);
     if (error) {
+      console.error("❌ Approval error:", error);
       toast({ title: 'Error', description: 'Failed to approve user.', variant: 'destructive' });
     } else {
+      console.log("✅ User approved successfully.");
       toast({ title: 'User Approved' });
       fetchPendingUsers();
     }
   };
 
   const handleDenyUser = async (userId: string) => {
+    console.log(`🔄 Denying (deleting) user: ${userId}`);
     const { error } = await supabase.from('profiles').delete().eq('id', userId);
     if (error) {
+      console.error("❌ Denial error:", error);
       toast({ title: 'Error', description: 'Failed to deny user.', variant: 'destructive' });
     } else {
+      console.log("✅ User denied and record removed.");
       toast({ title: 'User Denied' });
       fetchPendingUsers();
     }
@@ -259,6 +291,7 @@ const AdminDashboard = () => {
 
   const handleSaveSettings = async () => {
     if (!organizationId) return;
+    console.log("🔄 Saving organization settings...");
 
     const { error } = await supabase
       .from('organization_settings')
@@ -274,23 +307,31 @@ const AdminDashboard = () => {
       }, { onConflict: 'organization_id' });
 
     if (error) {
+      console.error("❌ Error saving settings:", error);
       toast({ title: 'Error', description: 'Failed to save settings.', variant: 'destructive' });
     } else {
+      console.log("✅ Settings saved successfully.");
       toast({ title: 'Settings Saved' });
       refreshSettings();
     }
   };
 
   const handleAssignSchedule = async (date: string, scheduleId: string) => {
+    console.log(`🔄 Assigning schedule ${scheduleId} to date: ${date}`);
     const { error } = await supabase.from('schedule_assignments').upsert({ date, schedule_id: scheduleId }, { onConflict: 'date' });
+    if (error) console.error("❌ Assignment error:", error);
     if (!error) fetchScheduleAssignments();
   };
 
   const handleBulkAssign = async () => {
     if (!bulkScheduleId || selectedDates.length === 0) return;
+    console.log(`🔄 Bulk assigning schedule ${bulkScheduleId} to ${selectedDates.length} days`);
+    
     for (const date of selectedDates) {
-      await supabase.from('schedule_assignments').upsert({ date, schedule_id: bulkScheduleId }, { onConflict: 'date' });
+      const { error } = await supabase.from('schedule_assignments').upsert({ date, schedule_id: bulkScheduleId }, { onConflict: 'date' });
+      if (error) console.error(`❌ Error assigning to ${date}:`, error);
     }
+    
     toast({ title: 'Schedules Assigned', description: `${selectedDates.length} days updated.` });
     setSelectedDates([]);
     fetchScheduleAssignments();
@@ -311,6 +352,7 @@ const AdminDashboard = () => {
   };
 
   const openEditSchedule = (schedule: Schedule) => {
+    console.log(`🔄 Opening editor for schedule: ${schedule.name}`);
     setEditingSchedule(schedule);
     setNewScheduleName(schedule.name);
     setNewScheduleIsSchoolDay(schedule.is_school_day);
@@ -321,11 +363,12 @@ const AdminDashboard = () => {
 
   const handleSaveSchedule = async () => {
     if (!newScheduleName.trim() || !organizationId) return;
+    console.log(`🔄 Saving schedule: ${newScheduleName}`);
 
     let scheduleId = editingSchedule?.id;
 
     if (editingSchedule) {
-      await supabase
+      const { error } = await supabase
         .from('schedules')
         .update({ 
           name: newScheduleName, 
@@ -333,6 +376,7 @@ const AdminDashboard = () => {
           color: newScheduleColor 
         })
         .eq('id', editingSchedule.id);
+      if (error) console.error("❌ Error updating schedule row:", error);
     } else {
       const { data, error } = await supabase
         .from('schedules')
@@ -346,6 +390,7 @@ const AdminDashboard = () => {
         .single();
       
       if (error) {
+        console.error("❌ Error creating schedule row:", error);
         toast({ title: "Error", description: "Could not create schedule", variant: "destructive" });
         return;
       }
@@ -353,6 +398,7 @@ const AdminDashboard = () => {
     }
 
     if (scheduleId) {
+      console.log(`🔄 Syncing periods for schedule ID: ${scheduleId}`);
       const currentIds = periods.filter(p => p.id).map(p => p.id);
       
       if (currentIds.length > 0) {
@@ -378,6 +424,7 @@ const AdminDashboard = () => {
       if (periodsToSave.length > 0) {
         const { error: upsertError } = await supabase.from('periods').upsert(periodsToSave);
         if (upsertError) {
+          console.error("❌ Error upserting periods:", upsertError);
           toast({ title: "Error", description: "Failed to save bell schedule rows", variant: "destructive" });
         }
       }
@@ -390,15 +437,18 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteSchedule = async (scheduleId: string) => {
-    if (!confirm('Are you sure you want to delete this schedule?')) return;
+    if (!confirm('Are you sure you want to delete this schedule? This will affect all assigned days.')) return;
+    console.log(`🔄 Deleting schedule: ${scheduleId}`);
 
     await supabase.from('periods').delete().eq('schedule_id', scheduleId);
     await supabase.from('schedule_assignments').delete().eq('schedule_id', scheduleId);
     const { error } = await supabase.from('schedules').delete().eq('id', scheduleId);
     
     if (error) {
+      console.error("❌ Deletion error:", error);
       toast({ title: 'Error', description: 'Failed to delete schedule.', variant: 'destructive' });
     } else {
+      console.log("✅ Schedule and related data deleted.");
       toast({ title: 'Schedule Deleted' });
       fetchSchedules();
       fetchScheduleAssignments();
@@ -422,16 +472,19 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     if (isVisible && organizationId) {
+      console.log("📡 Opening admin-passes realtime channel...");
       channelRef.current = supabase
         .channel('admin-passes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'passes' }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'passes' }, (payload) => {
+          console.log("🔔 Global pass update received:", payload);
           fetchActivePasses();
         })
-        .subscribe();
+        .subscribe((status) => console.log("📡 Admin channel status:", status));
     }
 
     return () => { 
       if (channelRef.current) {
+        console.log("📡 Closing admin-passes realtime channel.");
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
@@ -455,7 +508,7 @@ const AdminDashboard = () => {
 
   useEffect(() => { fetchScheduleAssignments(); }, [currentMonth, schedules, organizationId]);
 
-  if (authLoading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (authLoading) return <div className="min-h-screen flex items-center justify-center">Loading Admin Access...</div>;
   if (!user || role !== 'admin') return <Navigate to="/auth" replace />;
 
   const daysInMonth = eachDayOfInterval({ start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) });
@@ -475,7 +528,10 @@ const AdminDashboard = () => {
             </p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={signOut}>
+        <Button variant="outline" size="sm" onClick={() => {
+            console.log("🚪 Admin signing out...");
+            signOut();
+        }}>
           <LogOut className="h-4 w-4 mr-2" />Sign Out
         </Button>
       </header>
@@ -494,7 +550,7 @@ const AdminDashboard = () => {
           </TabsList>
 
           <TabsContent value="hallway" className="space-y-2">
-            <p className="text-sm text-muted-foreground mb-4">{activePasses.length} student{activePasses.length !== 1 ? 's' : ''} out</p>
+            <p className="text-sm text-muted-foreground mb-4">{activePasses.length} student{activePasses.length !== 1 ? 's' : ''} in the hallway</p>
             {activePasses.length === 0 ? (
               <Card><CardContent className="py-8 text-center text-muted-foreground">No students in hallways</CardContent></Card>
             ) : (
@@ -506,11 +562,11 @@ const AdminDashboard = () => {
                         <div>
                           <p className="font-medium">{pass.student_name}</p>
                           <p className="text-sm text-muted-foreground">From: {pass.from_class}</p>
-                          <p className="text-sm">To: {pass.destination}</p>
+                          <p className="text-sm font-semibold">To: {pass.destination}</p>
                         </div>
                         <div className="text-right space-y-1">
                           {pass.approved_at && <ElapsedTimer startTime={pass.approved_at} destination={pass.destination} />}
-                          <p className="text-xs text-muted-foreground capitalize">{pass.status.replace('_', ' ')}</p>
+                          <p className="text-xs text-muted-foreground capitalize font-bold">{pass.status.replace('_', ' ')}</p>
                         </div>
                       </div>
                     </CardContent>
@@ -531,7 +587,7 @@ const AdminDashboard = () => {
                     <Button variant="outline" size="sm" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}>Prev</Button>
                     <Button variant="outline" size="sm" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}>Next</Button>
                     <Button size="sm" variant="outline" onClick={() => { resetScheduleForm(); setScheduleDialogOpen(true); }}>
-                      <Plus className="h-4 w-4 mr-1" />Schedule
+                      <Plus className="h-4 w-4 mr-1" />Create New
                     </Button>
                   </div>
                 </div>
@@ -548,8 +604,8 @@ const AdminDashboard = () => {
                         ))}
                       </SelectContent>
                     </Select>
-                    <Button size="sm" onClick={handleBulkAssign} disabled={!bulkScheduleId}>Apply</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setSelectedDates([])}>Clear</Button>
+                    <Button size="sm" onClick={handleBulkAssign} disabled={!bulkScheduleId}>Apply to Selected</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setSelectedDates([])}>Cancel</Button>
                   </div>
                 )}
 
@@ -576,7 +632,7 @@ const AdminDashboard = () => {
                       >
                         <div className="text-xs font-medium">{format(day, 'd')}</div>
                         <Select value={assignment?.schedule_id || ''} onValueChange={(v) => handleAssignSchedule(dateStr, v)}>
-                          <SelectTrigger className="h-6 text-xs mt-1 bg-background/80"><SelectValue placeholder="—" /></SelectTrigger>
+                          <SelectTrigger className="h-6 text-[10px] mt-1 bg-background/80"><SelectValue placeholder="—" /></SelectTrigger>
                           <SelectContent>
                             {schedules.map(s => (
                               <SelectItem key={s.id} value={s.id}>
@@ -593,11 +649,11 @@ const AdminDashboard = () => {
                   })}
                 </div>
 
-                <div className="flex gap-4 mt-4 text-xs flex-wrap">
+                <div className="flex gap-4 mt-4 text-xs flex-wrap border-t pt-4">
                   {schedules.map(s => (
-                    <div key={s.id} className="flex items-center gap-2">
+                    <div key={s.id} className="flex items-center gap-2 bg-muted/50 p-2 rounded-lg">
                       <div className="w-3 h-3 rounded" style={{ backgroundColor: s.color || '#6B7280' }} />
-                      <span>{s.name}</span>
+                      <span className="font-bold">{s.name}</span>
                       <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => openEditSchedule(s)}><Edit className="h-3 w-3" /></Button>
                       <Button size="icon" variant="ghost" className="h-5 w-5 text-destructive hover:text-destructive" onClick={() => handleDeleteSchedule(s.id)}><Trash2 className="h-3 w-3" /></Button>
                     </div>
@@ -618,7 +674,7 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 {pendingUsers.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-4">No pending approvals</p>
+                  <p className="text-center text-muted-foreground py-4">No pending staff registrations</p>
                 ) : (
                   <div className="space-y-2">
                     {pendingUsers.map(u => (
@@ -626,11 +682,11 @@ const AdminDashboard = () => {
                         <div>
                           <p className="font-medium">{u.full_name}</p>
                           <p className="text-sm text-muted-foreground">{u.email}</p>
-                          <span className="text-xs capitalize bg-primary/10 text-primary px-2 py-0.5 rounded-full">{u.role}</span>
+                          <span className="text-xs font-black uppercase bg-primary/10 text-primary px-2 py-0.5 rounded-full">{u.role}</span>
                         </div>
                         <div className="flex gap-2">
-                          <Button size="sm" onClick={() => handleApproveUser(u.id)}><Check className="h-4 w-4" /></Button>
-                          <Button size="sm" variant="outline" onClick={() => handleDenyUser(u.id)}><X className="h-4 w-4" /></Button>
+                          <Button size="sm" onClick={() => handleApproveUser(u.id)} className="bg-green-600 hover:bg-green-700"><Check className="h-4 w-4" /></Button>
+                          <Button size="sm" variant="outline" onClick={() => handleDenyUser(u.id)} className="text-destructive border-destructive"><X className="h-4 w-4" /></Button>
                         </div>
                       </div>
                     ))}
@@ -650,42 +706,45 @@ const AdminDashboard = () => {
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Weekly Restroom Quota</Label>
-                    <Input type="number" min={1} max={20} value={weeklyQuota} onChange={(e) => setWeeklyQuota(parseInt(e.target.value) || 4)} />
+                    <Label className="font-bold">Weekly Restroom Quota</Label>
+                    <Input type="number" min={1} max={50} value={weeklyQuota} onChange={(e) => setWeeklyQuota(parseInt(e.target.value) || 4)} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Max Concurrent Bathroom</Label>
-                    <Input type="number" min={1} max={10} value={maxConcurrentBathroom} onChange={(e) => setMaxConcurrentBathroom(parseInt(e.target.value) || 2)} />
+                    <Label className="font-bold">Max Concurrent Bathroom</Label>
+                    <Input type="number" min={1} max={20} value={maxConcurrentBathroom} onChange={(e) => setMaxConcurrentBathroom(parseInt(e.target.value) || 2)} />
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <Label className="text-sm font-semibold">Expected Return Times (minutes)</Label>
+                  <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Expected Return Times (minutes)</Label>
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Bathroom</Label>
-                      <Input type="number" min={1} max={30} value={bathroomExpectedMinutes} onChange={(e) => setBathroomExpectedMinutes(parseInt(e.target.value) || 5)} />
+                      <Input type="number" min={1} value={bathroomExpectedMinutes} onChange={(e) => setBathroomExpectedMinutes(parseInt(e.target.value) || 5)} />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Locker</Label>
-                      <Input type="number" min={1} max={30} value={lockerExpectedMinutes} onChange={(e) => setLockerExpectedMinutes(parseInt(e.target.value) || 3)} />
+                      <Input type="number" min={1} value={lockerExpectedMinutes} onChange={(e) => setLockerExpectedMinutes(parseInt(e.target.value) || 3)} />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Office</Label>
-                      <Input type="number" min={1} max={30} value={officeExpectedMinutes} onChange={(e) => setOfficeExpectedMinutes(parseInt(e.target.value) || 10)} />
+                      <Input type="number" min={1} value={officeExpectedMinutes} onChange={(e) => setOfficeExpectedMinutes(parseInt(e.target.value) || 10)} />
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between p-4 rounded-lg border">
+                <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/20">
                   <div>
-                    <Label className="font-medium">Require Deletion Approval</Label>
-                    <p className="text-sm text-muted-foreground">Students must request account deletion (Ohio SB 29 compliance)</p>
+                    <Label className="font-bold">Require Deletion Approval</Label>
+                    <p className="text-xs text-muted-foreground">Students must request account deletion (Ohio SB 29 compliance)</p>
                   </div>
-                  <Switch checked={requireDeletionApproval} onCheckedChange={setRequireDeletionApproval} />
+                  <Switch checked={requireDeletionApproval} onCheckedChange={(val) => {
+                      console.log(`🔄 Toggling deletion approval setting to: ${val}`);
+                      setRequireDeletionApproval(val);
+                  }} />
                 </div>
 
-                <Button onClick={handleSaveSettings}>Save Settings</Button>
+                <Button onClick={handleSaveSettings} className="w-full font-bold">Save Organization Settings</Button>
               </CardContent>
             </Card>
           </TabsContent>
@@ -701,16 +760,16 @@ const AdminDashboard = () => {
       >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingSchedule ? 'Edit Schedule' : 'Create Schedule'}</DialogTitle>
+            <DialogTitle>{editingSchedule ? 'Edit Bell Schedule' : 'Create New Bell Schedule'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Schedule Name</Label>
-                <Input value={newScheduleName} onChange={(e) => setNewScheduleName(e.target.value)} placeholder="e.g., Regular" />
+                <Input value={newScheduleName} onChange={(e) => setNewScheduleName(e.target.value)} placeholder="e.g., Regular, Advisory, Assembly" />
               </div>
               <div className="space-y-2">
-                <Label>Color</Label>
+                <Label>Color Identifier</Label>
                 <div className="flex gap-2">
                   {SCHEDULE_COLORS.map(c => (
                     <button
@@ -724,16 +783,19 @@ const AdminDashboard = () => {
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg">
               <Checkbox id="isSchoolDay" checked={newScheduleIsSchoolDay} onCheckedChange={(checked) => setNewScheduleIsSchoolDay(!!checked)} />
-              <Label htmlFor="isSchoolDay">This is a school day</Label>
+              <Label htmlFor="isSchoolDay" className="font-medium">Students can request passes on this day</Label>
             </div>
 
             <div className="space-y-2">
-              <Label>Bell Schedule</Label>
+              <Label className="font-bold">Period Timings</Label>
               <InlinePeriodTable 
                 periods={periods} 
-                onChange={setPeriods} 
+                onChange={(updated) => {
+                    console.log("💾 Period table updated in memory.");
+                    setPeriods(updated);
+                }} 
                 scheduleId={editingSchedule?.id || 'new'}
                 defaultPeriodCount={defaultPeriodCount}
               />
@@ -741,7 +803,7 @@ const AdminDashboard = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setScheduleDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveSchedule}>Save Schedule</Button>
+            <Button onClick={handleSaveSchedule}>Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
