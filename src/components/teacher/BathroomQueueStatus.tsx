@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
-import { Users, Bath } from 'lucide-react';
+import { Users, Door-Open } from 'lucide-react';
 
 interface BathroomQueueStatusProps {
   classId: string;
@@ -62,10 +62,10 @@ export const BathroomQueueStatus = ({ classId, maxConcurrent = 2 }: BathroomQueu
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-full ${isFull ? 'bg-amber-500/20' : 'bg-primary/10'}`}>
-              <Bath className={`h-5 w-5 ${isFull ? 'text-amber-600' : 'text-primary'}`} />
+              <Door-open className={`h-5 w-5 ${isFull ? 'text-amber-600' : 'text-primary'}`} />
             </div>
             <div>
-              <p className="font-semibold">Bathroom Queue</p>
+              <p className="font-semibold">Restroom Queue</p>
               <p className="text-sm text-muted-foreground">
                 {activeCount}/{maxConcurrent} out • {pendingCount} waiting
               </p>
