@@ -18,7 +18,7 @@ import { ElapsedTimer } from '@/components/ElapsedTimer';
 import { FreezeIndicator } from '@/components/student/FreezeIndicator';
 import { QueuePosition } from '@/components/student/QueuePosition';
 import { ExpectedReturnTimer } from '@/components/student/ExpectedReturnTimer';
-import { LogOut, Plus, Clock, MapPin, Settings, Loader2 } from 'lucide-react';
+import { LogOut, Plus, Clock, MapPin, Settings as SettingsIcon, Loader2 } from 'lucide-react';
 
 const DESTINATIONS = ['Restroom', 'Locker', 'Office', 'Other'];
 
@@ -156,8 +156,10 @@ const StudentDashboard = () => {
             <p className="text-sm text-muted-foreground">{organization?.name}</p>
           </div>
         </div>
-        <Button variant="ghost" onClick={Settings}><Settings className="h-4 w-4 mr-2" /> Settings</Button>
+        <div>
+        <Button variant="ghost" onClick={() => navigate('/settings')}><Settings className="h-4 w-4 mr-2" /> Settings</Button>
         <Button variant="ghost" onClick={signOut}><LogOut className="h-4 w-4 mr-2" /> Sign Out</Button>
+        </div>
       </header>
 
       <div className="grid gap-6">
