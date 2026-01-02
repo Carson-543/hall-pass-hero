@@ -370,7 +370,7 @@ const TeacherDashboard = () => {
                             <Select value={freezeType} onValueChange={(v) => setFreezeType(v as 'bathroom' | 'all')}>
                               <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="bathroom">Bathroom Only</SelectItem>
+                                <SelectItem value="bathroom">Restroom Only</SelectItem>
                                 <SelectItem value="all">All Passes</SelectItem>
                               </SelectContent>
                             </Select>
