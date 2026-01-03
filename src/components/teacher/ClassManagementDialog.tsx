@@ -13,7 +13,9 @@ interface ClassInfo {
   name: string;
   period_order: number;
   join_code: string;
+  max_concurrent_bathroom?: number;
 }
+
 
 interface ClassManagementDialogProps {
   open: boolean;
@@ -33,17 +35,22 @@ export const ClassManagementDialog = ({
   const { toast } = useToast();
   const [className, setClassName] = useState('');
   const [periodOrder, setPeriodOrder] = useState('1');
+  const [maxConcurrent, setMaxConcurrent] = useState('2');
   const [defaultPeriodCount, setDefaultPeriodCount] = useState(7);
+
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (editingClass) {
       setClassName(editingClass.name);
       setPeriodOrder(editingClass.period_order.toString());
+      setMaxConcurrent(editingClass.max_concurrent_bathroom?.toString() || '2');
     } else {
       setClassName('');
       setPeriodOrder('1');
+      setMaxConcurrent('2');
     }
+
   }, [editingClass, open]);
 
   useEffect(() => {
@@ -66,7 +73,7 @@ export const ClassManagementDialog = ({
     if (editingClass) {
       const { error } = await supabase
         .from('classes')
-        .update({ name: className, period_order: parseInt(periodOrder) })
+        .update({ name: className, period_order: parseInt(periodOrder), max_concurrent_bathroom: parseInt(maxConcurrent) })
         .eq('id', editingClass.id);
 
       if (error) {
@@ -84,8 +91,10 @@ export const ClassManagementDialog = ({
           name: className,
           period_order: parseInt(periodOrder),
           teacher_id: userId,
+          max_concurrent_bathroom: parseInt(maxConcurrent),
           join_code: joinCode || Math.random().toString(36).substring(2, 8).toUpperCase()
         });
+
 
       if (error) {
         toast({ title: 'Error', description: 'Failed to create class.', variant: 'destructive' });
@@ -101,7 +110,7 @@ export const ClassManagementDialog = ({
   const handleDelete = async () => {
     if (!editingClass) return;
     setIsLoading(true);
-    
+
     const { error } = await supabase
       .from('classes')
       .delete()
@@ -150,12 +159,25 @@ export const ClassManagementDialog = ({
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-2">
+            <Label>Max Concurrent Bathroom Users</Label>
+            <Input
+              type="number"
+              min="1"
+              max="10"
+              value={maxConcurrent}
+              onChange={(e) => setMaxConcurrent(e.target.value)}
+              className="rounded-xl h-12"
+            />
+            <p className="text-xs text-muted-foreground">Overrides organization default</p>
+          </div>
+
         </div>
         <DialogFooter className="flex gap-2">
           {editingClass && (
-            <Button 
-              variant="destructive" 
-              onClick={handleDelete} 
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
               disabled={isLoading}
               className="rounded-xl"
             >

@@ -17,9 +17,9 @@ import { ElapsedTimer } from '@/components/ElapsedTimer';
 import { ClassManagementDialog } from '@/components/teacher/ClassManagementDialog';
 import { StudentManagementDialog } from '@/components/teacher/StudentManagementDialog';
 import { BathroomQueueStatus } from '@/components/teacher/BathroomQueueStatus';
-import { 
-  LogOut, Plus, AlertTriangle, Check, X, 
-  Copy, Search, Loader2, History, Timer, UserMinus, Snowflake 
+import {
+  LogOut, Plus, AlertTriangle, Check, X,
+  Copy, Search, Loader2, History, Timer, UserMinus, Snowflake
 } from 'lucide-react';
 import { startOfWeek, addMinutes, differenceInSeconds } from 'date-fns';
 
@@ -29,7 +29,9 @@ interface ClassInfo {
   name: string;
   period_order: number;
   join_code: string;
+  max_concurrent_bathroom?: number;
 }
+
 
 interface PendingPass {
   id: string;
@@ -138,12 +140,13 @@ const TeacherDashboard = () => {
 
   const fetchClasses = useCallback(async () => {
     if (!userId) return;
-    const { data } = await supabase.from('classes').select('id, name, period_order, join_code').eq('teacher_id', userId).order('period_order');
+    const { data } = await supabase.from('classes').select('id, name, period_order, join_code, max_concurrent_bathroom').eq('teacher_id', userId).order('period_order');
     if (data && data.length > 0) {
       setClasses(data);
       if (!selectedClassId) setSelectedClassId(data[0].id);
     }
   }, [userId, selectedClassId]);
+
 
   const fetchPasses = useCallback(async (classId: string) => {
     if (!userId || !classId) return;
@@ -230,7 +233,8 @@ const TeacherDashboard = () => {
     fetchFreezeStatus(selectedClassId);
     fetchRoster(selectedClassId);
     fetchPasses(selectedClassId);
-    const channel = supabase.channel(`teacher-${selectedClassId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'passes' }, () => fetchPasses(selectedClassId)).subscribe();
+    const channel = supabase.channel(`teacher-${selectedClassId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'passes', filter: `class_id=eq.${selectedClassId}` }, () => fetchPasses(selectedClassId)).subscribe();
+
     return () => { supabase.removeChannel(channel); };
   }, [selectedClassId, userId, fetchFreezeStatus, fetchRoster, fetchPasses]);
 
@@ -254,7 +258,7 @@ const TeacherDashboard = () => {
 
       <div className="space-y-6">
         <PeriodDisplay />
-        
+
         <div className="flex gap-2">
           <Select value={selectedClassId} onValueChange={setSelectedClassId}>
             <SelectTrigger className="h-14 rounded-2xl bg-card border-none shadow-sm text-lg font-bold px-6 flex-1"><SelectValue placeholder="Select Class" /></SelectTrigger>
@@ -265,7 +269,8 @@ const TeacherDashboard = () => {
 
         {selectedClassId && (
           <>
-            <BathroomQueueStatus classId={selectedClassId} maxConcurrent={settings?.max_concurrent_bathroom ?? 2} />
+            <BathroomQueueStatus classId={selectedClassId} maxConcurrent={currentClass?.max_concurrent_bathroom ?? settings?.max_concurrent_bathroom ?? 2} />
+
 
             <div className="flex flex-col gap-8">
               {/* REQUESTS SECTION */}
@@ -292,7 +297,7 @@ const TeacherDashboard = () => {
                     </PopoverContent>
                   </Popover>
                 </div>
-                
+
                 {pendingPasses.length === 0 ? (
                   <div className="py-8 text-center bg-muted/20 rounded-2xl border-2 border-dashed"><p className="text-sm font-bold text-muted-foreground">No active requests</p></div>
                 ) : (
@@ -302,8 +307,8 @@ const TeacherDashboard = () => {
                         <CardContent className="p-5 flex items-center justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                                <h3 className="text-lg font-bold">{pass.student_name}</h3>
-                                {pass.is_quota_exceeded && <div className="bg-destructive/10 text-destructive text-[10px] px-2 py-0.5 rounded-full font-black flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> LIMIT REACHED</div>}
+                              <h3 className="text-lg font-bold">{pass.student_name}</h3>
+                              {pass.is_quota_exceeded && <div className="bg-destructive/10 text-destructive text-[10px] px-2 py-0.5 rounded-full font-black flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> LIMIT REACHED</div>}
                             </div>
                             <span className={`inline-block mt-1 px-3 py-1 text-xs font-black rounded-full border tracking-wider uppercase ${getDestinationColor(pass.destination)}`}>{pass.destination}</span>
                           </div>
@@ -355,19 +360,19 @@ const TeacherDashboard = () => {
                 {currentClass && (
                   <div className="flex items-center gap-4 bg-primary/5 border-2 border-primary/20 p-2 pl-6 rounded-2xl group w-full sm:w-auto justify-between">
                     <div>
-                        <p className="text-[10px] font-black text-primary/60 uppercase leading-none mb-1">Join Code</p>
-                        <span className="text-2xl font-black tracking-[0.15em] text-primary">{currentClass.join_code}</span>
+                      <p className="text-[10px] font-black text-primary/60 uppercase leading-none mb-1">Join Code</p>
+                      <span className="text-2xl font-black tracking-[0.15em] text-primary">{currentClass.join_code}</span>
                     </div>
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-12 w-12 rounded-xl bg-white shadow-sm hover:bg-primary hover:text-white transition-colors"
-                        onClick={() => {
-                            navigator.clipboard.writeText(currentClass.join_code);
-                            toast({ title: "Code Copied", description: "Copied to clipboard" });
-                        }}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-12 w-12 rounded-xl bg-white shadow-sm hover:bg-primary hover:text-white transition-colors"
+                      onClick={() => {
+                        navigator.clipboard.writeText(currentClass.join_code);
+                        toast({ title: "Code Copied", description: "Copied to clipboard" });
+                      }}
                     >
-                        <Copy className="h-5 w-5" />
+                      <Copy className="h-5 w-5" />
                     </Button>
                   </div>
                 )}
@@ -391,7 +396,7 @@ const TeacherDashboard = () => {
       {/* FAB - QUICK PASS */}
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-md px-4">
         <Button onClick={() => setCreatePassDialogOpen(true)} className="w-full h-16 rounded-3xl shadow-2xl text-xl font-black flex items-center justify-center gap-4 border-t-4 border-white/20">
-            <Plus className="h-6 w-6" /> ISSUE QUICK PASS
+          <Plus className="h-6 w-6" /> ISSUE QUICK PASS
         </Button>
       </div>
 
@@ -400,31 +405,31 @@ const TeacherDashboard = () => {
         <DialogContent className="rounded-[2.5rem] max-w-sm p-8">
           <DialogHeader><DialogTitle className="font-black text-2xl text-center">Quick Pass</DialogTitle></DialogHeader>
           <div className="space-y-6 py-4">
-             <div className="space-y-3">
-                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Student</Label>
-                <Select value={selectedStudentForPass} onValueChange={setSelectedStudentForPass}>
-                    <SelectTrigger className="h-14 rounded-2xl bg-muted/30 border-none text-lg font-bold"><SelectValue placeholder="Who is leaving?" /></SelectTrigger>
-                    <SelectContent className="rounded-2xl">{students.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-                </Select>
-             </div>
-             <div className="space-y-3">
-                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Destination</Label>
-                <div className="grid grid-cols-2 gap-2">
-                    {DESTINATIONS.map(d => (
-                        <Button 
-                            key={d} 
-                            variant={selectedDestination === d ? 'default' : 'outline'} 
-                            className={`h-14 rounded-2xl font-bold border-2 ${selectedDestination === d ? 'border-primary' : 'border-transparent bg-muted/20'}`} 
-                            onClick={() => setSelectedDestination(d)}
-                        >{d}</Button>
-                    ))}
-                </div>
-             </div>
-             <Button onClick={handleQuickPass} className="w-full h-16 rounded-2xl font-black text-lg shadow-xl mt-4" disabled={!selectedStudentForPass || !selectedDestination}>Confirm & Issue</Button>
+            <div className="space-y-3">
+              <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Student</Label>
+              <Select value={selectedStudentForPass} onValueChange={setSelectedStudentForPass}>
+                <SelectTrigger className="h-14 rounded-2xl bg-muted/30 border-none text-lg font-bold"><SelectValue placeholder="Who is leaving?" /></SelectTrigger>
+                <SelectContent className="rounded-2xl">{students.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-3">
+              <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Destination</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {DESTINATIONS.map(d => (
+                  <Button
+                    key={d}
+                    variant={selectedDestination === d ? 'default' : 'outline'}
+                    className={`h-14 rounded-2xl font-bold border-2 ${selectedDestination === d ? 'border-primary' : 'border-transparent bg-muted/20'}`}
+                    onClick={() => setSelectedDestination(d)}
+                  >{d}</Button>
+                ))}
+              </div>
+            </div>
+            <Button onClick={handleQuickPass} className="w-full h-16 rounded-2xl font-black text-lg shadow-xl mt-4" disabled={!selectedStudentForPass || !selectedDestination}>Confirm & Issue</Button>
           </div>
         </DialogContent>
       </Dialog>
-      
+
       {/* HISTORY DIALOG */}
       <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
         <DialogContent className="rounded-[2.5rem] max-w-lg p-8">

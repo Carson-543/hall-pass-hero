@@ -110,8 +110,9 @@ export const StudentManagementDialog = ({
           <div className="space-y-4 py-4">
             <div className="bg-muted rounded-xl p-4">
               <p className="font-bold text-lg">{student.name}</p>
-              <p className="text-sm text-muted-foreground">{student.email}</p>
+              {/* Email hidden for privacy */}
             </div>
+
 
             {otherClasses.length > 0 && (
               <div className="space-y-2">
@@ -129,8 +130,8 @@ export const StudentManagementDialog = ({
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button 
-                    onClick={handleMove} 
+                  <Button
+                    onClick={handleMove}
                     disabled={isLoading || !targetClassId}
                     className="rounded-xl"
                   >
@@ -142,9 +143,9 @@ export const StudentManagementDialog = ({
           </div>
         )}
         <DialogFooter>
-          <Button 
-            variant="destructive" 
-            onClick={handleRemove} 
+          <Button
+            variant="destructive"
+            onClick={handleRemove}
             disabled={isLoading}
             className="rounded-xl w-full"
           >

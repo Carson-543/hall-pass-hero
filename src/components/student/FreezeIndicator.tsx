@@ -88,27 +88,30 @@ export const FreezeIndicator = ({ classId }: FreezeIndicatorProps) => {
 
   return (
     <Card className="relative overflow-hidden border-2 border-cyan-400/60 bg-gradient-to-br from-cyan-500/20 via-blue-500/15 to-indigo-500/20 backdrop-blur-sm animate-in fade-in duration-500">
-      {/* Frosted glass overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
-      
+      {/* Frosted glass overlay - Intensity increased */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/30 to-blue-200/5 pointer-events-none backdrop-blur-[2px]" />
+
+
       {/* Animated ice crystals */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(12)].map((_, i) => (
+        {[...Array(20)].map((_, i) => (
           <Snowflake
             key={i}
-            className="absolute text-cyan-300/40 animate-pulse"
+            className="absolute text-cyan-200/60 animate-pulse"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
-              width: `${8 + Math.random() * 12}px`,
-              height: `${8 + Math.random() * 12}px`,
+              width: `${10 + Math.random() * 20}px`,
+              height: `${10 + Math.random() * 20}px`,
               animationDelay: `${Math.random() * 2}s`,
-              animationDuration: `${2 + Math.random() * 2}s`,
+              animationDuration: `${2 + Math.random() * 3}s`,
               transform: `rotate(${Math.random() * 360}deg)`,
+              opacity: Math.random() * 0.7 + 0.3
             }}
           />
         ))}
       </div>
+
 
       {/* Pulsing border effect */}
       <div className="absolute inset-0 rounded-lg border-2 border-cyan-400/30 animate-pulse pointer-events-none" />
@@ -118,7 +121,8 @@ export const FreezeIndicator = ({ classId }: FreezeIndicatorProps) => {
           <div className="relative p-3 rounded-full bg-gradient-to-br from-cyan-400/30 to-blue-500/30 border border-cyan-300/50 shadow-lg shadow-cyan-500/20">
             <Snowflake className="h-7 w-7 text-cyan-100 animate-spin" style={{ animationDuration: '8s' }} />
             {/* Inner glow */}
-            <div className="absolute inset-0 rounded-full bg-cyan-400/20 blur-sm" />
+            <div className="absolute inset-0 rounded-full bg-cyan-400/40 blur-md" />
+
           </div>
           <div className="flex-1">
             <p className="font-bold text-lg text-cyan-100 drop-shadow-md">
@@ -158,7 +162,7 @@ export const FreezeIndicator = ({ classId }: FreezeIndicatorProps) => {
           100% { transform: translateX(100%); }
         }
       `}</style>
-      <div 
+      <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)',

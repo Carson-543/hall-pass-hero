@@ -18,8 +18,10 @@ import { PeriodDisplay } from '@/components/PeriodDisplay';
 import { ElapsedTimer } from '@/components/ElapsedTimer';
 import { InlinePeriodTable } from '@/components/admin/InlinePeriodTable';
 import { SubstituteCalendar } from '@/components/admin/SubstituteCalendar';
+import { SubManagementDialog } from '@/components/admin/SubManagementDialog';
 import { DeletionRequestsList } from '@/components/admin/DeletionRequestsList';
-import { LogOut, Check, X, Calendar, Clock, Plus, Trash2, Users, Edit, Settings, UserCheck, Building2 } from 'lucide-react';
+import { LogOut, Check, X, Calendar, Clock, Plus, Trash2, Users, Edit, Settings, UserCheck, Building2, UserPlus } from 'lucide-react';
+
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday } from 'date-fns';
 
 interface PendingUser {
@@ -85,6 +87,9 @@ const AdminDashboard = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [bulkScheduleId, setBulkScheduleId] = useState<string>('');
+  const [subDialogDate, setSubDialogDate] = useState<Date | null>(null);
+  const [subDialogOpen, setSubDialogOpen] = useState(false);
+
 
   // Organization Settings
   const [weeklyQuota, setWeeklyQuota] = useState(4);
@@ -145,13 +150,13 @@ const AdminDashboard = () => {
   const fetchActivePasses = async () => {
     if (!organizationId) return;
     console.log(`🔄 Fetching active passes for organization: ${organizationId}`);
-    
+
     // Get classes in this organization
     const { data: orgClasses, error: classError } = await supabase
       .from('classes')
       .select('id')
       .eq('organization_id', organizationId);
-    
+
     if (classError) console.error("❌ Error fetching classes:", classError);
     if (!orgClasses || orgClasses.length === 0) {
       console.log("ℹ️ No classes found for this organization.");
@@ -160,7 +165,7 @@ const AdminDashboard = () => {
     }
 
     const classIds = orgClasses.map(c => c.id);
-    
+
     const { data: passes, error: passError } = await supabase
       .from('passes')
       .select('id, student_id, destination, status, approved_at, class_id')
@@ -174,7 +179,7 @@ const AdminDashboard = () => {
       setActivePasses([]);
       return;
     }
-    
+
     console.log(`📥 ${passes.length} active passes found. Resolving names...`);
     const studentIds = [...new Set(passes.map(p => p.student_id))];
     const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', studentIds);
@@ -196,7 +201,7 @@ const AdminDashboard = () => {
   const fetchPendingUsers = async () => {
     if (!organizationId) return;
     console.log(`🔄 Fetching pending user approvals for: ${organizationId}`);
-    
+
     const { data: profiles, error: profileError } = await supabase
       .from('profiles')
       .select('id, full_name, email')
@@ -229,7 +234,7 @@ const AdminDashboard = () => {
 
   const fetchScheduleAssignments = async () => {
     if (!organizationId) return;
-    
+
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
     console.log(`🔄 Fetching schedule assignments for month: ${format(currentMonth, 'MMMM yyyy')}`);
@@ -238,9 +243,9 @@ const AdminDashboard = () => {
       .from('schedules')
       .select('id')
       .eq('organization_id', organizationId);
-    
+
     if (!orgSchedules) return;
-    
+
     const scheduleIds = orgSchedules.map(s => s.id);
 
     const { data, error } = await supabase
@@ -326,12 +331,12 @@ const AdminDashboard = () => {
   const handleBulkAssign = async () => {
     if (!bulkScheduleId || selectedDates.length === 0) return;
     console.log(`🔄 Bulk assigning schedule ${bulkScheduleId} to ${selectedDates.length} days`);
-    
+
     for (const date of selectedDates) {
       const { error } = await supabase.from('schedule_assignments').upsert({ date, schedule_id: bulkScheduleId }, { onConflict: 'date' });
       if (error) console.error(`❌ Error assigning to ${date}:`, error);
     }
-    
+
     toast({ title: 'Schedules Assigned', description: `${selectedDates.length} days updated.` });
     setSelectedDates([]);
     fetchScheduleAssignments();
@@ -370,25 +375,25 @@ const AdminDashboard = () => {
     if (editingSchedule) {
       const { error } = await supabase
         .from('schedules')
-        .update({ 
-          name: newScheduleName, 
-          is_school_day: newScheduleIsSchoolDay, 
-          color: newScheduleColor 
+        .update({
+          name: newScheduleName,
+          is_school_day: newScheduleIsSchoolDay,
+          color: newScheduleColor
         })
         .eq('id', editingSchedule.id);
       if (error) console.error("❌ Error updating schedule row:", error);
     } else {
       const { data, error } = await supabase
         .from('schedules')
-        .insert({ 
-          name: newScheduleName, 
-          is_school_day: newScheduleIsSchoolDay, 
+        .insert({
+          name: newScheduleName,
+          is_school_day: newScheduleIsSchoolDay,
           color: newScheduleColor,
           organization_id: organizationId
         })
         .select()
         .single();
-      
+
       if (error) {
         console.error("❌ Error creating schedule row:", error);
         toast({ title: "Error", description: "Could not create schedule", variant: "destructive" });
@@ -400,7 +405,7 @@ const AdminDashboard = () => {
     if (scheduleId) {
       console.log(`🔄 Syncing periods for schedule ID: ${scheduleId}`);
       const currentIds = periods.filter(p => p.id).map(p => p.id);
-      
+
       if (currentIds.length > 0) {
         await supabase
           .from('periods')
@@ -443,7 +448,7 @@ const AdminDashboard = () => {
     await supabase.from('periods').delete().eq('schedule_id', scheduleId);
     await supabase.from('schedule_assignments').delete().eq('schedule_id', scheduleId);
     const { error } = await supabase.from('schedules').delete().eq('id', scheduleId);
-    
+
     if (error) {
       console.error("❌ Deletion error:", error);
       toast({ title: 'Error', description: 'Failed to delete schedule.', variant: 'destructive' });
@@ -482,7 +487,7 @@ const AdminDashboard = () => {
         .subscribe((status) => console.log("📡 Admin channel status:", status));
     }
 
-    return () => { 
+    return () => {
       if (channelRef.current) {
         console.log("📡 Closing admin-passes realtime channel.");
         supabase.removeChannel(channelRef.current);
@@ -529,8 +534,8 @@ const AdminDashboard = () => {
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={() => {
-            console.log("🚪 Admin signing out...");
-            signOut();
+          console.log("🚪 Admin signing out...");
+          signOut();
         }}>
           <LogOut className="h-4 w-4 mr-2" />Sign Out
         </Button>
@@ -626,9 +631,10 @@ const AdminDashboard = () => {
                     return (
                       <div
                         key={dateStr}
-                        className={`relative p-1 min-h-[70px] border rounded-lg cursor-pointer transition-all hover:ring-1 hover:ring-ring ${isToday(day) ? 'ring-2 ring-primary' : ''} ${isSelected ? 'ring-2 ring-ring bg-primary/5' : ''}`}
+                        className={`relative p-1 min-h-[70px] border rounded-lg cursor-pointer transition-all hover:ring-1 hover:ring-ring group ${isToday(day) ? 'ring-2 ring-primary' : ''} ${isSelected ? 'ring-2 ring-ring bg-primary/5' : ''}`}
                         style={getScheduleStyle(scheduleForDay)}
                         onClick={() => toggleDateSelection(dateStr)}
+
                       >
                         <div className="text-xs font-medium">{format(day, 'd')}</div>
                         <Select value={assignment?.schedule_id || ''} onValueChange={(v) => handleAssignSchedule(dateStr, v)}>
@@ -644,8 +650,23 @@ const AdminDashboard = () => {
                             ))}
                           </SelectContent>
                         </Select>
+                        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 rounded-full bg-background/50 hover:bg-primary/20 hover:text-primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSubDialogDate(day);
+                              setSubDialogOpen(true);
+                            }}
+                          >
+                            <UserPlus className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
                     );
+
                   })}
                 </div>
 
@@ -740,8 +761,8 @@ const AdminDashboard = () => {
                     <p className="text-xs text-muted-foreground">Students must request account deletion (Ohio SB 29 compliance)</p>
                   </div>
                   <Switch checked={requireDeletionApproval} onCheckedChange={(val) => {
-                      console.log(`🔄 Toggling deletion approval setting to: ${val}`);
-                      setRequireDeletionApproval(val);
+                    console.log(`🔄 Toggling deletion approval setting to: ${val}`);
+                    setRequireDeletionApproval(val);
                   }} />
                 </div>
 
@@ -752,11 +773,11 @@ const AdminDashboard = () => {
         </Tabs>
       </div>
 
-      <Dialog 
-        open={scheduleDialogOpen} 
-        onOpenChange={(open) => { 
-          if (!open) resetScheduleForm(); 
-          setScheduleDialogOpen(open); 
+      <Dialog
+        open={scheduleDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) resetScheduleForm();
+          setScheduleDialogOpen(open);
         }}
       >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -791,23 +812,31 @@ const AdminDashboard = () => {
 
             <div className="space-y-2">
               <Label className="font-bold">Period Timings</Label>
-              <InlinePeriodTable 
-                periods={periods} 
+              <InlinePeriodTable
+                periods={periods}
                 onChange={(updated) => {
-                    console.log("💾 Period table updated in memory.");
-                    setPeriods(updated);
-                }} 
+                  console.log("💾 Period table updated in memory.");
+                  setPeriods(updated);
+                }}
               />
             </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setScheduleDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleSaveSchedule}>Save Schedule</Button>
+            </DialogFooter>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setScheduleDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveSchedule}>Save Changes</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SubManagementDialog
+        open={subDialogOpen}
+        onOpenChange={setSubDialogOpen}
+        date={subDialogDate}
+        organizationId={organizationId || null}
+      />
     </div>
   );
 };
 
 export default AdminDashboard;
+
