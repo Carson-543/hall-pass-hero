@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface Period {
   id: string;
@@ -27,6 +28,7 @@ interface CurrentPeriodInfo {
 }
 
 export const useCurrentPeriod = () => {
+  const { organizationId } = useOrganization();
   const [periodInfo, setPeriodInfo] = useState<CurrentPeriodInfo>({
     currentPeriod: null,
     nextPeriod: null,
@@ -41,26 +43,60 @@ export const useCurrentPeriod = () => {
   const fetchScheduleData = async () => {
     const today = new Date().toISOString().split('T')[0];
     
-    // Get today's schedule assignment
-    const { data: assignment } = await supabase
-      .from('schedule_assignments')
-      .select('schedule_id')
-      .eq('date', today)
-      .maybeSingle();
-
+    // Get today's schedule assignment - filter by organization's schedules
     let scheduleId: string | null = null;
-
-    if (assignment) {
-      scheduleId = assignment.schedule_id;
-    } else {
-      // Default to Regular schedule if no assignment
-      const { data: regularSchedule } = await supabase
+    
+    if (organizationId) {
+      // First get schedules for this organization
+      const { data: orgSchedules } = await supabase
         .from('schedules')
         .select('id')
-        .eq('name', 'Regular')
-        .single();
+        .eq('organization_id', organizationId);
       
-      scheduleId = regularSchedule?.id ?? null;
+      if (orgSchedules && orgSchedules.length > 0) {
+        const scheduleIds = orgSchedules.map(s => s.id);
+        
+        // Check for assignment today
+        const { data: assignment } = await supabase
+          .from('schedule_assignments')
+          .select('schedule_id')
+          .eq('date', today)
+          .in('schedule_id', scheduleIds)
+          .maybeSingle();
+        
+        if (assignment) {
+          scheduleId = assignment.schedule_id;
+        } else {
+          // Default to Regular schedule in this org
+          const { data: regularSchedule } = await supabase
+            .from('schedules')
+            .select('id')
+            .eq('organization_id', organizationId)
+            .eq('name', 'Regular')
+            .maybeSingle();
+          
+          scheduleId = regularSchedule?.id ?? orgSchedules[0].id;
+        }
+      }
+    } else {
+      // Fallback: no org filter (for public access)
+      const { data: assignment } = await supabase
+        .from('schedule_assignments')
+        .select('schedule_id')
+        .eq('date', today)
+        .maybeSingle();
+
+      if (assignment) {
+        scheduleId = assignment.schedule_id;
+      } else {
+        const { data: regularSchedule } = await supabase
+          .from('schedules')
+          .select('id')
+          .eq('name', 'Regular')
+          .maybeSingle();
+        
+        scheduleId = regularSchedule?.id ?? null;
+      }
     }
 
     if (!scheduleId) {
@@ -71,7 +107,7 @@ export const useCurrentPeriod = () => {
     // Get schedule details
     const { data: schedule } = await supabase
       .from('schedules')
-      .select('*')
+      .select('id, name, is_school_day')
       .eq('id', scheduleId)
       .single();
 
@@ -97,7 +133,7 @@ export const useCurrentPeriod = () => {
     // Get periods for this schedule
     const { data: periods } = await supabase
       .from('periods')
-      .select('*')
+      .select('id, name, period_order, start_time, end_time, is_passing_period')
       .eq('schedule_id', scheduleId)
       .order('period_order', { ascending: true });
 
@@ -178,7 +214,7 @@ export const useCurrentPeriod = () => {
     updateCurrentPeriod();
     const interval = setInterval(updateCurrentPeriod, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [organizationId]);
 
   return { ...periodInfo, loading };
 };

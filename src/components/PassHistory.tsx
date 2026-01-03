@@ -10,12 +10,10 @@ interface Pass {
   destination: string;
   status: string;
   requested_at: string;
-  approved_at: string | null;
-  returned_at: string | null;
   class_name: string;
 }
 
-type TimeFilter = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'all';
+type TimeFilter = 'this_week' | 'last_week' | 'this_month' | 'all';
 
 export const PassHistory = () => {
   const { user } = useAuth();
@@ -53,46 +51,44 @@ export const PassHistory = () => {
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         break;
       }
-      case 'last_month': {
-        endDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        break;
-      }
     }
 
+    // Limit to 10 passes, select only needed columns
     let query = supabase
       .from('passes')
-      .select(`
-        id,
-        destination,
-        status,
-        requested_at,
-        approved_at,
-        returned_at,
-        classes (name)
-      `)
+      .select('id, destination, status, requested_at, class_id')
       .eq('student_id', user.id)
-      .order('requested_at', { ascending: false });
+      .order('requested_at', { ascending: false })
+      .limit(10);
 
     if (startDate) {
       query = query.gte('requested_at', startDate.toISOString());
     }
-    if (timeFilter !== 'all' && timeFilter !== 'this_week' && timeFilter !== 'this_month') {
+    if (timeFilter === 'last_week') {
       query = query.lt('requested_at', endDate.toISOString());
     }
 
     const { data } = await query;
 
-    if (data) {
+    if (data && data.length > 0) {
+      // Batch fetch class names
+      const classIds = [...new Set(data.map(p => p.class_id))];
+      const { data: classesData } = await supabase
+        .from('classes')
+        .select('id, name')
+        .in('id', classIds);
+      
+      const classMap = new Map(classesData?.map(c => [c.id, c.name]) || []);
+
       setPasses(data.map((p: any) => ({
         id: p.id,
         destination: p.destination,
         status: p.status,
         requested_at: p.requested_at,
-        approved_at: p.approved_at,
-        returned_at: p.returned_at,
-        class_name: p.classes?.name ?? 'Unknown'
+        class_name: classMap.get(p.class_id) ?? 'Unknown'
       })));
+    } else {
+      setPasses([]);
     }
     setLoading(false);
   };
@@ -128,7 +124,6 @@ export const PassHistory = () => {
               <SelectItem value="this_week">This Week</SelectItem>
               <SelectItem value="last_week">Last Week</SelectItem>
               <SelectItem value="this_month">This Month</SelectItem>
-              <SelectItem value="last_month">Last Month</SelectItem>
               <SelectItem value="all">All Time</SelectItem>
             </SelectContent>
           </Select>

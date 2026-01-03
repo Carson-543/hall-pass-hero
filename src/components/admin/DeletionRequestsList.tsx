@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { Check, X, UserX, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -13,17 +14,19 @@ interface DeletionRequest {
   requested_at: string;
   status: string;
   user_name: string;
-  user_email: string;
   user_role: string;
 }
 
 export const DeletionRequestsList = () => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const [requests, setRequests] = useState<DeletionRequest[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (!organizationId) return;
+    
     fetchRequests();
 
     const channel = supabase
@@ -31,19 +34,23 @@ export const DeletionRequestsList = () => {
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'account_deletion_requests'
+        table: 'account_deletion_requests',
+        filter: `organization_id=eq.${organizationId}`
       }, () => fetchRequests())
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [organizationId]);
 
   const fetchRequests = async () => {
+    if (!organizationId) return;
+    
     const { data: requestData } = await supabase
       .from('account_deletion_requests')
-      .select('*')
+      .select('id, user_id, requested_at, status')
+      .eq('organization_id', organizationId)
       .eq('status', 'pending')
       .order('requested_at');
 
@@ -52,28 +59,24 @@ export const DeletionRequestsList = () => {
       return;
     }
 
-    // Fetch user details
+    // Fetch user details (name only - no email for privacy)
     const userIds = requestData.map(r => r.user_id);
     const [profilesRes, rolesRes] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, email').in('id', userIds),
+      supabase.from('profiles').select('id, full_name').in('id', userIds),
       supabase.from('user_roles').select('user_id, role').in('user_id', userIds)
     ]);
 
-    const profileMap = new Map(profilesRes.data?.map(p => [p.id, p]));
+    const profileMap = new Map(profilesRes.data?.map(p => [p.id, p.full_name]));
     const roleMap = new Map(rolesRes.data?.map(r => [r.user_id, r.role]));
 
-    setRequests(requestData.map(r => {
-      const profile = profileMap.get(r.user_id);
-      return {
-        id: r.id,
-        user_id: r.user_id,
-        requested_at: r.requested_at,
-        status: r.status,
-        user_name: profile?.full_name || 'Unknown',
-        user_email: profile?.email || 'Unknown',
-        user_role: roleMap.get(r.user_id) || 'unknown'
-      };
-    }));
+    setRequests(requestData.map(r => ({
+      id: r.id,
+      user_id: r.user_id,
+      requested_at: r.requested_at || new Date().toISOString(),
+      status: r.status || 'pending',
+      user_name: profileMap.get(r.user_id) || 'Unknown',
+      user_role: roleMap.get(r.user_id) || 'unknown'
+    })));
   };
 
   const handleApprove = async (request: DeletionRequest) => {
@@ -148,7 +151,6 @@ export const DeletionRequestsList = () => {
           >
             <div>
               <p className="font-medium">{request.user_name}</p>
-              <p className="text-sm text-muted-foreground">{request.user_email}</p>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-xs bg-muted px-2 py-0.5 rounded capitalize">
                   {request.user_role}
