@@ -87,29 +87,84 @@ export const FreezeIndicator = ({ classId }: FreezeIndicatorProps) => {
   const isBathroomOnly = freeze.freeze_type === 'bathroom';
 
   return (
-    <Card className="border-amber-500/50 bg-amber-500/10 animate-in fade-in duration-300">
-      <CardContent className="p-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-full bg-amber-500/20">
-            <Snowflake className="h-5 w-5 text-amber-600 animate-pulse" />
+    <Card className="relative overflow-hidden border-2 border-cyan-400/60 bg-gradient-to-br from-cyan-500/20 via-blue-500/15 to-indigo-500/20 backdrop-blur-sm animate-in fade-in duration-500">
+      {/* Frosted glass overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
+      
+      {/* Animated ice crystals */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {[...Array(12)].map((_, i) => (
+          <Snowflake
+            key={i}
+            className="absolute text-cyan-300/40 animate-pulse"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              width: `${8 + Math.random() * 12}px`,
+              height: `${8 + Math.random() * 12}px`,
+              animationDelay: `${Math.random() * 2}s`,
+              animationDuration: `${2 + Math.random() * 2}s`,
+              transform: `rotate(${Math.random() * 360}deg)`,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Pulsing border effect */}
+      <div className="absolute inset-0 rounded-lg border-2 border-cyan-400/30 animate-pulse pointer-events-none" />
+
+      <CardContent className="relative p-5">
+        <div className="flex items-center gap-4">
+          <div className="relative p-3 rounded-full bg-gradient-to-br from-cyan-400/30 to-blue-500/30 border border-cyan-300/50 shadow-lg shadow-cyan-500/20">
+            <Snowflake className="h-7 w-7 text-cyan-100 animate-spin" style={{ animationDuration: '8s' }} />
+            {/* Inner glow */}
+            <div className="absolute inset-0 rounded-full bg-cyan-400/20 blur-sm" />
           </div>
           <div className="flex-1">
-            <p className="font-semibold text-amber-700">
-              {isBathroomOnly ? 'Bathroom Passes' : 'All Passes'} Temporarily Unavailable
+            <p className="font-bold text-lg text-cyan-100 drop-shadow-md">
+              {isBathroomOnly ? '🚽 Bathroom Passes' : '🔒 All Passes'} Frozen
             </p>
             {timeRemaining !== null ? (
-              <p className="text-sm text-amber-600 flex items-center gap-1">
-                <Timer className="h-3 w-3" />
-                Available again in {formatTime(timeRemaining)}
-              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <Timer className="h-4 w-4 text-cyan-300" />
+                <p className="text-cyan-200 font-mono text-lg font-bold tracking-wider">
+                  {formatTime(timeRemaining)}
+                </p>
+                <span className="text-cyan-300/80 text-sm">remaining</span>
+              </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                Your teacher has paused pass requests
+              <p className="text-sm text-cyan-200/80 mt-1">
+                Your teacher has temporarily paused pass requests
               </p>
             )}
           </div>
         </div>
+
+        {/* Ice crack decorations */}
+        <svg className="absolute bottom-0 right-0 w-24 h-24 text-cyan-300/20 pointer-events-none" viewBox="0 0 100 100">
+          <path d="M0 100 L30 70 L25 50 L40 30 L35 10 L50 0" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M30 70 L45 75 L60 60" fill="none" stroke="currentColor" strokeWidth="1" />
+          <path d="M40 30 L55 35" fill="none" stroke="currentColor" strokeWidth="1" />
+        </svg>
+        <svg className="absolute top-0 left-0 w-16 h-16 text-cyan-300/15 pointer-events-none" viewBox="0 0 100 100">
+          <path d="M100 0 L70 30 L80 50 L60 70 L70 90" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
       </CardContent>
+
+      {/* Shimmer effect */}
+      <style>{`
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+      `}</style>
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)',
+          animation: 'shimmer 3s infinite',
+        }}
+      />
     </Card>
   );
 };

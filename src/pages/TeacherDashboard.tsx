@@ -265,7 +265,7 @@ const TeacherDashboard = () => {
 
         {selectedClassId && (
           <>
-            <BathroomQueueStatus pendingCount={bathroomPending} activeCount={bathroomActive} maxConcurrent={settings?.max_concurrent_bathroom ?? 2} />
+            <BathroomQueueStatus classId={selectedClassId} maxConcurrent={settings?.max_concurrent_bathroom ?? 2} />
 
             <div className="flex flex-col gap-8">
               {/* REQUESTS SECTION */}

@@ -664,7 +664,7 @@ const AdminDashboard = () => {
           </TabsContent>
 
           <TabsContent value="substitutes">
-            <SubstituteCalendar organizationId={organizationId || ''} />
+            <SubstituteCalendar />
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-4">
@@ -696,7 +696,7 @@ const AdminDashboard = () => {
             </Card>
 
             {requireDeletionApproval && (
-              <DeletionRequestsList organizationId={organizationId || ''} />
+              <DeletionRequestsList />
             )}
 
             <Card>
@@ -706,8 +706,9 @@ const AdminDashboard = () => {
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="font-bold">Weekly Restroom Quota</Label>
+                    <Label className="font-bold">Weekly Restroom Quota (per student)</Label>
                     <Input type="number" min={1} max={50} value={weeklyQuota} onChange={(e) => setWeeklyQuota(parseInt(e.target.value) || 4)} />
+                    <p className="text-xs text-muted-foreground">Default restroom passes allowed per student per week</p>
                   </div>
                   <div className="space-y-2">
                     <Label className="font-bold">Max Concurrent Bathroom</Label>
@@ -796,8 +797,6 @@ const AdminDashboard = () => {
                     console.log("💾 Period table updated in memory.");
                     setPeriods(updated);
                 }} 
-                scheduleId={editingSchedule?.id || 'new'}
-                defaultPeriodCount={defaultPeriodCount}
               />
             </div>
           </div>

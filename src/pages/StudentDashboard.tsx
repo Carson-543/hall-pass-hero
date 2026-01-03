@@ -36,7 +36,7 @@ const StudentDashboard = () => {
   const [selectedDestination, setSelectedDestination] = useState<string>('');
   const [customDestination, setCustomDestination] = useState<string>('');
   const [requestLoading, setRequestLoading] = useState(false);
-  const [activeFreeze, setActiveFreeze] = useState<any | null>(null);
+  const [activeFreeze, setActiveFreeze] = useState<{ freeze_type: 'bathroom' | 'all' } | null>(null);
 
   // --- STABLE FETCHERS ---
 
@@ -93,8 +93,8 @@ const StudentDashboard = () => {
 
   const fetchActiveFreeze = useCallback(async (id: string) => {
     if (!id) return;
-    const { data } = await supabase.from('pass_freezes').select('*').eq('class_id', id).eq('is_active', true).maybeSingle();
-    setActiveFreeze(data);
+    const { data } = await supabase.from('pass_freezes').select('freeze_type').eq('class_id', id).eq('is_active', true).maybeSingle();
+    setActiveFreeze(data ? { freeze_type: data.freeze_type as 'bathroom' | 'all' } : null);
   }, []);
 
   // --- EFFECT 1: INITIAL LOAD ONLY ---
@@ -119,12 +119,12 @@ const StudentDashboard = () => {
     return () => { supabase.removeChannel(channel); };
   }, [user?.id, fetchActivePass, refreshQuota]);
 
-  // --- EFFECT 3: REALTIME SUBSCRIPTION (Freezes) ---
+  // --- EFFECT 3: FREEZE CHECK FOR BUTTON DISABLE ---
   useEffect(() => {
     if (!selectedClassId) return;
     fetchActiveFreeze(selectedClassId);
     const channel = supabase
-      .channel(`freeze-${selectedClassId}`)
+      .channel(`freeze-check-${selectedClassId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pass_freezes', filter: `class_id=eq.${selectedClassId}` }, 
       () => fetchActiveFreeze(selectedClassId))
       .subscribe();
@@ -166,7 +166,7 @@ const StudentDashboard = () => {
         <PeriodDisplay />
         <QuotaDisplay />
 
-        {activeFreeze && <FreezeIndicator freezeType={activeFreeze.freeze_type} endsAt={activeFreeze.ends_at} />}
+        {selectedClassId && <FreezeIndicator classId={selectedClassId} />}
 
         {activePass ? (
           <Card className="border-2 border-primary bg-primary/5">
