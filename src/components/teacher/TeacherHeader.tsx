@@ -12,7 +12,7 @@ export const TeacherHeader = ({ signOut }: TeacherHeaderProps) => {
                 <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
                     <span className="text-primary-foreground font-bold text-xl">T</span>
                 </div>
-                <h1 className="text-xl font-bold">Teacher Dashboard</h1>
+                <h1 className="text-xl font-bold">Teacher Dashboard (Updated)</h1>
             </div>
             <Button
                 variant="ghost"

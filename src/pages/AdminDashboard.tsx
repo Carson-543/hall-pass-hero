@@ -19,7 +19,8 @@ import { ElapsedTimer } from '@/components/ElapsedTimer';
 import { InlinePeriodTable } from '@/components/admin/InlinePeriodTable';
 
 import { DeletionRequestsList } from '@/components/admin/DeletionRequestsList';
-import { LogOut, Check, X, Calendar, Clock, Plus, Trash2, Users, Edit, Settings, UserCheck, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { SubManagementDialog } from '@/components/admin/SubManagementDialog';
+import { LogOut, Check, X, Calendar, Clock, Plus, Trash2, Users, Edit, Settings, UserCheck, Building2, ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
 
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday } from 'date-fns';
 
@@ -86,6 +87,8 @@ const AdminDashboard = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [bulkScheduleId, setBulkScheduleId] = useState<string>('');
+  const [subDialogDate, setSubDialogDate] = useState<Date | null>(null);
+  const [subDialogOpen, setSubDialogOpen] = useState(false);
 
 
   // Organization Settings
@@ -672,7 +675,18 @@ const AdminDashboard = () => {
                                 <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full ${isTodayDate ? 'bg-blue-500 text-white' : 'text-muted-foreground'}`}>
                                   {format(day, 'd')}
                                 </span>
-                                {/* Removed UserPlus button for substitute management */}
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity -mr-1 -mt-1 hover:bg-transparent text-muted-foreground hover:text-primary"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSubDialogDate(day);
+                                    setSubDialogOpen(true);
+                                  }}
+                                >
+                                  <UserPlus className="h-3 w-3" />
+                                </Button>
                               </div>
 
                               {schedule ? (
@@ -868,7 +882,12 @@ const AdminDashboard = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Removed SubManagementDialog */}
+      <SubManagementDialog
+        open={subDialogOpen}
+        onOpenChange={setSubDialogOpen}
+        date={subDialogDate}
+        organizationId={organizationId || null}
+      />
     </div>
   );
 };
