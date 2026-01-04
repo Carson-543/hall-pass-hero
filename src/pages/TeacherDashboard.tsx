@@ -251,11 +251,15 @@ export const TeacherDashboard = () => {
       .select('profiles:student_id(id, full_name, email)')
       .eq('class_id', selectedClassId);
     if (data) {
-      setStudents(data.map((d: any) => ({
-        id: d.profiles.id,
-        name: d.profiles.full_name,
-        email: d.profiles.email
-      })));
+      setStudents(
+        data
+          .filter((d: any) => d.profiles)
+          .map((d: any) => ({
+            id: d.profiles.id,
+            name: d.profiles.full_name,
+            email: d.profiles.email
+          }))
+      );
     }
   };
 

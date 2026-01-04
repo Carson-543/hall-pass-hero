@@ -92,7 +92,7 @@ const Auth = () => {
   if (showOrgSelector && user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/30 p-4">
-        <motion.div 
+        <motion.div
           className="w-full max-w-md space-y-4"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -118,7 +118,7 @@ const Auth = () => {
             <CardHeader>
               <CardTitle>Awaiting Approval</CardTitle>
               <CardDescription>
-                Your account is pending approval from an administrator at {organization?.name}. 
+                Your account is pending approval from an administrator at {organization?.name}.
                 You'll be able to access the system once approved.
               </CardDescription>
             </CardHeader>
@@ -207,9 +207,9 @@ const Auth = () => {
         transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
         className="relative z-10"
       >
-        <GlassCard className="w-full max-w-md" hover3D>
+        <GlassCard className="w-full max-w-xl" hover3D>
           <CardHeader className="text-center pb-2">
-            <motion.div 
+            <motion.div
               className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/30"
               whileHover={{ scale: 1.05, rotate: 5 }}
             >

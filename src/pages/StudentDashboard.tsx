@@ -17,13 +17,13 @@ import { ElapsedTimer } from '@/components/ElapsedTimer';
 import { FreezeIndicator } from '@/components/student/FreezeIndicator';
 import { QueuePosition } from '@/components/student/QueuePosition';
 import { ExpectedReturnTimer } from '@/components/student/ExpectedReturnTimer';
-import { IceOverlay } from '@/components/student/IceOverlay';
+
 import { GlassCard } from '@/components/ui/glass-card';
 import { GlowButton } from '@/components/ui/glow-button';
 import { PageTransition, FadeIn, StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
 import { FloatingElement } from '@/components/ui/floating-element';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { LogOut, Clock, MapPin, Settings as SettingsIcon, Loader2, ArrowLeft, Sparkles, DoorOpen, KeyRound, Building2, MoreHorizontal } from 'lucide-react';
+import { LogOut, Clock, MapPin, Settings as SettingsIcon, Loader2, ArrowLeft, Sparkles, DoorOpen, KeyRound, Building2, MoreHorizontal, Snowflake } from 'lucide-react';
 
 const DESTINATIONS = [
   { id: 'Restroom', icon: DoorOpen, label: 'Restroom' },
@@ -111,13 +111,13 @@ const StudentDashboard = () => {
     if (!user?.id) return;
     const channel = supabase
       .channel(`student-pass-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'passes', filter: `student_id=eq.${user.id}` }, 
-      (payload) => {
-        fetchActivePass();
-        if (payload.eventType === 'UPDATE' && ['returned', 'completed', 'denied'].includes((payload.new as any).status)) {
-          refreshQuota();
-        }
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'passes', filter: `student_id=eq.${user.id}` },
+        (payload) => {
+          fetchActivePass();
+          if (payload.eventType === 'UPDATE' && ['returned', 'completed', 'denied'].includes((payload.new as any).status)) {
+            refreshQuota();
+          }
+        })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user?.id, fetchActivePass, refreshQuota]);
@@ -127,8 +127,8 @@ const StudentDashboard = () => {
     fetchActiveFreeze(selectedClassId);
     const channel = supabase
       .channel(`freeze-check-${selectedClassId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pass_freezes', filter: `class_id=eq.${selectedClassId}` }, 
-      () => fetchActiveFreeze(selectedClassId))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pass_freezes', filter: `class_id=eq.${selectedClassId}` },
+        () => fetchActiveFreeze(selectedClassId))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [selectedClassId, fetchActiveFreeze]);
@@ -145,10 +145,10 @@ const StudentDashboard = () => {
   const handleRequest = async () => {
     if (!user?.id || !selectedClassId || !selectedDestination) return;
     setRequestLoading(true);
-    await supabase.from('passes').insert({ 
-      student_id: user.id, 
-      class_id: selectedClassId, 
-      destination: selectedDestination 
+    await supabase.from('passes').insert({
+      student_id: user.id,
+      class_id: selectedClassId,
+      destination: selectedDestination
     });
     setRequestLoading(false);
     fetchActivePass();
@@ -156,9 +156,9 @@ const StudentDashboard = () => {
 
   const handleCheckIn = async () => {
     if (!activePass) return;
-    await supabase.from('passes').update({ 
-      status: 'pending_return', 
-      returned_at: new Date().toISOString() 
+    await supabase.from('passes').update({
+      status: 'pending_return',
+      returned_at: new Date().toISOString()
     }).eq('id', activePass.id);
   };
 
@@ -187,16 +187,14 @@ const StudentDashboard = () => {
   return (
     <PageTransition className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
       {/* Ice overlay for freeze state */}
-      <AnimatePresence>
-        {activeFreeze && <IceOverlay active={!!activeFreeze} freezeType={activeFreeze.freeze_type} endsAt={activeFreeze.ends_at} />}
-      </AnimatePresence>
+
 
       <div className="relative z-10 p-4 max-w-2xl mx-auto pb-24">
         {/* Header */}
         <FadeIn>
           <header className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
-              <motion.div 
+              <motion.div
                 className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/30"
                 whileHover={{ scale: 1.05, rotate: 5 }}
                 whileTap={{ scale: 0.95 }}
@@ -249,14 +247,14 @@ const StudentDashboard = () => {
                   transition={{ duration: 0.3 }}
                 >
                   <FloatingElement distance={5} duration={4}>
-                    <GlassCard 
-                      glow 
+                    <GlassCard
+                      glow
                       glowColor={activePass.status === 'approved' ? 'success' : 'warning'}
                       className="relative overflow-hidden border-2 border-primary/30"
                     >
                       {/* Animated gradient background */}
                       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 animate-pulse" />
-                      
+
                       <div className="relative space-y-6">
                         {/* Header */}
                         <div className="flex items-start justify-between">
@@ -269,9 +267,9 @@ const StudentDashboard = () => {
                               From: {activePass.class_name}
                             </p>
                           </div>
-                          <StatusBadge 
-                            status={activePass.status === 'pending' ? 'pending' : 'active'} 
-                            pulse 
+                          <StatusBadge
+                            status={activePass.status === 'pending' ? 'pending' : 'active'}
+                            pulse
                           />
                         </div>
 
@@ -300,9 +298,9 @@ const StudentDashboard = () => {
 
                         {/* Check In Button */}
                         {activePass.status === 'approved' && (
-                          <GlowButton 
-                            variant="success" 
-                            size="lg" 
+                          <GlowButton
+                            variant="success"
+                            size="lg"
                             className="w-full"
                             onClick={handleCheckIn}
                           >
@@ -357,7 +355,7 @@ const StudentDashboard = () => {
                           const Icon = dest.icon;
                           const disabled = isDestinationDisabled(dest.id);
                           const selected = selectedDestination === dest.id;
-                          
+
                           return (
                             <motion.button
                               key={dest.id}
@@ -366,8 +364,9 @@ const StudentDashboard = () => {
                               className={`
                                 relative p-4 rounded-xl border-2 transition-all duration-200
                                 flex flex-col items-center gap-2
-                                ${selected 
-                                  ? 'border-primary bg-primary/10 text-primary shadow-lg shadow-primary/20' 
+                                overflow-hidden
+                                ${selected
+                                  ? 'border-primary bg-primary/10 text-primary shadow-lg shadow-primary/20'
                                   : 'border-border hover:border-primary/50 hover:bg-muted/50'
                                 }
                                 ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
@@ -378,6 +377,7 @@ const StudentDashboard = () => {
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ delay: i * 0.05 }}
                             >
+                              {disabled && <MiniSnowflakes />}
                               <Icon className={`w-6 h-6 ${selected ? 'text-primary' : 'text-muted-foreground'}`} />
                               <span className={`text-sm font-bold ${selected ? 'text-primary' : ''}`}>
                                 {dest.label}
