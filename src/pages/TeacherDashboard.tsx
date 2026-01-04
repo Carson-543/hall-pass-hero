@@ -1,18 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ClassManagementDialog } from '@/components/teacher/ClassManagementDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { differenceInSeconds } from 'date-fns';
 
-// New Components
+// Components
 import { TeacherHeader } from '@/components/teacher/TeacherHeader';
 import { TeacherControls } from '@/components/teacher/TeacherControls';
 import { RequestQueue } from '@/components/teacher/RequestQueue';
 import { ActivePassList } from '@/components/teacher/ActivePassList';
 import { RosterGrid } from '@/components/teacher/RosterGrid';
 import { TeacherSettings } from '@/components/teacher/TeacherSettings';
+import { GlassCard } from '@/components/ui/glass-card';
+import { PageTransition, StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
 
 // --- Interfaces ---
 interface Student {
@@ -80,14 +82,12 @@ export const TeacherDashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  // --- Auth & Initial Data ---
   useEffect(() => {
     checkUser();
   }, []);
 
   useEffect(() => {
     if (selectedClassId) {
-      // Set up real-time subscription for passes
       const channel = supabase
         .channel('public:passes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'passes', filter: `class_id=eq.${selectedClassId}` }, () => {
@@ -95,7 +95,6 @@ export const TeacherDashboard = () => {
         })
         .subscribe();
 
-      // Set up real-time subscription for freeze status
       const freezeChannel = supabase
         .channel('public:pass_freezes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'pass_freezes', filter: `class_id=eq.${selectedClassId}` }, () => {
@@ -103,7 +102,6 @@ export const TeacherDashboard = () => {
         })
         .subscribe();
 
-      // Set up real-time subscription for class updates
       const classChannel = supabase
         .channel('public:classes')
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'classes', filter: `id=eq.${selectedClassId}` }, (payload) => {
@@ -128,14 +126,12 @@ export const TeacherDashboard = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { navigate('/auth'); return; }
 
-      // Fetch profile
       const { data: profileData } = await supabase
         .from('profiles')
         .select('id, full_name')
         .eq('id', user.id)
         .single();
 
-      // Fetch role from user_roles table
       const { data: roleData } = await supabase
         .from('user_roles')
         .select('role')
@@ -148,13 +144,11 @@ export const TeacherDashboard = () => {
       }
 
       setProfile({ ...profileData, email: user.email });
-      const userId = user.id;
 
-      // Fetch Global Settings
       const { data: membership } = await supabase
         .from('organization_memberships')
         .select('organization_id')
-        .eq('user_id', userId)
+        .eq('user_id', user.id)
         .single();
 
       if (membership?.organization_id) {
@@ -166,7 +160,7 @@ export const TeacherDashboard = () => {
         if (orgData) setSettings(orgData);
       }
 
-      await fetchClasses(userId);
+      await fetchClasses(user.id);
     } catch (error) {
       console.error("Error checking user:", error);
       toast({ title: "Error loading dashboard", description: "Please refresh the page.", variant: "destructive" });
@@ -189,7 +183,6 @@ export const TeacherDashboard = () => {
     }
   }, [profile, selectedClassId]);
 
-  // --- Actions ---
   const signOut = async () => { await supabase.auth.signOut(); navigate('/auth'); };
 
   const fetchFreezeStatus = useCallback(async (classId: string) => {
@@ -201,9 +194,7 @@ export const TeacherDashboard = () => {
       .eq('is_active', true)
       .maybeSingle();
 
-    // Check if expired
     if (data && data.ends_at && new Date(data.ends_at) < new Date()) {
-      // Auto-deactivate expired freeze
       await supabase.from('pass_freezes').update({ is_active: false }).eq('id', data.id);
       setActiveFreeze(null);
     } else {
@@ -331,12 +322,9 @@ export const TeacherDashboard = () => {
   };
 
   const handleCheckIn = async (passId: string) => {
-    const end = new Date().toISOString();
-    const pass = activePasses.find(p => p.id === passId);
-
     const { error } = await supabase
       .from('passes')
-      .update({ status: 'returned', returned_at: end })
+      .update({ status: 'returned', returned_at: new Date().toISOString() })
       .eq('id', passId);
     if (error) toast({ title: "Error", description: "Failed to return pass", variant: "destructive" });
     else toast({ title: "Welcome Back!", description: "Student checked in." });
@@ -358,88 +346,121 @@ export const TeacherDashboard = () => {
     toast({ title: "History feature coming soon", description: `Viewing history for ${student.name}` });
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-screen">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-background">
+        <motion.div
+          className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+        >
+          <div className="w-8 h-8 border-3 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+        </motion.div>
+      </div>
+    );
+  }
 
   const currentClass = classes.find(c => c.id === selectedClassId);
   const maxConcurrent = settings?.max_concurrent_bathroom ?? 2;
 
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-6 pb-24 max-w-7xl mx-auto">
-      <TeacherHeader signOut={signOut} />
+    <PageTransition className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
+      <div className="p-4 sm:p-6 pb-24 max-w-7xl mx-auto">
+        <TeacherHeader signOut={signOut} />
 
-      <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList className="grid w-full max-w-sm grid-cols-2 ml-0">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-        </TabsList>
+        <Tabs defaultValue="dashboard" className="space-y-6">
+          <TabsList className="grid w-full max-w-sm grid-cols-2 rounded-xl bg-muted/50 p-1">
+            <TabsTrigger value="dashboard" className="rounded-lg font-bold">Dashboard</TabsTrigger>
+            <TabsTrigger value="settings" className="rounded-lg font-bold">Settings</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="dashboard" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {/* Controls Section */}
-          <TeacherControls
-            classes={classes}
-            selectedClassId={selectedClassId}
-            onClassChange={setSelectedClassId}
-            onAddClass={() => setDialogOpen(true)}
-            activeFreeze={activeFreeze}
-            freezeType={freezeType}
-            onFreezeTypeChange={setFreezeType}
-            timerMinutes={timerMinutes}
-            onTimerChange={setTimerMinutes}
-            isFreezeLoading={isFreezeLoading}
-            onFreeze={handleFreeze}
-            onUnfreeze={handleUnfreeze}
-            currentClass={currentClass}
-            maxConcurrent={maxConcurrent}
-          />
+          <TabsContent value="dashboard">
+            <StaggerContainer className="space-y-6">
+              {/* Controls Section */}
+              <StaggerItem>
+                <GlassCard variant="frosted" className="p-4">
+                  <TeacherControls
+                    classes={classes}
+                    selectedClassId={selectedClassId}
+                    onClassChange={setSelectedClassId}
+                    onAddClass={() => setDialogOpen(true)}
+                    activeFreeze={activeFreeze}
+                    freezeType={freezeType}
+                    onFreezeTypeChange={setFreezeType}
+                    timerMinutes={timerMinutes}
+                    onTimerChange={setTimerMinutes}
+                    isFreezeLoading={isFreezeLoading}
+                    onFreeze={handleFreeze}
+                    onUnfreeze={handleUnfreeze}
+                    currentClass={currentClass}
+                    maxConcurrent={maxConcurrent}
+                  />
+                </GlassCard>
+              </StaggerItem>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Left Column: Requests */}
-            <RequestQueue
-              pendingPasses={pendingPasses.map(p => ({
-                ...p,
-                is_quota_exceeded: activePasses.filter(ap => ap.destination === 'Restroom').length >= maxConcurrent && p.destination === 'Restroom'
-              }))}
-              onApprove={handleApprove}
-              onDeny={handleDeny}
-            />
+              {/* Pass Management Grid */}
+              <StaggerItem>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <GlassCard variant="frosted" className="p-5">
+                    <RequestQueue
+                      pendingPasses={pendingPasses.map(p => ({
+                        ...p,
+                        is_quota_exceeded: activePasses.filter(ap => ap.destination === 'Restroom').length >= maxConcurrent && p.destination === 'Restroom'
+                      }))}
+                      onApprove={handleApprove}
+                      onDeny={handleDeny}
+                    />
+                  </GlassCard>
 
-            {/* Right Column: Active */}
-            <ActivePassList
-              activePasses={activePasses}
-              onCheckIn={handleCheckIn}
-            />
-          </div>
+                  <GlassCard variant="frosted" className="p-5">
+                    <ActivePassList
+                      activePasses={activePasses}
+                      onCheckIn={handleCheckIn}
+                    />
+                  </GlassCard>
+                </div>
+              </StaggerItem>
 
-          {/* Roster Section */}
-          {selectedClassId && (
-            <RosterGrid
-              students={students}
-              currentClass={currentClass}
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-              onViewHistory={handleViewHistory}
-              onRemoveStudent={handleRemoveStudent}
-            />
-          )}
-        </TabsContent>
+              {/* Roster Section */}
+              {selectedClassId && (
+                <StaggerItem>
+                  <GlassCard variant="frosted" className="p-5">
+                    <RosterGrid
+                      students={students}
+                      currentClass={currentClass}
+                      searchQuery={searchQuery}
+                      setSearchQuery={setSearchQuery}
+                      onViewHistory={handleViewHistory}
+                      onRemoveStudent={handleRemoveStudent}
+                    />
+                  </GlassCard>
+                </StaggerItem>
+              )}
+            </StaggerContainer>
+          </TabsContent>
 
-        <TabsContent value="settings" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <TeacherSettings userEmail={profile?.email} />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="settings">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <GlassCard variant="frosted">
+                <TeacherSettings userEmail={profile?.email} />
+              </GlassCard>
+            </motion.div>
+          </TabsContent>
+        </Tabs>
 
-      <ClassManagementDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        userId={profile?.id || ''}
-        editingClass={null}
-        onSaved={() => { fetchClasses(profile?.id); toast({ title: "Class Saved" }); }}
-      />
-    </div>
+        <ClassManagementDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          userId={profile?.id || ''}
+          editingClass={null}
+          onSaved={() => { fetchClasses(profile?.id); toast({ title: "Class Saved" }); }}
+        />
+      </div>
+    </PageTransition>
   );
 };
 

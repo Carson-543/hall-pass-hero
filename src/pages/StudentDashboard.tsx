@@ -1,15 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { PeriodDisplay } from '@/components/PeriodDisplay';
-import Settings from '@/pages/Settings';
 import { QuotaDisplay } from '@/components/QuotaDisplay';
 import { useCurrentPeriod } from '@/hooks/useCurrentPeriod';
 import { useWeeklyQuota } from '@/hooks/useWeeklyQuota';
@@ -18,9 +17,20 @@ import { ElapsedTimer } from '@/components/ElapsedTimer';
 import { FreezeIndicator } from '@/components/student/FreezeIndicator';
 import { QueuePosition } from '@/components/student/QueuePosition';
 import { ExpectedReturnTimer } from '@/components/student/ExpectedReturnTimer';
-import { LogOut, Plus, Clock, MapPin, Settings as SettingsIcon, Loader2 } from 'lucide-react';
+import { IceOverlay } from '@/components/student/IceOverlay';
+import { GlassCard } from '@/components/ui/glass-card';
+import { GlowButton } from '@/components/ui/glow-button';
+import { PageTransition, FadeIn, StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
+import { FloatingElement } from '@/components/ui/floating-element';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { LogOut, Clock, MapPin, Settings as SettingsIcon, Loader2, ArrowLeft, Sparkles, DoorOpen, KeyRound, Building2, MoreHorizontal } from 'lucide-react';
 
-const DESTINATIONS = ['Restroom', 'Locker', 'Office', 'Other'];
+const DESTINATIONS = [
+  { id: 'Restroom', icon: DoorOpen, label: 'Restroom' },
+  { id: 'Locker', icon: KeyRound, label: 'Locker' },
+  { id: 'Office', icon: Building2, label: 'Office' },
+  { id: 'Other', icon: MoreHorizontal, label: 'Other' },
+];
 
 const StudentDashboard = () => {
   const { user, role, signOut, loading: authLoading } = useAuth();
@@ -34,15 +44,11 @@ const StudentDashboard = () => {
   const [activePass, setActivePass] = useState<any | null>(null);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [selectedDestination, setSelectedDestination] = useState<string>('');
-  const [customDestination, setCustomDestination] = useState<string>('');
   const [requestLoading, setRequestLoading] = useState(false);
-  const [activeFreeze, setActiveFreeze] = useState<{ freeze_type: 'bathroom' | 'all' } | null>(null);
-
-  // --- STABLE FETCHERS ---
+  const [activeFreeze, setActiveFreeze] = useState<{ freeze_type: string; ends_at?: string | null } | null>(null);
 
   const fetchEnrolledClasses = useCallback(async () => {
     if (!user?.id) return;
-    console.log("📡 [FETCH] Enrolled Classes");
     const { data: enrollments } = await supabase
       .from('class_enrollments')
       .select('class_id')
@@ -73,8 +79,7 @@ const StudentDashboard = () => {
 
   const fetchActivePass = useCallback(async () => {
     if (!user?.id) return;
-    console.log("📡 [FETCH] Active Pass Status");
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('passes')
       .select(`id, destination, status, requested_at, approved_at, expected_return_at, class_id`)
       .eq('student_id', user.id)
@@ -93,17 +98,15 @@ const StudentDashboard = () => {
 
   const fetchActiveFreeze = useCallback(async (id: string) => {
     if (!id) return;
-    const { data } = await supabase.from('pass_freezes').select('freeze_type').eq('class_id', id).eq('is_active', true).maybeSingle();
-    setActiveFreeze(data ? { freeze_type: data.freeze_type as 'bathroom' | 'all' } : null);
+    const { data } = await supabase.from('pass_freezes').select('freeze_type, ends_at').eq('class_id', id).eq('is_active', true).maybeSingle();
+    setActiveFreeze(data ? { freeze_type: data.freeze_type, ends_at: data.ends_at } : null);
   }, []);
 
-  // --- EFFECT 1: INITIAL LOAD ONLY ---
   useEffect(() => {
     fetchEnrolledClasses();
     fetchActivePass();
   }, [fetchEnrolledClasses, fetchActivePass]);
 
-  // --- EFFECT 2: REALTIME SUBSCRIPTION (Passes) ---
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
@@ -119,7 +122,6 @@ const StudentDashboard = () => {
     return () => { supabase.removeChannel(channel); };
   }, [user?.id, fetchActivePass, refreshQuota]);
 
-  // --- EFFECT 3: FREEZE CHECK FOR BUTTON DISABLE ---
   useEffect(() => {
     if (!selectedClassId) return;
     fetchActiveFreeze(selectedClassId);
@@ -131,7 +133,6 @@ const StudentDashboard = () => {
     return () => { supabase.removeChannel(channel); };
   }, [selectedClassId, fetchActiveFreeze]);
 
-  // --- EFFECT 4: AUTO-SELECT CLASS BASED ON BELL SCHEDULE ---
   useEffect(() => {
     if (currentPeriod && enrolledClasses.length > 0) {
       const match = enrolledClasses.find(c => c.period_order === currentPeriod.period_order);
@@ -141,100 +142,284 @@ const StudentDashboard = () => {
     }
   }, [currentPeriod, enrolledClasses, selectedClassId]);
 
-  if (authLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
+  const handleRequest = async () => {
+    if (!user?.id || !selectedClassId || !selectedDestination) return;
+    setRequestLoading(true);
+    await supabase.from('passes').insert({ 
+      student_id: user.id, 
+      class_id: selectedClassId, 
+      destination: selectedDestination 
+    });
+    setRequestLoading(false);
+    fetchActivePass();
+  };
+
+  const handleCheckIn = async () => {
+    if (!activePass) return;
+    await supabase.from('passes').update({ 
+      status: 'pending_return', 
+      returned_at: new Date().toISOString() 
+    }).eq('id', activePass.id);
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+        >
+          <Loader2 className="w-8 h-8 text-primary" />
+        </motion.div>
+      </div>
+    );
+  }
+
   if (!user || role !== 'student') return <Navigate to="/auth" replace />;
 
+  const isDestinationDisabled = (dest: string) => {
+    if (!activeFreeze) return false;
+    if (activeFreeze.freeze_type === 'all') return true;
+    if (activeFreeze.freeze_type === 'bathroom' && dest === 'Restroom') return true;
+    return false;
+  };
+
   return (
-    <div className="min-h-screen bg-background p-4 max-w-4xl mx-auto pb-24">
-      <header className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-black text-xl">S</span>
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Student Dashboard</h1>
-            <p className="text-sm text-muted-foreground">{organization?.name}</p>
-          </div>
-        </div>
-        <div>
-        <Button variant="ghost" onClick={() => navigate('/settings')}><SettingsIcon className="h-4 w-4 mr-2" /> Settings</Button>
-        <Button variant="ghost" onClick={signOut}><LogOut className="h-4 w-4 mr-2" /> Sign Out</Button>
-        </div>
-      </header>
+    <PageTransition className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
+      {/* Ice overlay for freeze state */}
+      <AnimatePresence>
+        {activeFreeze && <IceOverlay active={!!activeFreeze} freezeType={activeFreeze.freeze_type} endsAt={activeFreeze.ends_at} />}
+      </AnimatePresence>
 
-      <div className="grid gap-6">
-        <PeriodDisplay />
-        <QuotaDisplay />
-
-        {selectedClassId && <FreezeIndicator classId={selectedClassId} />}
-
-        {activePass ? (
-          <Card className="border-2 border-primary bg-primary/5">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-bold flex justify-between items-center uppercase tracking-wider text-primary">
-                Live Pass
-                {activePass.status === 'approved' && activePass.approved_at && (
-                  <ElapsedTimer startTime={activePass.approved_at} destination={activePass.destination} />
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6 pt-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-3xl font-black">{activePass.destination}</h3>
-                  <p className="text-sm text-muted-foreground">From: {activePass.class_name}</p>
-                </div>
-                <div className="px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold uppercase">
-                  {activePass.status.replace('_', ' ')}
-                </div>
-              </div>
-              {activePass.status === 'pending' && <QueuePosition classId={activePass.class_id} passId={activePass.id} />}
-              {activePass.status === 'approved' && <ExpectedReturnTimer expectedReturnAt={activePass.expected_return_at} />}
-              {activePass.status === 'approved' && (
-                <Button className="w-full" onClick={() => supabase.from('passes').update({ status: 'pending_return', returned_at: new Date().toISOString() }).eq('id', activePass.id)}>
-                  Check Back In
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader><CardTitle className="text-lg">Request Pass</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Class</Label>
-                <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-                  <SelectTrigger><SelectValue placeholder="Select Class" /></SelectTrigger>
-                  <SelectContent>
-                    {enrolledClasses.map(c => <SelectItem key={c.id} value={c.id}>P{c.period_order}: {c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {DESTINATIONS.map(d => (
-                  <Button key={d} variant={selectedDestination === d ? 'default' : 'outline'} onClick={() => setSelectedDestination(d)} disabled={activeFreeze?.freeze_type === 'all' || (activeFreeze?.freeze_type === 'bathroom' && d === 'Restroom')}>
-                    {d}
-                  </Button>
-                ))}
-              </div>
-              <Button 
-                className="w-full h-12 font-bold" 
-                disabled={!selectedClassId || !selectedDestination || requestLoading}
-                onClick={async () => {
-                  setRequestLoading(true);
-                  await supabase.from('passes').insert({ student_id: user.id, class_id: selectedClassId, destination: selectedDestination });
-                  setRequestLoading(false);
-                  fetchActivePass();
-                }}
+      <div className="relative z-10 p-4 max-w-2xl mx-auto pb-24">
+        {/* Header */}
+        <FadeIn>
+          <header className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+              <motion.div 
+                className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/30"
+                whileHover={{ scale: 1.05, rotate: 5 }}
+                whileTap={{ scale: 0.95 }}
               >
-                {requestLoading ? 'Requesting...' : 'Submit Request'}
+                <Sparkles className="w-7 h-7 text-primary-foreground" />
+              </motion.div>
+              <div>
+                <h1 className="text-2xl font-black tracking-tight">SmartPass</h1>
+                <p className="text-sm text-muted-foreground font-medium">{organization?.name}</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => navigate('/settings')}>
+                <SettingsIcon className="h-5 w-5" />
               </Button>
-            </CardContent>
-          </Card>
-        )}
-        <PassHistory />
+              <Button variant="ghost" size="icon" className="rounded-xl" onClick={signOut}>
+                <LogOut className="h-5 w-5" />
+              </Button>
+            </div>
+          </header>
+        </FadeIn>
+
+        <StaggerContainer className="grid gap-6">
+          {/* Period & Quota Row */}
+          <StaggerItem>
+            <div className="grid grid-cols-2 gap-4">
+              <GlassCard variant="frosted" className="p-4">
+                <PeriodDisplay />
+              </GlassCard>
+              <GlassCard variant="frosted" className="p-4">
+                <QuotaDisplay />
+              </GlassCard>
+            </div>
+          </StaggerItem>
+
+          {/* Freeze Indicator */}
+          <StaggerItem>
+            {selectedClassId && <FreezeIndicator classId={selectedClassId} />}
+          </StaggerItem>
+
+          {/* Main Content */}
+          <StaggerItem>
+            <AnimatePresence mode="wait">
+              {activePass ? (
+                <motion.div
+                  key="active-pass"
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <FloatingElement distance={5} duration={4}>
+                    <GlassCard 
+                      glow 
+                      glowColor={activePass.status === 'approved' ? 'success' : 'warning'}
+                      className="relative overflow-hidden border-2 border-primary/30"
+                    >
+                      {/* Animated gradient background */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 animate-pulse" />
+                      
+                      <div className="relative space-y-6">
+                        {/* Header */}
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground mb-2">
+                              Live Pass
+                            </p>
+                            <h2 className="text-4xl font-black tracking-tight">{activePass.destination}</h2>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              From: {activePass.class_name}
+                            </p>
+                          </div>
+                          <StatusBadge 
+                            status={activePass.status === 'pending' ? 'pending' : 'active'} 
+                            pulse 
+                          />
+                        </div>
+
+                        {/* Timer */}
+                        {activePass.status === 'approved' && activePass.approved_at && (
+                          <div className="p-4 rounded-xl bg-muted/50 backdrop-blur-sm">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Clock className="w-5 h-5 text-primary" />
+                                <span className="text-sm font-medium text-muted-foreground">Time Out</span>
+                              </div>
+                              <ElapsedTimer startTime={activePass.approved_at} destination={activePass.destination} />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Queue Position */}
+                        {activePass.status === 'pending' && (
+                          <QueuePosition classId={activePass.class_id} passId={activePass.id} />
+                        )}
+
+                        {/* Expected Return */}
+                        {activePass.status === 'approved' && (
+                          <ExpectedReturnTimer expectedReturnAt={activePass.expected_return_at} />
+                        )}
+
+                        {/* Check In Button */}
+                        {activePass.status === 'approved' && (
+                          <GlowButton 
+                            variant="success" 
+                            size="lg" 
+                            className="w-full"
+                            onClick={handleCheckIn}
+                          >
+                            <ArrowLeft className="w-5 h-5" />
+                            Check Back In
+                          </GlowButton>
+                        )}
+                      </div>
+                    </GlassCard>
+                  </FloatingElement>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="request-form"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <GlassCard hover3D className="space-y-6">
+                    <div>
+                      <h2 className="text-xl font-bold mb-1">Request Pass</h2>
+                      <p className="text-sm text-muted-foreground">Select your class and destination</p>
+                    </div>
+
+                    {/* Class Selection */}
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Class
+                      </Label>
+                      <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+                        <SelectTrigger className="h-14 rounded-xl text-base font-medium">
+                          <SelectValue placeholder="Select your class" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {enrolledClasses.map(c => (
+                            <SelectItem key={c.id} value={c.id} className="text-base">
+                              <span className="font-bold">P{c.period_order}:</span> {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Destination Grid */}
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Destination
+                      </Label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {DESTINATIONS.map((dest, i) => {
+                          const Icon = dest.icon;
+                          const disabled = isDestinationDisabled(dest.id);
+                          const selected = selectedDestination === dest.id;
+                          
+                          return (
+                            <motion.button
+                              key={dest.id}
+                              onClick={() => !disabled && setSelectedDestination(dest.id)}
+                              disabled={disabled}
+                              className={`
+                                relative p-4 rounded-xl border-2 transition-all duration-200
+                                flex flex-col items-center gap-2
+                                ${selected 
+                                  ? 'border-primary bg-primary/10 text-primary shadow-lg shadow-primary/20' 
+                                  : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                                }
+                                ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
+                              `}
+                              whileHover={!disabled ? { scale: 1.02 } : undefined}
+                              whileTap={!disabled ? { scale: 0.98 } : undefined}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: i * 0.05 }}
+                            >
+                              <Icon className={`w-6 h-6 ${selected ? 'text-primary' : 'text-muted-foreground'}`} />
+                              <span className={`text-sm font-bold ${selected ? 'text-primary' : ''}`}>
+                                {dest.label}
+                              </span>
+                              {selected && (
+                                <motion.div
+                                  className="absolute inset-0 rounded-xl border-2 border-primary"
+                                  layoutId="destination-highlight"
+                                />
+                              )}
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Submit Button */}
+                    <GlowButton
+                      variant="primary"
+                      size="lg"
+                      className="w-full"
+                      onClick={handleRequest}
+                      loading={requestLoading}
+                      disabled={!selectedClassId || !selectedDestination || requestLoading}
+                    >
+                      {requestLoading ? 'Requesting...' : 'Submit Request'}
+                    </GlowButton>
+                  </GlassCard>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </StaggerItem>
+
+          {/* Pass History */}
+          <StaggerItem>
+            <GlassCard variant="frosted" className="p-4">
+              <PassHistory />
+            </GlassCard>
+          </StaggerItem>
+        </StaggerContainer>
       </div>
-    </div>
+    </PageTransition>
   );
 };
 
