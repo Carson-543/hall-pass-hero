@@ -17,10 +17,9 @@ import { useToast } from '@/hooks/use-toast';
 import { PeriodDisplay } from '@/components/PeriodDisplay';
 import { ElapsedTimer } from '@/components/ElapsedTimer';
 import { InlinePeriodTable } from '@/components/admin/InlinePeriodTable';
-import { SubstituteCalendar } from '@/components/admin/SubstituteCalendar';
-import { SubManagementDialog } from '@/components/admin/SubManagementDialog';
+
 import { DeletionRequestsList } from '@/components/admin/DeletionRequestsList';
-import { LogOut, Check, X, Calendar, Clock, Plus, Trash2, Users, Edit, Settings, UserCheck, Building2, UserPlus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LogOut, Check, X, Calendar, Clock, Plus, Trash2, Users, Edit, Settings, UserCheck, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday } from 'date-fns';
 
@@ -87,8 +86,6 @@ const AdminDashboard = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [bulkScheduleId, setBulkScheduleId] = useState<string>('');
-  const [subDialogDate, setSubDialogDate] = useState<Date | null>(null);
-  const [subDialogOpen, setSubDialogOpen] = useState(false);
 
 
   // Organization Settings
@@ -548,7 +545,6 @@ const AdminDashboard = () => {
           <TabsList className="w-full bg-muted">
             <TabsTrigger value="hallway" className="flex-1">Hallway</TabsTrigger>
             <TabsTrigger value="schedule" className="flex-1">Schedule</TabsTrigger>
-            <TabsTrigger value="substitutes" className="flex-1">Substitutes</TabsTrigger>
             <TabsTrigger value="settings" className="flex-1">
               Settings {pendingUsers.length > 0 && <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-destructive text-destructive-foreground">{pendingUsers.length}</span>}
             </TabsTrigger>
@@ -676,18 +672,7 @@ const AdminDashboard = () => {
                                 <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full ${isTodayDate ? 'bg-blue-500 text-white' : 'text-muted-foreground'}`}>
                                   {format(day, 'd')}
                                 </span>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity -mr-1 -mt-1 hover:bg-transparent text-muted-foreground hover:text-primary"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSubDialogDate(day);
-                                    setSubDialogOpen(true);
-                                  }}
-                                >
-                                  <UserPlus className="h-3 w-3" />
-                                </Button>
+                                {/* Removed UserPlus button for substitute management */}
                               </div>
 
                               {schedule ? (
@@ -741,9 +726,7 @@ const AdminDashboard = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="substitutes">
-            <SubstituteCalendar />
-          </TabsContent>
+          {/* Removed TabsContent for substitutes */}
 
           <TabsContent value="settings" className="space-y-4">
             <Card>
@@ -885,12 +868,7 @@ const AdminDashboard = () => {
         </DialogContent>
       </Dialog>
 
-      <SubManagementDialog
-        open={subDialogOpen}
-        onOpenChange={setSubDialogOpen}
-        date={subDialogDate}
-        organizationId={organizationId || null}
-      />
+      {/* Removed SubManagementDialog */}
     </div>
   );
 };
