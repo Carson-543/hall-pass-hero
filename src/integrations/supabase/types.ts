@@ -88,7 +88,9 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          is_queue_autonomous: boolean | null
           join_code: string
+          max_concurrent_bathroom: number | null
           name: string
           organization_id: string | null
           period_order: number
@@ -97,7 +99,9 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          is_queue_autonomous?: boolean | null
           join_code: string
+          max_concurrent_bathroom?: number | null
           name: string
           organization_id?: string | null
           period_order: number
@@ -106,7 +110,9 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          is_queue_autonomous?: boolean | null
           join_code?: string
+          max_concurrent_bathroom?: number | null
           name?: string
           organization_id?: string | null
           period_order?: number
@@ -579,6 +585,14 @@ export type Database = {
       get_expected_return_time: {
         Args: { _class_id: string; _destination: string }
         Returns: string
+      }
+      get_organization_by_slug: {
+        Args: { _slug: string }
+        Returns: {
+          id: string
+          name: string
+          slug: string
+        }[]
       }
       get_user_organization: { Args: { _user_id: string }; Returns: string }
       get_user_role: {

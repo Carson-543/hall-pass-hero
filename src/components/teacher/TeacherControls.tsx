@@ -18,7 +18,7 @@ interface TeacherControlsProps {
     selectedClassId: string;
     onClassChange: (value: string) => void;
     onAddClass: () => void;
-    activeFreeze: { freeze_type: 'bathroom' | 'all' } | null;
+    activeFreeze: { freeze_type: string } | null;
     freezeType: 'bathroom' | 'all';
     onFreezeTypeChange: (value: 'bathroom' | 'all') => void;
     timerMinutes: string;
@@ -27,7 +27,7 @@ interface TeacherControlsProps {
     onFreeze: () => void;
     onUnfreeze: () => void;
     currentClass: ClassInfo | undefined;
-    onToggleAutoQueue: () => void;
+    onToggleAutoQueue?: () => void;
     maxConcurrent: number;
 }
 
