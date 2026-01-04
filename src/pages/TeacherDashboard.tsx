@@ -115,25 +115,35 @@ export const TeacherDashboard = () => {
   }, [selectedClassId]);
 
   const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { navigate('/login'); return; }
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { navigate('/auth'); return; }
 
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-    if (!profile || profile.role !== 'teacher') { navigate('/'); return; }
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      if (!profile || profile.role !== 'teacher') { navigate('/'); return; }
 
-    setProfile({ ...profile, email: user.email });
-    const userId = user.id;
+      setProfile({ ...profile, email: user.email });
+      const userId = user.id;
 
-    // Fetch Global Settings
-    const { data: orgData } = await supabase
-      .from('organization_settings')
-      .select('max_concurrent_bathroom, organization_id')
-      .eq('organization_id', (await supabase.from('organization_memberships').select('organization_id').eq('user_id', userId).single()).data?.organization_id)
-      .single();
-    if (orgData) setSettings(orgData);
+      // Fetch Global Settings
+      const { data: membership } = await supabase.from('organization_memberships').select('organization_id').eq('user_id', userId).single();
 
-    fetchClasses(userId);
-    setLoading(false);
+      if (membership?.organization_id) {
+        const { data: orgData } = await supabase
+          .from('organization_settings')
+          .select('max_concurrent_bathroom, organization_id')
+          .eq('organization_id', membership.organization_id)
+          .single();
+        if (orgData) setSettings(orgData);
+      }
+
+      await fetchClasses(userId);
+    } catch (error) {
+      console.error("Error checking user:", error);
+      toast({ title: "Error loading dashboard", description: "Please refresh the page.", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchClasses = useCallback(async (userId?: string) => {
