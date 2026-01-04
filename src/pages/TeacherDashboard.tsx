@@ -212,12 +212,14 @@ export const TeacherDashboard = () => {
       endsAt = date.toISOString();
     }
 
-    const { error } = await supabase.from('pass_freezes').insert({
+    const { error } = await supabase.from('pass_freezes').upsert({
       class_id: selectedClassId,
       teacher_id: profile.id,
       freeze_type: freezeType,
       ends_at: endsAt,
       is_active: true
+    }, {
+      onConflict: 'class_id'
     });
 
     if (error) toast({ title: "Error", description: "Failed to freeze queue", variant: "destructive" });
@@ -244,8 +246,11 @@ export const TeacherDashboard = () => {
     setIsFreezeLoading(false);
   };
 
+  // Helper validation
+  const isValidUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
   const fetchStudents = async () => {
-    if (!selectedClassId) return;
+    if (!selectedClassId || !isValidUUID(selectedClassId)) return;
     const { data } = await supabase
       .from('class_enrollments')
       .select('profiles:student_id(id, full_name, email)')
@@ -264,7 +269,7 @@ export const TeacherDashboard = () => {
   };
 
   const fetchPasses = async () => {
-    if (!selectedClassId) return;
+    if (!selectedClassId || !isValidUUID(selectedClassId)) return;
     const { data } = await supabase
       .from('passes')
       .select('id, student_id, class_id, destination, status, requested_at, approved_at, profiles:student_id(full_name)')
