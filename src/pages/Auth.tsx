@@ -8,7 +8,7 @@ import { OrganizationSelector } from '@/components/organization/OrganizationSele
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -187,179 +187,196 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/30 p-4 relative overflow-hidden">
-      {/* Decorative background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-primary/10 blur-3xl"
-          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
-          transition={{ duration: 8, repeat: Infinity }}
-        />
-        <motion.div
-          className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full bg-primary/5 blur-3xl"
-          animate={{ scale: [1.2, 1, 1.2], opacity: [0.2, 0.4, 0.2] }}
-          transition={{ duration: 10, repeat: Infinity }}
-        />
-      </div>
 
       <motion.div
         initial={{ opacity: 0, y: 30, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className="relative z-10"
+        className="relative z-10 w-full flex justify-center"
       >
-        <GlassCard className="w-full max-w-xl" hover3D>
-          <CardHeader className="text-center pb-2">
-            <motion.div
-              className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/30"
-              whileHover={{ scale: 1.05, rotate: 5 }}
-            >
-              <Sparkles className="w-8 h-8 text-primary-foreground" />
-            </motion.div>
-            <CardTitle className="text-3xl font-black tracking-tight">SmartPass</CardTitle>
-            <CardDescription className="text-base">Digital Hall Pass Management</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="login" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-2 rounded-xl bg-muted/50 p-1">
-                <TabsTrigger value="login" className="rounded-lg font-bold">Login</TabsTrigger>
-                <TabsTrigger value="signup" className="rounded-lg font-bold">Sign Up</TabsTrigger>
-              </TabsList>
+        <GlassCard className="w-full max-w-5xl p-0 overflow-hidden">
+          <div className="grid grid-cols-1 md:grid-cols-2 min-h-[600px]">
+            {/* Left Panel: Visual/Branding */}
+            <div className="relative hidden md:flex flex-col items-center justify-center p-12 bg-primary/5 text-center overflow-hidden">
+              {/* Decorative background elements moved here */}
+              <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <motion.div
+                  className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-primary/10 blur-3xl"
+                  animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+                  transition={{ duration: 8, repeat: Infinity }}
+                />
+                <motion.div
+                  className="absolute -bottom-20 -left-20 w-80 h-80 rounded-full bg-primary/5 blur-3xl"
+                  animate={{ scale: [1.2, 1, 1.2], opacity: [0.2, 0.4, 0.2] }}
+                  transition={{ duration: 10, repeat: Infinity }}
+                />
+              </div>
 
-              <TabsContent value="login" className="space-y-4">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Email
-                    </Label>
-                    <Input
-                      id="login-email"
-                      type="email"
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      className="h-12 rounded-xl"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="login-password" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <div className="relative z-10 flex flex-col items-center">
+                <motion.div
+                  className="w-20 h-20 mb-6 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/30"
+                  whileHover={{ scale: 1.05, rotate: 5 }}
+                >
+                  <Sparkles className="w-10 h-10 text-primary-foreground" />
+                </motion.div>
+                <h1 className="text-4xl font-black tracking-tight mb-3">SmartPass</h1>
+                <p className="text-lg text-muted-foreground max-w-xs mx-auto">
+                  Digital Hall Pass Management System for Modern Schools
+                </p>
+              </div>
+            </div>
+
+            {/* Right Panel: Form */}
+            <div className="p-8 md:p-12 flex flex-col justify-center h-full bg-background/50 backdrop-blur-sm">
+              <div className="md:hidden flex flex-col items-center mb-8">
+                 <div className="w-12 h-12 mb-3 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/30">
+                  <Sparkles className="w-6 h-6 text-primary-foreground" />
+                </div>
+                <h1 className="text-2xl font-bold">SmartPass</h1>
+              </div>
+
+              <Tabs defaultValue="login" className="space-y-6 w-full">
+                <TabsList className="grid w-full grid-cols-2 rounded-xl bg-muted/50 p-1">
+                  <TabsTrigger value="login" className="rounded-lg font-bold">Login</TabsTrigger>
+                  <TabsTrigger value="signup" className="rounded-lg font-bold">Sign Up</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="login" className="space-y-4">
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="login-email" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Email
+                      </Label>
+                      <Input
+                        id="login-email"
+                        type="email"
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
+                        placeholder="you@example.com"
+                        className="h-12 rounded-xl"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="login-password" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                          Password
+                        </Label>
+                        <Button
+                          type="button"
+                          variant="link"
+                          className="px-0 h-auto text-xs text-primary"
+                          onClick={() => setForgotPasswordOpen(true)}
+                        >
+                          Forgot password?
+                        </Button>
+                      </div>
+                      <div className="relative">
+                        <Input
+                          id="login-password"
+                          type={showPassword ? "text" : "password"}
+                          value={loginPassword}
+                          onChange={(e) => setLoginPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="h-12 rounded-xl pr-12"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                    </div>
+                    <GlowButton type="submit" className="w-full" size="lg" loading={isLoading}>
+                      Sign In
+                    </GlowButton>
+                  </form>
+                </TabsContent>
+
+                <TabsContent value="signup" className="space-y-4">
+                  <form onSubmit={handleSignup} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-name" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Full Name
+                      </Label>
+                      <Input
+                        id="signup-name"
+                        type="text"
+                        value={signupName}
+                        onChange={(e) => setSignupName(e.target.value)}
+                        placeholder="John Doe"
+                        className="h-12 rounded-xl"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-email" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Email
+                      </Label>
+                      <Input
+                        id="signup-email"
+                        type="email"
+                        value={signupEmail}
+                        onChange={(e) => setSignupEmail(e.target.value)}
+                        placeholder="you@example.com"
+                        className="h-12 rounded-xl"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-password" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         Password
                       </Label>
-                      <Button
-                        type="button"
-                        variant="link"
-                        className="px-0 h-auto text-xs text-primary"
-                        onClick={() => setForgotPasswordOpen(true)}
-                      >
-                        Forgot password?
-                      </Button>
+                      <div className="relative">
+                        <Input
+                          id="signup-password"
+                          type={showPassword ? "text" : "password"}
+                          value={signupPassword}
+                          onChange={(e) => setSignupPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="h-12 rounded-xl pr-12"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
                     </div>
-                    <div className="relative">
-                      <Input
-                        id="login-password"
-                        type={showPassword ? "text" : "password"}
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="h-12 rounded-xl pr-12"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-role" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Role
+                      </Label>
+                      <Select value={signupRole} onValueChange={(v) => setSignupRole(v as AppRole)}>
+                        <SelectTrigger className="h-12 rounded-xl">
+                          <SelectValue placeholder="Select your role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="student">Student</SelectItem>
+                          <SelectItem value="teacher">Teacher</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {signupRole !== 'student' && (
+                        <p className="text-xs text-muted-foreground">
+                          Teacher and Admin accounts require approval.
+                        </p>
+                      )}
                     </div>
-                  </div>
-                  <GlowButton type="submit" className="w-full" size="lg" loading={isLoading}>
-                    Sign In
-                  </GlowButton>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="signup" className="space-y-4">
-                <form onSubmit={handleSignup} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-name" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Full Name
-                    </Label>
-                    <Input
-                      id="signup-name"
-                      type="text"
-                      value={signupName}
-                      onChange={(e) => setSignupName(e.target.value)}
-                      placeholder="John Doe"
-                      className="h-12 rounded-xl"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Email
-                    </Label>
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      value={signupEmail}
-                      onChange={(e) => setSignupEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      className="h-12 rounded-xl"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Password
-                    </Label>
-                    <div className="relative">
-                      <Input
-                        id="signup-password"
-                        type={showPassword ? "text" : "password"}
-                        value={signupPassword}
-                        onChange={(e) => setSignupPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="h-12 rounded-xl pr-12"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-role" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Role
-                    </Label>
-                    <Select value={signupRole} onValueChange={(v) => setSignupRole(v as AppRole)}>
-                      <SelectTrigger className="h-12 rounded-xl">
-                        <SelectValue placeholder="Select your role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="student">Student</SelectItem>
-                        <SelectItem value="teacher">Teacher</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {signupRole !== 'student' && (
-                      <p className="text-xs text-muted-foreground">
-                        Teacher and Admin accounts require approval.
-                      </p>
-                    )}
-                  </div>
-                  <GlowButton type="submit" className="w-full" size="lg" loading={isLoading}>
-                    Create Account
-                  </GlowButton>
-                </form>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
+                    <GlowButton type="submit" className="w-full" size="lg" loading={isLoading}>
+                      Create Account
+                    </GlowButton>
+                  </form>
+                </TabsContent>
+              </Tabs>
+            </div>
+          </div>
         </GlassCard>
       </motion.div>
 
