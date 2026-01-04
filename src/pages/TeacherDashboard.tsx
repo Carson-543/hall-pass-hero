@@ -26,26 +26,36 @@ interface ClassInfo {
   name: string;
   period_order: number;
   join_code: string;
-  max_concurrent_bathroom?: number;
-  is_queue_autonomous?: boolean;
 }
 
-interface Pass {
+interface PendingPass {
   id: string;
   student_id: string;
   class_id: string;
   destination: string;
-  status: 'pending' | 'approved' | 'active' | 'returned' | 'denied';
-  created_at: string;
+  status: 'pending' | 'approved' | 'denied' | 'pending_return' | 'returned';
+  requested_at: string;
   approved_at?: string;
-  profiles: { full_name: string };
+  student_name: string;
   is_quota_exceeded?: boolean;
+}
+
+interface ActivePass {
+  id: string;
+  student_id: string;
+  class_id: string;
+  destination: string;
+  status: 'pending' | 'approved' | 'denied' | 'pending_return' | 'returned';
+  requested_at: string;
+  approved_at?: string;
+  student_name: string;
 }
 
 interface FreezeStatus {
   id: string;
-  freeze_type: 'bathroom' | 'all';
-  frozen_until: string | null;
+  freeze_type: string;
+  ends_at: string | null;
+  is_active: boolean;
 }
 
 interface Settings {
@@ -56,19 +66,19 @@ export const TeacherDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<{ id: string, full_name: string, role: string, email?: string } | null>(null);
+  const [profile, setProfile] = useState<{ id: string; full_name: string; email?: string } | null>(null);
   const [classes, setClasses] = useState<ClassInfo[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [students, setStudents] = useState<Student[]>([]);
-  const [pendingPasses, setPendingPasses] = useState<Pass[]>([]);
-  const [activePasses, setActivePasses] = useState<Pass[]>([]);
+  const [pendingPasses, setPendingPasses] = useState<PendingPass[]>([]);
+  const [activePasses, setActivePasses] = useState<ActivePass[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [activeFreeze, setActiveFreeze] = useState<FreezeStatus | null>(null);
   const [isFreezeLoading, setIsFreezeLoading] = useState(false);
   const [freezeType, setFreezeType] = useState<'bathroom' | 'all'>('bathroom');
   const [timerMinutes, setTimerMinutes] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [dialogOpen, setDialogOpen] = useState(false); // Class Management Dialog
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   // --- Auth & Initial Data ---
   useEffect(() => {
@@ -87,20 +97,19 @@ export const TeacherDashboard = () => {
 
       // Set up real-time subscription for freeze status
       const freezeChannel = supabase
-        .channel('public:class_freezes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'class_freezes', filter: `class_id=eq.${selectedClassId}` }, () => {
+        .channel('public:pass_freezes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'pass_freezes', filter: `class_id=eq.${selectedClassId}` }, () => {
           fetchFreezeStatus(selectedClassId);
         })
         .subscribe();
 
-      // Set up real-time subscription for class updates (auto queue)
+      // Set up real-time subscription for class updates
       const classChannel = supabase
         .channel('public:classes')
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'classes', filter: `id=eq.${selectedClassId}` }, (payload) => {
           setClasses(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
         })
         .subscribe();
-
 
       fetchStudents();
       fetchPasses();
@@ -119,19 +128,39 @@ export const TeacherDashboard = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { navigate('/auth'); return; }
 
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      if (!profile || profile.role !== 'teacher') { navigate('/'); return; }
+      // Fetch profile
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('id', user.id)
+        .single();
 
-      setProfile({ ...profile, email: user.email });
+      // Fetch role from user_roles table
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profileData || !roleData || roleData.role !== 'teacher') {
+        navigate('/');
+        return;
+      }
+
+      setProfile({ ...profileData, email: user.email });
       const userId = user.id;
 
       // Fetch Global Settings
-      const { data: membership } = await supabase.from('organization_memberships').select('organization_id').eq('user_id', userId).single();
+      const { data: membership } = await supabase
+        .from('organization_memberships')
+        .select('organization_id')
+        .eq('user_id', userId)
+        .single();
 
       if (membership?.organization_id) {
         const { data: orgData } = await supabase
           .from('organization_settings')
-          .select('max_concurrent_bathroom, organization_id')
+          .select('max_concurrent_bathroom')
           .eq('organization_id', membership.organization_id)
           .single();
         if (orgData) setSettings(orgData);
@@ -149,7 +178,11 @@ export const TeacherDashboard = () => {
   const fetchClasses = useCallback(async (userId?: string) => {
     const uid = userId || profile?.id;
     if (!uid) return;
-    const { data } = await supabase.from('classes').select('id, name, period_order, join_code, max_concurrent_bathroom, is_queue_autonomous').eq('teacher_id', uid).order('period_order');
+    const { data } = await supabase
+      .from('classes')
+      .select('id, name, period_order, join_code')
+      .eq('teacher_id', uid)
+      .order('period_order');
     if (data && data.length > 0) {
       setClasses(data);
       if (!selectedClassId) setSelectedClassId(data[0].id);
@@ -157,14 +190,21 @@ export const TeacherDashboard = () => {
   }, [profile, selectedClassId]);
 
   // --- Actions ---
-  const signOut = async () => { await supabase.auth.signOut(); navigate('/login'); };
+  const signOut = async () => { await supabase.auth.signOut(); navigate('/auth'); };
 
   const fetchFreezeStatus = useCallback(async (classId: string) => {
     if (!classId) return;
-    const { data } = await supabase.from('class_freezes').select('*').eq('class_id', classId).is('ended_at', null).maybeSingle();
+    const { data } = await supabase
+      .from('pass_freezes')
+      .select('id, freeze_type, ends_at, is_active')
+      .eq('class_id', classId)
+      .eq('is_active', true)
+      .maybeSingle();
 
     // Check if expired
-    if (data && data.frozen_until && new Date(data.frozen_until) < new Date()) {
+    if (data && data.ends_at && new Date(data.ends_at) < new Date()) {
+      // Auto-deactivate expired freeze
+      await supabase.from('pass_freezes').update({ is_active: false }).eq('id', data.id);
       setActiveFreeze(null);
     } else {
       setActiveFreeze(data);
@@ -172,19 +212,21 @@ export const TeacherDashboard = () => {
   }, []);
 
   const handleFreeze = async () => {
-    if (!selectedClassId) return;
+    if (!selectedClassId || !profile?.id) return;
     setIsFreezeLoading(true);
-    let frozenUntil = null;
+    let endsAt = null;
     if (timerMinutes) {
       const date = new Date();
       date.setMinutes(date.getMinutes() + parseInt(timerMinutes));
-      frozenUntil = date.toISOString();
+      endsAt = date.toISOString();
     }
 
-    const { error } = await supabase.from('class_freezes').insert({
+    const { error } = await supabase.from('pass_freezes').insert({
       class_id: selectedClassId,
+      teacher_id: profile.id,
       freeze_type: freezeType,
-      frozen_until: frozenUntil
+      ends_at: endsAt,
+      is_active: true
     });
 
     if (error) toast({ title: "Error", description: "Failed to freeze queue", variant: "destructive" });
@@ -199,7 +241,10 @@ export const TeacherDashboard = () => {
   const handleUnfreeze = async () => {
     if (!activeFreeze) return;
     setIsFreezeLoading(true);
-    const { error } = await supabase.from('class_freezes').update({ ended_at: new Date().toISOString() }).eq('id', activeFreeze.id);
+    const { error } = await supabase
+      .from('pass_freezes')
+      .update({ is_active: false })
+      .eq('id', activeFreeze.id);
     if (error) toast({ title: "Error", description: "Failed to unfreeze", variant: "destructive" });
     else {
       toast({ title: "Queue Unfrozen", description: "Pass requests resume." });
@@ -208,64 +253,78 @@ export const TeacherDashboard = () => {
     setIsFreezeLoading(false);
   };
 
-  // --- Logic ---
-  const toggleAutoQueue = async () => {
-    if (!selectedClassId) return;
-    const currentStatus = classes.find(c => c.id === selectedClassId)?.is_queue_autonomous;
-    const newStatus = !currentStatus;
-
-    const { error } = await supabase
-      .from('classes')
-      .update({ is_queue_autonomous: newStatus })
-      .eq('id', selectedClassId);
-
-    if (error) {
-      toast({ title: "Error", description: "Failed to update queue settings", variant: "destructive" });
-    } else {
-      toast({
-        title: newStatus ? "Autonomous Queue Enabled" : "Autonomous Queue Disabled",
-        description: newStatus ? "Students will be automatically approved based on capacity." : "Manual approval required."
-      });
-      // Class update will come via realtime subscription
-    }
-  };
-
   const fetchStudents = async () => {
     if (!selectedClassId) return;
     const { data } = await supabase
-      .from('class_students')
+      .from('class_enrollments')
       .select('profiles:student_id(id, full_name, email)')
       .eq('class_id', selectedClassId);
-    if (data) setStudents(data.map((d: any) => ({ id: d.profiles.id, name: d.profiles.full_name, email: d.profiles.email })));
+    if (data) {
+      setStudents(data.map((d: any) => ({
+        id: d.profiles.id,
+        name: d.profiles.full_name,
+        email: d.profiles.email
+      })));
+    }
   };
 
   const fetchPasses = async () => {
     if (!selectedClassId) return;
     const { data } = await supabase
       .from('passes')
-      .select('*, profiles:student_id(full_name)')
+      .select('id, student_id, class_id, destination, status, requested_at, approved_at, profiles:student_id(full_name)')
       .eq('class_id', selectedClassId)
-      .in('status', ['pending', 'approved', 'active'])
-      .order('created_at', { ascending: true }); // Oldest first for queue
+      .in('status', ['pending', 'approved', 'pending_return'])
+      .order('requested_at', { ascending: true });
 
     if (data) {
-      setPendingPasses(data.filter((p: any) => p.status === 'pending').map((p: any) => ({ ...p, student_name: p.profiles.full_name })));
-      setActivePasses(data.filter((p: any) => ['approved', 'active'].includes(p.status)).map((p: any) => ({ ...p, student_name: p.profiles.full_name })));
+      const pending = data
+        .filter((p: any) => p.status === 'pending')
+        .map((p: any) => ({
+          id: p.id,
+          student_id: p.student_id,
+          class_id: p.class_id,
+          destination: p.destination,
+          status: p.status,
+          requested_at: p.requested_at,
+          approved_at: p.approved_at,
+          student_name: p.profiles?.full_name || 'Unknown',
+          is_quota_exceeded: false
+        }));
+
+      const active = data
+        .filter((p: any) => ['approved', 'pending_return'].includes(p.status))
+        .map((p: any) => ({
+          id: p.id,
+          student_id: p.student_id,
+          class_id: p.class_id,
+          destination: p.destination,
+          status: p.status,
+          requested_at: p.requested_at,
+          approved_at: p.approved_at,
+          student_name: p.profiles?.full_name || 'Unknown'
+        }));
+
+      setPendingPasses(pending);
+      setActivePasses(active);
     }
   };
 
   const handleApprove = async (passId: string, override: boolean = false) => {
-    if (!override) {
-      // Double check limits? (Logic is mostly server side / verify visually)
-    }
-    const { error } = await supabase.from('passes').update({ status: 'approved', approved_at: new Date().toISOString() }).eq('id', passId);
+    const { error } = await supabase
+      .from('passes')
+      .update({ status: 'approved', approved_at: new Date().toISOString() })
+      .eq('id', passId);
     if (error) toast({ title: "Error", description: "Failed to approve pass", variant: "destructive" });
     else toast({ title: "Pass Approved" });
     fetchPasses();
   };
 
   const handleDeny = async (passId: string) => {
-    const { error } = await supabase.from('passes').update({ status: 'denied', ended_at: new Date().toISOString() }).eq('id', passId);
+    const { error } = await supabase
+      .from('passes')
+      .update({ status: 'denied', denied_at: new Date().toISOString() })
+      .eq('id', passId);
     if (error) toast({ title: "Error", description: "Failed to deny pass", variant: "destructive" });
     else toast({ title: "Pass Denied" });
     fetchPasses();
@@ -274,32 +333,39 @@ export const TeacherDashboard = () => {
   const handleCheckIn = async (passId: string) => {
     const end = new Date().toISOString();
     const pass = activePasses.find(p => p.id === passId);
-    const duration = pass?.approved_at ? differenceInSeconds(new Date(end), new Date(pass.approved_at)) : 0;
 
-    const { error } = await supabase.from('passes').update({ status: 'returned', ended_at: end, duration_seconds: duration }).eq('id', passId);
+    const { error } = await supabase
+      .from('passes')
+      .update({ status: 'returned', returned_at: end })
+      .eq('id', passId);
     if (error) toast({ title: "Error", description: "Failed to return pass", variant: "destructive" });
     else toast({ title: "Welcome Back!", description: "Student checked in." });
     fetchPasses();
   };
 
   const handleRemoveStudent = async (student: Student) => {
-    // Implement remove logic
     if (!confirm(`Remove ${student.name} from class?`)) return;
-    const { error } = await supabase.from('class_students').delete().eq('class_id', selectedClassId).eq('student_id', student.id);
+    const { error } = await supabase
+      .from('class_enrollments')
+      .delete()
+      .eq('class_id', selectedClassId)
+      .eq('student_id', student.id);
     if (error) toast({ title: "Error", variant: "destructive" });
     else { toast({ title: "Student Removed" }); fetchStudents(); }
   };
 
   const handleViewHistory = (student: Student) => {
-    // Placeholder
     toast({ title: "History feature coming soon", description: `Viewing history for ${student.name}` });
   };
 
-
-  if (loading) return <div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>;
+  if (loading) return (
+    <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+    </div>
+  );
 
   const currentClass = classes.find(c => c.id === selectedClassId);
-  const maxConcurrent = currentClass?.max_concurrent_bathroom ?? settings?.max_concurrent_bathroom ?? 2;
+  const maxConcurrent = settings?.max_concurrent_bathroom ?? 2;
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6 pb-24 max-w-7xl mx-auto">
@@ -327,7 +393,6 @@ export const TeacherDashboard = () => {
             onFreeze={handleFreeze}
             onUnfreeze={handleUnfreeze}
             currentClass={currentClass}
-            onToggleAutoQueue={toggleAutoQueue}
             maxConcurrent={maxConcurrent}
           />
 
@@ -377,4 +442,5 @@ export const TeacherDashboard = () => {
     </div>
   );
 };
+
 export default TeacherDashboard;
