@@ -19,8 +19,9 @@ import { StudentManagementDialog } from '@/components/teacher/StudentManagementD
 import { BathroomQueueStatus } from '@/components/teacher/BathroomQueueStatus';
 import {
   LogOut, Plus, AlertTriangle, Check, X,
-  Copy, Search, Loader2, History, Timer, UserMinus, Snowflake
+  Copy, Search, Loader2, History, Timer, UserMinus, Snowflake, Bot
 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { startOfWeek, addMinutes, differenceInSeconds } from 'date-fns';
 
 // --- Interfaces ---

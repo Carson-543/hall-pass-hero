@@ -20,7 +20,7 @@ import { InlinePeriodTable } from '@/components/admin/InlinePeriodTable';
 import { SubstituteCalendar } from '@/components/admin/SubstituteCalendar';
 import { SubManagementDialog } from '@/components/admin/SubManagementDialog';
 import { DeletionRequestsList } from '@/components/admin/DeletionRequestsList';
-import { LogOut, Check, X, Calendar, Clock, Plus, Trash2, Users, Edit, Settings, UserCheck, Building2, UserPlus } from 'lucide-react';
+import { LogOut, Check, X, Calendar, Clock, Plus, Trash2, Users, Edit, Settings, UserCheck, Building2, UserPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday } from 'date-fns';
 
@@ -94,7 +94,7 @@ const AdminDashboard = () => {
   // Organization Settings
   const [weeklyQuota, setWeeklyQuota] = useState(4);
   const [defaultPeriodCount, setDefaultPeriodCount] = useState(7);
-  const [maxConcurrentBathroom, setMaxConcurrentBathroom] = useState(2);
+
   const [requireDeletionApproval, setRequireDeletionApproval] = useState(false);
   const [bathroomExpectedMinutes, setBathroomExpectedMinutes] = useState(5);
   const [lockerExpectedMinutes, setLockerExpectedMinutes] = useState(3);
@@ -112,7 +112,7 @@ const AdminDashboard = () => {
       console.log("⚙️ Loading organization settings into admin state:", settings);
       setWeeklyQuota(settings.weekly_bathroom_limit);
       setDefaultPeriodCount(settings.default_period_count);
-      setMaxConcurrentBathroom(settings.max_concurrent_bathroom);
+
       setRequireDeletionApproval(settings.require_deletion_approval);
       setBathroomExpectedMinutes(settings.bathroom_expected_minutes);
       setLockerExpectedMinutes(settings.locker_expected_minutes);
@@ -304,7 +304,7 @@ const AdminDashboard = () => {
         organization_id: organizationId,
         weekly_bathroom_limit: weeklyQuota,
         default_period_count: defaultPeriodCount,
-        max_concurrent_bathroom: maxConcurrentBathroom,
+
         require_deletion_approval: requireDeletionApproval,
         bathroom_expected_minutes: bathroomExpectedMinutes,
         locker_expected_minutes: lockerExpectedMinutes,
@@ -581,107 +581,164 @@ const AdminDashboard = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="schedule">
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />{format(currentMonth, 'MMMM yyyy')}
-                  </CardTitle>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}>Prev</Button>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}>Next</Button>
-                    <Button size="sm" variant="outline" onClick={() => { resetScheduleForm(); setScheduleDialogOpen(true); }}>
-                      <Plus className="h-4 w-4 mr-1" />Create New
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {selectedDates.length > 0 && (
-                  <div className="mb-4 p-3 bg-muted rounded-lg flex items-center gap-3 flex-wrap">
-                    <span className="text-sm font-medium">{selectedDates.length} days selected</span>
-                    <Select value={bulkScheduleId} onValueChange={setBulkScheduleId}>
-                      <SelectTrigger className="w-40 h-8"><SelectValue placeholder="Select schedule" /></SelectTrigger>
-                      <SelectContent>
-                        {schedules.map(s => (
-                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+          <TabsContent value="schedule" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left Column: Calendar & Controls */}
+              <div className="lg:col-span-8 space-y-6">
+                <Card className="border-none shadow-md overflow-hidden">
+                  <CardHeader className="bg-primary/5 pb-4 border-b">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-xl">
+                        <Calendar className="h-5 w-5 text-primary" />
+                        School Schedule
+                      </CardTitle>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => { resetScheduleForm(); setScheduleDialogOpen(true); }}>
+                          <Plus className="h-4 w-4 mr-1" /> New Schedule Type
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="p-6 flex flex-col items-center">
+                      {/* Custom Navigation for Month */}
+                      <div className="flex items-center justify-between w-full max-w-3xl mb-4 px-4">
+                        <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1))}>
+                          <ChevronLeft className="h-5 w-5" />
+                        </Button>
+                        <h3 className="text-xl font-bold">{format(currentMonth, 'MMMM yyyy')}</h3>
+                        <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1))}>
+                          <ChevronRight className="h-5 w-5" />
+                        </Button>
+                      </div>
+
+                      {selectedDates.length > 0 && (
+                        <div className="w-full max-w-3xl mb-6 p-4 bg-primary/10 rounded-xl border border-primary/20 flex flex-wrap items-center gap-4 animate-in fade-in slide-in-from-top-2">
+                          <span className="font-bold text-primary flex items-center gap-2">
+                            <Check className="h-4 w-4" /> {selectedDates.length} days selected
+                          </span>
+                          <div className="flex-1 flex gap-2">
+                            <Select value={bulkScheduleId} onValueChange={setBulkScheduleId}>
+                              <SelectTrigger className="bg-background border-primary/20"><SelectValue placeholder="Select Schedule to Assign" /></SelectTrigger>
+                              <SelectContent>
+                                {schedules.map(s => (
+                                  <SelectItem key={s.id} value={s.id}>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: s.color || '#6B7280' }} />
+                                      {s.name}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button onClick={handleBulkAssign} disabled={!bulkScheduleId} className="font-bold shadow-sm">
+                              Apply
+                            </Button>
+                            <Button variant="ghost" onClick={() => setSelectedDates([])}>
+                              Clear
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Calendar Grid - Custom Implementation for specific controls */}
+                      <div className="w-full max-w-3xl grid grid-cols-7 gap-1 sm:gap-2">
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                          <div key={day} className="text-center text-xs font-black uppercase text-muted-foreground py-2">
+                            {day}
+                          </div>
                         ))}
-                      </SelectContent>
-                    </Select>
-                    <Button size="sm" onClick={handleBulkAssign} disabled={!bulkScheduleId}>Apply to Selected</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setSelectedDates([])}>Cancel</Button>
-                  </div>
-                )}
 
-                <div className="grid grid-cols-7 gap-1 mb-2 text-center text-xs font-medium text-muted-foreground">
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d}>{d}</div>)}
-                </div>
+                        {Array.from({ length: daysInMonth[0].getDay() }).map((_, i) => (
+                          <div key={`empty-${i}`} className="aspect-square" />
+                        ))}
 
-                <div className="grid grid-cols-7 gap-1">
-                  {Array.from({ length: daysInMonth[0].getDay() }).map((_, i) => (
-                    <div key={`empty-${i}`} />
-                  ))}
-                  {daysInMonth.map(day => {
-                    const dateStr = format(day, 'yyyy-MM-dd');
-                    const assignment = scheduleAssignments.find(a => a.date === dateStr);
-                    const isSelected = selectedDates.includes(dateStr);
-                    const scheduleForDay = schedules.find(s => s.id === assignment?.schedule_id);
+                        {daysInMonth.map(day => {
+                          const dateStr = format(day, 'yyyy-MM-dd');
+                          const assignment = scheduleAssignments.find(a => a.date === dateStr);
+                          const schedule = schedules.find(s => s.id === assignment?.schedule_id);
+                          const isSelected = selectedDates.includes(dateStr);
+                          const isTodayDate = isToday(day);
 
-                    return (
-                      <div
-                        key={dateStr}
-                        className={`relative p-1 min-h-[70px] border rounded-lg cursor-pointer transition-all hover:ring-1 hover:ring-ring group ${isToday(day) ? 'ring-2 ring-primary' : ''} ${isSelected ? 'ring-2 ring-ring bg-primary/5' : ''}`}
-                        style={getScheduleStyle(scheduleForDay)}
-                        onClick={() => toggleDateSelection(dateStr)}
+                          return (
+                            <div
+                              key={dateStr}
+                              onClick={() => toggleDateSelection(dateStr)}
+                              className={`
+                                  relative aspect-square p-1 rounded-xl border cursor-pointer transition-all duration-200
+                                  hover:border-primary/50 hover:shadow-md group flex flex-col justify-between overflow-hidden
+                                  ${isSelected ? 'ring-2 ring-primary border-primary bg-primary/5' : 'bg-card border-border'}
+                                  ${isTodayDate ? 'ring-1 ring-offset-2 ring-blue-500' : ''}
+                                `}
+                              style={schedule?.color ? { backgroundColor: `${schedule.color}15`, borderColor: isSelected ? undefined : `${schedule.color}40` } : {}}
+                            >
+                              <div className="flex justify-between items-start">
+                                <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full ${isTodayDate ? 'bg-blue-500 text-white' : 'text-muted-foreground'}`}>
+                                  {format(day, 'd')}
+                                </span>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity -mr-1 -mt-1 hover:bg-transparent text-muted-foreground hover:text-primary"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSubDialogDate(day);
+                                    setSubDialogOpen(true);
+                                  }}
+                                >
+                                  <UserPlus className="h-3 w-3" />
+                                </Button>
+                              </div>
 
-                      >
-                        <div className="text-xs font-medium">{format(day, 'd')}</div>
-                        <Select value={assignment?.schedule_id || ''} onValueChange={(v) => handleAssignSchedule(dateStr, v)}>
-                          <SelectTrigger className="h-6 text-[10px] mt-1 bg-background/80"><SelectValue placeholder="—" /></SelectTrigger>
-                          <SelectContent>
-                            {schedules.map(s => (
-                              <SelectItem key={s.id} value={s.id}>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color || '#6B7280' }} />
-                                  {s.name}
+                              {schedule ? (
+                                <div className="mt-1">
+                                  <div
+                                    className="text-[10px] font-bold truncate px-1.5 py-0.5 rounded text-white shadow-sm text-center"
+                                    style={{ backgroundColor: schedule.color || '#6B7280' }}
+                                  >
+                                    {schedule.name}
+                                  </div>
                                 </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-6 w-6 rounded-full bg-background/50 hover:bg-primary/20 hover:text-primary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSubDialogDate(day);
-                              setSubDialogOpen(true);
-                            }}
-                          >
-                            <UserPlus className="h-3 w-3" />
-                          </Button>
+                              ) : (
+                                <div className="flex-1 flex items-center justify-center">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/20" />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Right Column: Legend & Tools */}
+              <div className="lg:col-span-4 space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-black uppercase text-muted-foreground tracking-wider">Schedule Types</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {schedules.map(s => (
+                      <div key={s.id} className="flex items-center justify-between group p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="w-4 h-4 rounded-full shadow-sm" style={{ backgroundColor: s.color || '#6B7280' }} />
+                          <span className="font-bold">{s.name}</span>
+                        </div>
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditSchedule(s)}><Edit className="h-3 w-3" /></Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteSchedule(s.id)}><Trash2 className="h-3 w-3" /></Button>
                         </div>
                       </div>
-                    );
-
-                  })}
-                </div>
-
-                <div className="flex gap-4 mt-4 text-xs flex-wrap border-t pt-4">
-                  {schedules.map(s => (
-                    <div key={s.id} className="flex items-center gap-2 bg-muted/50 p-2 rounded-lg">
-                      <div className="w-3 h-3 rounded" style={{ backgroundColor: s.color || '#6B7280' }} />
-                      <span className="font-bold">{s.name}</span>
-                      <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => openEditSchedule(s)}><Edit className="h-3 w-3" /></Button>
-                      <Button size="icon" variant="ghost" className="h-5 w-5 text-destructive hover:text-destructive" onClick={() => handleDeleteSchedule(s.id)}><Trash2 className="h-3 w-3" /></Button>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                    ))}
+                    <Button variant="outline" className="w-full border-dashed" onClick={() => { resetScheduleForm(); setScheduleDialogOpen(true); }}>
+                      <Plus className="h-4 w-4 mr-2" /> Create New Schedule
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="substitutes">
@@ -732,8 +789,8 @@ const AdminDashboard = () => {
                     <p className="text-xs text-muted-foreground">Default restroom passes allowed per student per week</p>
                   </div>
                   <div className="space-y-2">
-                    <Label className="font-bold">Max Concurrent Bathroom</Label>
-                    <Input type="number" min={1} max={20} value={maxConcurrentBathroom} onChange={(e) => setMaxConcurrentBathroom(parseInt(e.target.value) || 2)} />
+                    <Label className="font-bold">Default Periods per Day</Label>
+                    <Input type="number" min={1} max={12} value={defaultPeriodCount} onChange={(e) => setDefaultPeriodCount(parseInt(e.target.value) || 7)} />
                   </div>
                 </div>
 
