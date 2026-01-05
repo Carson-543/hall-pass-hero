@@ -98,36 +98,38 @@ const StudentDashboard = () => {
 
 const MiniSnowflakes = () => {
   return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden">
-      <motion.div 
-        className="absolute inset-0 flex items-center justify-center opacity-20"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 0.2 }}
-      >
-        <div className="relative w-full h-full">
-          {/* Top Left Snowflake */}
-          <motion.div 
-            className="absolute top-1 left-1"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-          >
-            <Snowflake size={12} className="text-blue-400" />
-          </motion.div>
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="absolute inset-0 pointer-events-none overflow-hidden"
+    >
+      {/* 1. The Frost Tint: Makes the button look frozen/disabled */}
+      <div className="absolute inset-0 bg-blue-500/10 backdrop-blur-[1px]" />
 
-          {/* Bottom Right Snowflake */}
-          <motion.div 
-            className="absolute bottom-1 right-1"
-            animate={{ rotate: -360 }}
-            transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-          >
-            <Snowflake size={14} className="text-blue-300" />
-          </motion.div>
+      {/* 2. Higher Contrast Snowflakes */}
+      <div className="absolute inset-0 p-1">
+        {/* Top Snowflake */}
+        <motion.div 
+          className="absolute top-1 right-1"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+        >
+          <Snowflake size={14} className="text-blue-600 fill-blue-200/50" />
+        </motion.div>
 
-          {/* Center Pulsing Glow */}
-          <div className="absolute inset-0 bg-blue-500/5 animate-pulse" />
-        </div>
-      </motion.div>
-    </div>
+        {/* Bottom Snowflake */}
+        <motion.div 
+          className="absolute bottom-1 left-1"
+          animate={{ rotate: -360 }}
+          transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+        >
+          <Snowflake size={12} className="text-blue-500" />
+        </motion.div>
+      </div>
+
+      {/* 3. Frost Border Effect */}
+      <div className="absolute inset-0 border border-blue-200/50 rounded-xl" />
+    </motion.div>
   );
 };
   
