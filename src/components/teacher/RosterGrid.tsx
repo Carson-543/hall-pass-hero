@@ -31,6 +31,15 @@ export const RosterGrid = ({
 
     return (
         <div className="space-y-6 pt-12 border-t border-white/10 mt-12">
+            <div className="flex flex-col gap-1 mb-4">
+                <h2 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+                    <div className="w-1.5 h-6 bg-blue-500 rounded-full" />
+                    Class Roster
+                </h2>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-3.5">
+                    Manage students and view history
+                </p>
+            </div>
             <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
                 <div className="relative w-full sm:max-w-md">
                     <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />

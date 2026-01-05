@@ -74,9 +74,13 @@ export const TeacherControls = ({
                     <SelectTrigger className="h-14 rounded-2xl bg-white/10 border-2 border-white/20 shadow-xl text-lg font-bold px-6 flex-1 text-white hover:bg-white/15 transition-all">
                         <SelectValue placeholder="Select Class" />
                     </SelectTrigger>
-                    <SelectContent className="bg-slate-900 border-white/20 text-white rounded-2xl">
+                    <SelectContent className="bg-slate-900 border-white/20 text-white rounded-2xl overflow-hidden backdrop-blur-xl">
                         {classes.map(c => (
-                            <SelectItem key={c.id} value={c.id}>
+                            <SelectItem
+                                key={c.id}
+                                value={c.id}
+                                className="focus:bg-blue-600 focus:text-white py-3 cursor-pointer transition-colors font-bold"
+                            >
                                 Period {c.period_order}: {c.name}
                             </SelectItem>
                         ))}
@@ -108,7 +112,7 @@ export const TeacherControls = ({
                                     className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-44 rounded-full border-2 shadow-lg ${!!activeFreeze ? 'bg-red-600 border-red-500 text-white' : 'bg-white/10 border-white/20 text-blue-400 hover:border-blue-400/50 hover:bg-white/15'}`}
                                     disabled={isFreezeLoading}
                                 >
-                                    <div className="absolute left-0 flex items-center justify-center w-10 h-10">
+                                    <div className="absolute inset-y-0 left-0 flex items-center justify-center w-10">
                                         {isFreezeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Snowflake className={`h-4 w-4 ${activeFreeze ? 'animate-pulse' : ''}`} />}
                                     </div>
                                     <span className="ml-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[10px] font-black uppercase tracking-widest">
@@ -161,9 +165,9 @@ export const TeacherControls = ({
                             <AlertDialogTrigger asChild>
                                 <Button
                                     variant="outline"
-                                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-48 rounded-full border-2 shadow-lg ${currentClass?.is_queue_autonomous ? 'bg-blue-600 border-blue-500 text-white' : 'bg-white/10 border-white/20 text-slate-400 hover:border-blue-400/50 hover:bg-white/15'}`}
+                                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-48 rounded-full border-2 shadow-lg ${currentClass?.is_queue_autonomous ? 'bg-blue-600 border-blue-500 text-white hover:bg-blue-700' : 'bg-white/10 border-white/20 text-slate-400 hover:border-blue-400/50 hover:bg-white/15'}`}
                                 >
-                                    <div className="absolute left-0 flex items-center justify-center w-10 h-10">
+                                    <div className="absolute inset-y-0 left-0 flex items-center justify-center w-10">
                                         <Bot className={`h-4 w-4 ${currentClass?.is_queue_autonomous ? 'text-white' : ''}`} />
                                     </div>
                                     <span className="ml-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[10px] font-black uppercase tracking-widest">

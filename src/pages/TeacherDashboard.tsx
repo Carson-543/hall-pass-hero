@@ -16,7 +16,6 @@ import { TeacherControls } from '@/components/teacher/TeacherControls';
 import { RequestQueue } from '@/components/teacher/RequestQueue';
 import { ActivePassList } from '@/components/teacher/ActivePassList';
 import { RosterGrid } from '@/components/teacher/RosterGrid';
-import { TeacherSettings } from '@/components/teacher/TeacherSettings';
 import { GlassCard } from '@/components/ui/glass-card';
 import { PageTransition, StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
 
@@ -396,83 +395,66 @@ export const TeacherDashboard = () => {
           <PeriodDisplay />
         </div>
 
-        <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full max-w-sm grid-cols-2 rounded-xl bg-white/5 border border-white/10 p-1">
-            <TabsTrigger value="dashboard" className="rounded-lg font-bold data-[state=active]:bg-blue-600 data-[state=active]:text-white">Dashboard</TabsTrigger>
-            <TabsTrigger value="settings" className="rounded-lg font-bold data-[state=active]:bg-blue-600 data-[state=active]:text-white">Settings</TabsTrigger>
-          </TabsList>
+        <StaggerContainer className="space-y-6">
+          <StaggerItem>
+            <GlassCard className="p-6 bg-slate-900/60 border-2 border-white/10 shadow-xl">
+              <TeacherControls
+                classes={classes}
+                selectedClassId={selectedClassId}
+                onClassChange={setSelectedClassId}
+                onAddClass={() => setDialogOpen(true)}
+                activeFreeze={activeFreeze}
+                freezeType={freezeType}
+                onFreezeTypeChange={setFreezeType}
+                timerMinutes={timerMinutes}
+                onTimerChange={setTimerMinutes}
+                isFreezeLoading={isFreezeLoading}
+                onFreeze={handleFreeze}
+                onUnfreeze={handleUnfreeze}
+                currentClass={currentClass}
+                maxConcurrent={maxConcurrent}
+                onToggleAutoQueue={handleToggleAutoQueue}
+              />
+            </GlassCard>
+          </StaggerItem>
 
-          <TabsContent value="dashboard">
-            <StaggerContainer className="space-y-6">
-              <StaggerItem>
-                <GlassCard className="p-6 bg-slate-900/60 border-2 border-white/10 shadow-xl">
-                  <TeacherControls
-                    classes={classes}
-                    selectedClassId={selectedClassId}
-                    onClassChange={setSelectedClassId}
-                    onAddClass={() => setDialogOpen(true)}
-                    activeFreeze={activeFreeze}
-                    freezeType={freezeType}
-                    onFreezeTypeChange={setFreezeType}
-                    timerMinutes={timerMinutes}
-                    onTimerChange={setTimerMinutes}
-                    isFreezeLoading={isFreezeLoading}
-                    onFreeze={handleFreeze}
-                    onUnfreeze={handleUnfreeze}
-                    currentClass={currentClass}
-                    maxConcurrent={maxConcurrent}
-                    onToggleAutoQueue={handleToggleAutoQueue}
-                  />
-                </GlassCard>
-              </StaggerItem>
-
-              <StaggerItem>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <GlassCard className="p-6 bg-slate-900/60 border-2 border-white/10 shadow-xl">
-                    <RequestQueue
-                      pendingPasses={pendingPasses.map(p => ({
-                        ...p,
-                        is_quota_exceeded: activePasses.filter(ap => ap.destination === 'Restroom').length >= maxConcurrent && p.destination === 'Restroom'
-                      }))}
-                      onApprove={handleApprove}
-                      onDeny={handleDeny}
-                    />
-                  </GlassCard>
-
-                  <GlassCard className="p-6 bg-slate-900/60 border-2 border-white/10 shadow-xl">
-                    <ActivePassList
-                      activePasses={activePasses}
-                      onCheckIn={handleCheckIn}
-                    />
-                  </GlassCard>
-                </div>
-              </StaggerItem>
-
-              {selectedClassId && (
-                <StaggerItem>
-                  <GlassCard className="p-6 bg-slate-900/60 border-2 border-white/10 shadow-xl">
-                    <RosterGrid
-                      students={students}
-                      currentClass={currentClass}
-                      searchQuery={searchQuery}
-                      setSearchQuery={setSearchQuery}
-                      onViewHistory={handleViewHistory}
-                      onRemoveStudent={handleRemoveStudent}
-                    />
-                  </GlassCard>
-                </StaggerItem>
-              )}
-            </StaggerContainer>
-          </TabsContent>
-
-          <TabsContent value="settings">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+          <StaggerItem>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <GlassCard className="p-6 bg-slate-900/60 border-2 border-white/10 shadow-xl">
-                <TeacherSettings userEmail={profile?.email} />
+                <RequestQueue
+                  pendingPasses={pendingPasses.map(p => ({
+                    ...p,
+                    is_quota_exceeded: activePasses.filter(ap => ap.destination === 'Restroom').length >= maxConcurrent && p.destination === 'Restroom'
+                  }))}
+                  onApprove={handleApprove}
+                  onDeny={handleDeny}
+                />
               </GlassCard>
-            </motion.div>
-          </TabsContent>
-        </Tabs>
+
+              <GlassCard className="p-6 bg-slate-900/60 border-2 border-white/10 shadow-xl">
+                <ActivePassList
+                  activePasses={activePasses}
+                  onCheckIn={handleCheckIn}
+                />
+              </GlassCard>
+            </div>
+          </StaggerItem>
+
+          {selectedClassId && (
+            <StaggerItem>
+              <GlassCard className="p-6 bg-slate-900/60 border-2 border-white/10 shadow-xl">
+                <RosterGrid
+                  students={students}
+                  currentClass={currentClass}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                  onViewHistory={handleViewHistory}
+                  onRemoveStudent={handleRemoveStudent}
+                />
+              </GlassCard>
+            </StaggerItem>
+          )}
+        </StaggerContainer>
 
         <ClassManagementDialog
           open={dialogOpen}
