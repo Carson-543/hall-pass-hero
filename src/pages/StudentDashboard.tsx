@@ -33,6 +33,39 @@ const DESTINATIONS = [
   { id: 'Other', icon: MoreHorizontal, label: 'Other' },
 ];
 
+const MiniSnowflakes = () => {
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {/* 1. The Frost Tint: Makes the button look frozen/disabled */}
+      <div className="absolute inset-0 bg-blue-500/10 backdrop-blur-[1px]" />
+
+      {/* 2. Higher Contrast Snowflakes */}
+      <div className="absolute inset-0 p-1">
+        {/* Top Snowflake */}
+        <motion.div
+          className="absolute top-1 right-1"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+        >
+          <Snowflake size={14} className="text-blue-900 fill-blue-200/50" />
+        </motion.div>
+
+        {/* Bottom Snowflake */}
+        <motion.div
+          className="absolute bottom-1 left-1"
+          animate={{ rotate: -360 }}
+          transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+        >
+          <Snowflake size={12} className="text-blue-900" />
+        </motion.div>
+      </div>
+
+      {/* 3. Frost Border Effect */}
+      <div className="absolute inset-0 border border-blue-200/50 rounded-xl" />
+    </div>
+  );
+};
+
 const StudentDashboard = () => {
   const { user, role, signOut, loading: authLoading } = useAuth();
   const { organization } = useOrganization();
@@ -108,42 +141,7 @@ const StudentDashboard = () => {
     }
   }, [user?.id]);
 
-  const MiniSnowflakes = () => {
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="absolute inset-0 pointer-events-none overflow-hidden"
-      >
-        {/* 1. The Frost Tint: Makes the button look frozen/disabled */}
-        <div className="absolute inset-0 bg-blue-500/10 backdrop-blur-[1px]" />
 
-        {/* 2. Higher Contrast Snowflakes */}
-        <div className="absolute inset-0 p-1">
-          {/* Top Snowflake */}
-          <motion.div
-            className="absolute top-1 right-1"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
-          >
-            <Snowflake size={14} className="text-blue-900 fill-blue-200/50" />
-          </motion.div>
-
-          {/* Bottom Snowflake */}
-          <motion.div
-            className="absolute bottom-1 left-1"
-            animate={{ rotate: -360 }}
-            transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-          >
-            <Snowflake size={12} className="text-blue-900" />
-          </motion.div>
-        </div>
-
-        {/* 3. Frost Border Effect */}
-        <div className="absolute inset-0 border border-blue-200/50 rounded-xl" />
-      </motion.div>
-    );
-  };
 
   const fetchActiveFreeze = useCallback(async (id: string) => {
     if (!id) return;
