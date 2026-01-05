@@ -464,10 +464,11 @@ const AdminDashboard = () => {
       }));
 
       if (periodsToSave.length > 0) {
+        console.log("💾 Payload being sent to Supabase:", JSON.stringify(periodsToSave, null, 2));
         const { error: upsertError } = await supabase.from('periods').upsert(periodsToSave);
         if (upsertError) {
-          console.error("❌ Error upserting periods:", upsertError);
-          toast({ title: "Error", description: "Failed to save bell schedule rows", variant: "destructive" });
+          console.error("❌ Error upserting periods:", JSON.stringify(upsertError, null, 2));
+          toast({ title: "Error", description: "Failed to save bell schedule rows: " + upsertError.message, variant: "destructive" });
         }
       }
     }
