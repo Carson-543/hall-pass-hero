@@ -23,6 +23,7 @@ interface ClassManagementDialogProps {
   onOpenChange: (open: boolean) => void;
   editingClass: ClassInfo | null;
   userId: string;
+  organizationId: string | null;
   onSaved: () => void;
 }
 
@@ -31,6 +32,7 @@ export const ClassManagementDialog = ({
   onOpenChange,
   editingClass,
   userId,
+  organizationId,
   onSaved
 }: ClassManagementDialogProps) => {
   const { toast } = useToast();
@@ -90,6 +92,7 @@ export const ClassManagementDialog = ({
           name: className,
           period_order: parseInt(periodOrder),
           teacher_id: userId,
+          organization_id: organizationId,
           join_code: joinCode || Math.random().toString(36).substring(2, 8).toUpperCase()
         });
 

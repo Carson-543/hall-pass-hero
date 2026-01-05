@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useCurrentPeriod } from '@/hooks/useCurrentPeriod';
 import { ClassManagementDialog } from '@/components/teacher/ClassManagementDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 // Components
 import { PeriodDisplay } from '@/components/PeriodDisplay';
@@ -70,6 +71,7 @@ interface Settings {
 export const TeacherDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { organizationId } = useOrganization();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<{ id: string; full_name: string; email?: string } | null>(null);
   const [classes, setClasses] = useState<ClassInfo[]>([]);
@@ -153,10 +155,22 @@ export const TeacherDashboard = () => {
       .order('period_order');
     if (data && data.length > 0) {
       console.log(`[TeacherDashboard] Found ${data.length} classes for teacher`);
+
+      // Backfill missing organization_id if we have it
+      if (organizationId) {
+        const withoutOrg = data.filter(c => !(c as any).organization_id);
+        if (withoutOrg.length > 0) {
+          console.log(`[TeacherDashboard] Backfilling organization_id for ${withoutOrg.length} classes...`);
+          await supabase
+            .from('classes')
+            .update({ organization_id: organizationId })
+            .in('id', withoutOrg.map(c => c.id));
+        }
+      }
+
       setClasses(data);
-      // Don't set default here, let the useEffect with currentPeriod do it
     }
-  }, [profile]);
+  }, [profile, organizationId]);
 
   // Auto-select class based on current period
   useEffect(() => {
@@ -671,6 +685,7 @@ export const TeacherDashboard = () => {
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           userId={profile?.id || ''}
+          organizationId={organizationId}
           editingClass={null}
           onSaved={() => { fetchClasses(profile?.id); toast({ title: "Class Saved" }); }}
         />
