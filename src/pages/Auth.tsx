@@ -239,18 +239,14 @@ const Auth = () => {
 
           {/* Feature highlights for "pop" */}
           <motion.div
-            className="mt-12 grid grid-cols-2 gap-4 w-full"
+            className="mt-12 w-full"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6 }}
           >
-            <div className="p-4 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-sm">
-              <p className="text-blue-400 font-black text-2xl">Real-time</p>
-              <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">Tracking</p>
-            </div>
-            <div className="p-4 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-sm">
-              <p className="text-blue-400 font-black text-2xl">Unlimited</p>
-              <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">Scalability</p>
+            <div className="p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-sm text-center">
+              <p className="text-blue-400 font-black text-3xl">Real-time</p>
+              <p className="text-slate-500 text-sm font-bold uppercase tracking-[0.2em]">Tracking</p>
             </div>
           </motion.div>
         </div>
