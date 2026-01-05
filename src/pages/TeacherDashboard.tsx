@@ -89,40 +89,7 @@ export const TeacherDashboard = () => {
     checkUser();
   }, []);
 
-  useEffect(() => {
-    if (selectedClassId) {
-      const channel = supabase
-        .channel('public:passes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'passes', filter: `class_id=eq.${selectedClassId}` }, () => {
-          fetchPasses();
-        })
-        .subscribe();
 
-      const freezeChannel = supabase
-        .channel('public:pass_freezes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'pass_freezes', filter: `class_id=eq.${selectedClassId}` }, () => {
-          fetchFreezeStatus(selectedClassId);
-        })
-        .subscribe();
-
-      const classChannel = supabase
-        .channel('public:classes')
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'classes', filter: `id=eq.${selectedClassId}` }, (payload) => {
-          setClasses(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
-        })
-        .subscribe();
-
-      fetchStudents();
-      fetchPasses();
-      fetchFreezeStatus(selectedClassId);
-
-      return () => {
-        supabase.removeChannel(channel);
-        supabase.removeChannel(freezeChannel);
-        supabase.removeChannel(classChannel);
-      };
-    }
-  }, [selectedClassId]);
 
   const checkUser = async () => {
     try {
@@ -190,6 +157,7 @@ export const TeacherDashboard = () => {
 
   const fetchFreezeStatus = useCallback(async (classId: string) => {
     if (!classId) return;
+    console.log(`[TeacherDashboard] Fetching freeze status for class ${classId}`);
     const { data } = await supabase
       .from('pass_freezes')
       .select('id, freeze_type, ends_at, is_active')
@@ -197,7 +165,14 @@ export const TeacherDashboard = () => {
       .eq('is_active', true)
       .maybeSingle();
 
+    if (data) {
+      console.log(`[TeacherDashboard] Freeze active:`, data);
+    } else {
+      console.log(`[TeacherDashboard] No active freeze`);
+    }
+
     if (data && data.ends_at && new Date(data.ends_at) < new Date()) {
+      console.log(`[TeacherDashboard] Freeze expired, deactivating...`);
       await supabase.from('pass_freezes').update({ is_active: false }).eq('id', data.id);
       setActiveFreeze(null);
     } else {
@@ -254,6 +229,7 @@ export const TeacherDashboard = () => {
 
   const fetchStudents = async () => {
     if (!selectedClassId || !isValidUUID(selectedClassId)) return;
+    console.log(`[TeacherDashboard] Fetching students for class: ${selectedClassId}`);
 
     // Step 1: Get enrollments
     const { data: enrollments } = await supabase
@@ -262,6 +238,7 @@ export const TeacherDashboard = () => {
       .eq('class_id', selectedClassId);
 
     if (!enrollments || enrollments.length === 0) {
+      console.log(`[TeacherDashboard] No students enrolled`);
       setStudents([]);
       return;
     }
@@ -274,6 +251,7 @@ export const TeacherDashboard = () => {
       .in('id', studentIds);
 
     if (profiles) {
+      console.log(`[TeacherDashboard] Loaded ${profiles.length} student profiles`);
       setStudents(profiles.map(p => ({
         id: p.id,
         name: p.full_name,
@@ -316,7 +294,15 @@ export const TeacherDashboard = () => {
   };
 
   const fetchPasses = async () => {
-    if (!selectedClassId || !isValidUUID(selectedClassId)) return;
+    if (!selectedClassId) return;
+    console.log(`[TeacherDashboard] Fetching passes for class ${selectedClassId}`);
+
+    // Also fetch class settings for debug
+    const { data: classData } = await supabase.from('classes').select('is_queue_autonomous, max_concurrent_bathroom').eq('id', selectedClassId).single();
+    if (classData) {
+      console.log(`[TeacherDashboard] Class Autonomous: ${classData.is_queue_autonomous}`);
+    }
+
     const { data } = await supabase
       .from('passes')
       .select('id, student_id, class_id, destination, status, requested_at, approved_at, profiles:student_id(full_name)')
@@ -325,37 +311,53 @@ export const TeacherDashboard = () => {
       .order('requested_at', { ascending: true });
 
     if (data) {
-      const pending = data
-        .filter((p: any) => p.status === 'pending')
-        .map((p: any) => ({
-          id: p.id,
-          student_id: p.student_id,
-          class_id: p.class_id,
-          destination: p.destination,
-          status: p.status,
-          requested_at: p.requested_at,
-          approved_at: p.approved_at,
-          student_name: p.profiles?.full_name || 'Unknown',
-          is_quota_exceeded: false
-        }));
-
-      const active = data
-        .filter((p: any) => ['approved', 'pending_return'].includes(p.status))
-        .map((p: any) => ({
-          id: p.id,
-          student_id: p.student_id,
-          class_id: p.class_id,
-          destination: p.destination,
-          status: p.status,
-          requested_at: p.requested_at,
-          approved_at: p.approved_at,
-          student_name: p.profiles?.full_name || 'Unknown'
-        }));
-
-      setPendingPasses(pending);
-      setActivePasses(active);
+      console.log(`[TeacherDashboard] Fetched ${data.length} active/pending passes`);
+      setPendingPasses(data.filter(p => p.status === 'pending').map(p => ({
+        ...p,
+        student_name: (p.profiles as { full_name: string })?.full_name || 'Unknown',
+        is_quota_exceeded: false
+      })) as PendingPass[]);
+      setActivePasses(data.filter(p => ['approved', 'pending_return'].includes(p.status)).map(p => ({
+        ...p,
+        student_name: (p.profiles as { full_name: string })?.full_name || 'Unknown',
+      })) as ActivePass[]);
     }
   };
+
+  // Main Subscription Effect
+  useEffect(() => {
+    if (selectedClassId) {
+      const channelName = `teacher-dashboard-${selectedClassId}-v3`;
+      console.log(`[TeacherDashboard] Subscribing to channel: ${channelName}`);
+
+      const channel = supabase
+        .channel(channelName)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'passes', filter: `class_id=eq.${selectedClassId}` }, (payload) => {
+          console.log('[TeacherDashboard] Realtime update on passes:', payload);
+          fetchPasses();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'pass_freezes', filter: `class_id=eq.${selectedClassId}` }, (payload) => {
+          console.log('[TeacherDashboard] Realtime update on pass_freezes:', payload);
+          fetchFreezeStatus(selectedClassId);
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'classes', filter: `id=eq.${selectedClassId}` }, (payload) => {
+          console.log('[TeacherDashboard] Realtime update on classes:', payload);
+          setClasses(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
+        })
+        .subscribe((status) => {
+          console.log(`[TeacherDashboard] Channel status: ${status}`);
+        });
+
+      fetchStudents();
+      fetchPasses();
+      fetchFreezeStatus(selectedClassId);
+
+      return () => {
+        console.log(`[TeacherDashboard] Unsubscribing from channel: ${channelName}`);
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [selectedClassId, fetchFreezeStatus]);
 
   const handleApprove = async (passId: string, override: boolean = false) => {
     const { error } = await supabase
@@ -433,24 +435,20 @@ export const TeacherDashboard = () => {
   useEffect(() => {
     if (!selectedClassId || !currentClass?.is_queue_autonomous) return;
 
+    const channelName = `auto-queue-${selectedClassId}`;
+    console.log(`[TeacherDashboard] Subscribing to auto-queue channel: ${channelName}`);
+
     const channel = supabase
-      .channel('auto-queue-advance')
+      .channel(channelName)
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
         table: 'passes',
         filter: `class_id=eq.${selectedClassId}`
       }, (payload) => {
+        console.log('[TeacherDashboard] Auto-queue event:', payload);
         // If a pass was just marked 'returned' (by student or teacher)
         if (payload.new.status === 'returned' && payload.old.status !== 'returned') {
-          // We need fresh state to perform the check safely. 
-          // Since we can't easily access the absolute latest state inside this callback without refs or deps,
-          // and adding deps triggers re-subscriptions, a safe bet is to:
-          // 1. Trigger a fetch
-          // 2. Perform the check inside the fetch or separate logic.
-
-          // Actually, simpler: The `fetchPasses` is already called by the main subscription.
-          // We can add a `useEffect` on `activePasses` change? Close but dangerous (loops).
 
           // Better approach: Let's rely on the main subscription calling `fetchPasses`.
           // But `fetchPasses` sets state. We need to perform the check AFTER state updates?

@@ -49,12 +49,14 @@ const StudentDashboard = () => {
 
   const fetchEnrolledClasses = useCallback(async () => {
     if (!user?.id) return;
+    console.log('[StudentDashboard] Fetching enrolled classes');
     const { data: enrollments } = await supabase
       .from('class_enrollments')
       .select('class_id')
       .eq('student_id', user.id);
 
     if (!enrollments?.length) {
+      console.log('[StudentDashboard] No enrollments found');
       setEnrolledClasses([]);
       return;
     }
@@ -65,12 +67,16 @@ const StudentDashboard = () => {
       .in('id', enrollments.map(e => e.class_id))
       .order('period_order');
 
-    if (!classesData) return;
+    if (!classesData) {
+      console.log('[StudentDashboard] Error or no classes data found for enrollments');
+      return;
+    }
 
     const teacherIds = [...new Set(classesData.map(c => c.teacher_id))];
     const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', teacherIds);
     const teacherMap = Object.fromEntries(profiles?.map(p => [p.id, p.full_name]) || []);
 
+    console.log(`[StudentDashboard] Loaded ${classesData.length} classes`);
     setEnrolledClasses(classesData.map(c => ({
       ...c,
       teacher_name: teacherMap[c.teacher_id] ?? 'Unknown'
@@ -79,6 +85,7 @@ const StudentDashboard = () => {
 
   const fetchActivePass = useCallback(async () => {
     if (!user?.id) return;
+    console.log('[StudentDashboard] Fetching active pass');
     const { data } = await supabase
       .from('passes')
       .select(`id, destination, status, requested_at, approved_at, expected_return_at, class_id`)
@@ -89,9 +96,13 @@ const StudentDashboard = () => {
       .maybeSingle();
 
     if (data) {
+      console.log('[StudentDashboard] Found active pass:', data.id, data.status);
       const { data: classData } = await supabase.from('classes').select('name, is_queue_autonomous').eq('id', data.class_id).maybeSingle();
       setActivePass({ ...data, class_name: classData?.name ?? 'Unknown', is_queue_autonomous: classData?.is_queue_autonomous });
+      // Also fetch freeze status for this active class to show potential freezes
+      fetchActiveFreeze(data.class_id);
     } else {
+      console.log('[StudentDashboard] No active pass found');
       setActivePass(null);
     }
   }, [user?.id]);
@@ -135,7 +146,9 @@ const StudentDashboard = () => {
 
   const fetchActiveFreeze = useCallback(async (id: string) => {
     if (!id) return;
+    console.log(`[StudentDashboard] Fetching freeze status for class ${id}`);
     const { data } = await supabase.from('pass_freezes').select('freeze_type, ends_at').eq('class_id', id).eq('is_active', true).maybeSingle();
+    console.log(`[StudentDashboard] Freeze status for ${id}:`, data);
     setActiveFreeze(data ? { freeze_type: data.freeze_type, ends_at: data.ends_at } : null);
   }, []);
 
@@ -146,28 +159,49 @@ const StudentDashboard = () => {
 
   useEffect(() => {
     if (!user?.id) return;
+    const channelName = `student-pass-${user.id}`;
+    console.log(`[StudentDashboard] Subscribing to: ${channelName}`);
+
     const channel = supabase
-      .channel(`student-pass-${user.id}`)
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'passes', filter: `student_id=eq.${user.id}` },
         (payload) => {
+          console.log('[StudentDashboard] Pass update:', payload);
           fetchActivePass();
           if (payload.eventType === 'UPDATE' && ['returned', 'completed', 'denied'].includes((payload.new as any).status)) {
             refreshQuota();
           }
         })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+      .subscribe((status) => {
+        console.log(`[StudentDashboard] Channel ${channelName} status: ${status}`);
+      });
+    return () => {
+      console.log(`[StudentDashboard] Unsubscribing from: ${channelName}`);
+      supabase.removeChannel(channel);
+    };
   }, [user?.id, fetchActivePass, refreshQuota]);
 
   useEffect(() => {
     if (!selectedClassId) return;
     fetchActiveFreeze(selectedClassId);
+
+    const channelName = `freeze-check-${selectedClassId}`;
+    console.log(`[StudentDashboard] Subscribing to freeze channel: ${channelName}`);
+
     const channel = supabase
-      .channel(`freeze-check-${selectedClassId}`)
+      .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pass_freezes', filter: `class_id=eq.${selectedClassId}` },
-        () => fetchActiveFreeze(selectedClassId))
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+        (payload) => {
+          console.log('[StudentDashboard] Freeze update:', payload);
+          fetchActiveFreeze(selectedClassId);
+        })
+      .subscribe((status) => {
+        console.log(`[StudentDashboard] Freeze channel status: ${status}`);
+      });
+    return () => {
+      console.log(`[StudentDashboard] Unsubscribing from freeze channel`);
+      supabase.removeChannel(channel);
+    };
   }, [selectedClassId, fetchActiveFreeze]);
 
   useEffect(() => {
