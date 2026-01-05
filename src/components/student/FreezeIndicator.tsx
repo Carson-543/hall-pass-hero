@@ -97,7 +97,7 @@ export const FreezeIndicator = ({ classId }: FreezeIndicatorProps) => {
         {[...Array(20)].map((_, i) => (
           <Snowflake
             key={i}
-            className="absolute text-cyan-200/60 animate-pulse"
+            className="absolute text-blue-800 animate-pulse"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
@@ -119,7 +119,7 @@ export const FreezeIndicator = ({ classId }: FreezeIndicatorProps) => {
       <CardContent className="relative p-5">
         <div className="flex items-center gap-4">
           <div className="relative p-3 rounded-full bg-gradient-to-br from-cyan-400/30 to-blue-500/30 border border-cyan-300/50 shadow-lg shadow-cyan-500/20">
-            <Snowflake className="h-7 w-7 text-cyan-100 animate-spin" style={{ animationDuration: '8s' }} />
+            <Snowflake className="h-7 w-7 text-blue-800 animate-spin" style={{ animationDuration: '8s' }} />
             {/* Inner glow */}
             <div className="absolute inset-0 rounded-full bg-cyan-400/40 blur-md" />
 
