@@ -114,7 +114,7 @@ const MiniSnowflakes = () => {
           animate={{ rotate: 360 }}
           transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
         >
-          <Snowflake size={14} className="text-blue-600 fill-blue-200/50" />
+          <Snowflake size={14} className="text-blue-900 fill-blue-200/50" />
         </motion.div>
 
         {/* Bottom Snowflake */}
@@ -123,7 +123,7 @@ const MiniSnowflakes = () => {
           animate={{ rotate: -360 }}
           transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
         >
-          <Snowflake size={12} className="text-blue-500" />
+          <Snowflake size={12} className="text-blue-900" />
         </motion.div>
       </div>
 
