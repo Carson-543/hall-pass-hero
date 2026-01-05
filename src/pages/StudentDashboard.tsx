@@ -194,13 +194,11 @@ const StudentDashboard = () => {
   const handleCheckIn = async () => {
     if (!activePass) return;
 
-    const isAutonomous = activePass.is_queue_autonomous;
-    const newStatus = isAutonomous ? 'returned' : 'pending_return';
+    const { error } = await supabase.rpc('student_check_in', { p_pass_id: activePass.id });
 
-    await supabase.from('passes').update({
-      status: newStatus,
-      returned_at: new Date().toISOString()
-    }).eq('id', activePass.id);
+    if (error) {
+      toast({ title: "Error checking in", description: error.message, variant: "destructive" });
+    }
   };
 
   const handleCancelRequest = async () => {
