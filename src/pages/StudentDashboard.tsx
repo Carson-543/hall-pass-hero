@@ -89,50 +89,50 @@ const StudentDashboard = () => {
       .maybeSingle();
 
     if (data) {
-      const { data: classData } = await supabase.from('classes').select('name').eq('id', data.class_id).maybeSingle();
-      setActivePass({ ...data, class_name: classData?.name ?? 'Unknown' });
+      const { data: classData } = await supabase.from('classes').select('name, is_queue_autonomous').eq('id', data.class_id).maybeSingle();
+      setActivePass({ ...data, class_name: classData?.name ?? 'Unknown', is_queue_autonomous: classData?.is_queue_autonomous });
     } else {
       setActivePass(null);
     }
   }, [user?.id]);
 
-const MiniSnowflakes = () => {
-  return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="absolute inset-0 pointer-events-none overflow-hidden"
-    >
-      {/* 1. The Frost Tint: Makes the button look frozen/disabled */}
-      <div className="absolute inset-0 bg-blue-500/10 backdrop-blur-[1px]" />
+  const MiniSnowflakes = () => {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="absolute inset-0 pointer-events-none overflow-hidden"
+      >
+        {/* 1. The Frost Tint: Makes the button look frozen/disabled */}
+        <div className="absolute inset-0 bg-blue-500/10 backdrop-blur-[1px]" />
 
-      {/* 2. Higher Contrast Snowflakes */}
-      <div className="absolute inset-0 p-1">
-        {/* Top Snowflake */}
-        <motion.div 
-          className="absolute top-1 right-1"
-          animate={{ rotate: 360 }}
-          transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
-        >
-          <Snowflake size={14} className="text-blue-900 fill-blue-200/50" />
-        </motion.div>
+        {/* 2. Higher Contrast Snowflakes */}
+        <div className="absolute inset-0 p-1">
+          {/* Top Snowflake */}
+          <motion.div
+            className="absolute top-1 right-1"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+          >
+            <Snowflake size={14} className="text-blue-900 fill-blue-200/50" />
+          </motion.div>
 
-        {/* Bottom Snowflake */}
-        <motion.div 
-          className="absolute bottom-1 left-1"
-          animate={{ rotate: -360 }}
-          transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-        >
-          <Snowflake size={12} className="text-blue-900" />
-        </motion.div>
-      </div>
+          {/* Bottom Snowflake */}
+          <motion.div
+            className="absolute bottom-1 left-1"
+            animate={{ rotate: -360 }}
+            transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+          >
+            <Snowflake size={12} className="text-blue-900" />
+          </motion.div>
+        </div>
 
-      {/* 3. Frost Border Effect */}
-      <div className="absolute inset-0 border border-blue-200/50 rounded-xl" />
-    </motion.div>
-  );
-};
-  
+        {/* 3. Frost Border Effect */}
+        <div className="absolute inset-0 border border-blue-200/50 rounded-xl" />
+      </motion.div>
+    );
+  };
+
   const fetchActiveFreeze = useCallback(async (id: string) => {
     if (!id) return;
     const { data } = await supabase.from('pass_freezes').select('freeze_type, ends_at').eq('class_id', id).eq('is_active', true).maybeSingle();
@@ -193,8 +193,12 @@ const MiniSnowflakes = () => {
 
   const handleCheckIn = async () => {
     if (!activePass) return;
+
+    const isAutonomous = activePass.is_queue_autonomous;
+    const newStatus = isAutonomous ? 'returned' : 'pending_return';
+
     await supabase.from('passes').update({
-      status: 'pending_return',
+      status: newStatus,
       returned_at: new Date().toISOString()
     }).eq('id', activePass.id);
   };
@@ -206,7 +210,7 @@ const MiniSnowflakes = () => {
       .update({ status: 'denied', denied_at: new Date().toISOString() })
       .eq('id', activePass.id)
       .eq('status', 'pending');
-    
+
     if (!error) {
       toast({ title: 'Request Cancelled' });
       setActivePass(null);

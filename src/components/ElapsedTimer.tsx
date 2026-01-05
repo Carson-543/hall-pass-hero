@@ -21,7 +21,7 @@ export const ElapsedTimer = ({ startTime, destination, className, showWarning = 
 
   useEffect(() => {
     const start = new Date(startTime).getTime();
-    
+
     const updateElapsed = () => {
       const now = Date.now();
       setElapsed(Math.floor((now - start) / 1000));
@@ -56,13 +56,16 @@ export const ElapsedTimer = ({ startTime, destination, className, showWarning = 
       )}
     >
       {showWarning && isOverdue ? (
-        <AlertTriangle className="h-3.5 w-3.5" />
+        <>
+          <AlertTriangle className="h-3.5 w-3.5" />
+          <span>+{formatElapsed(elapsed - threshold)}</span>
+          <span className="text-xs uppercase font-bold tracking-wider">Overdue</span>
+        </>
       ) : (
-        <Clock className="h-3.5 w-3.5" />
-      )}
-      <span>{formatElapsed(elapsed)}</span>
-      {showWarning && isOverdue && (
-        <span className="text-xs">(overdue)</span>
+        <>
+          <Clock className="h-3.5 w-3.5" />
+          <span>{formatElapsed(Math.max(0, elapsed))}</span>
+        </>
       )}
     </div>
   );

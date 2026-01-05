@@ -83,6 +83,8 @@ export const TeacherDashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  const currentClass = classes.find(c => c.id === selectedClassId);
+
   useEffect(() => {
     checkUser();
   }, []);
@@ -375,14 +377,128 @@ export const TeacherDashboard = () => {
     fetchPasses();
   };
 
+  const checkAndAdvanceQueue = async (classId: string, currentActivePasses: ActivePass[], currentPendingPasses: PendingPass[]) => {
+    if (!currentClass?.is_queue_autonomous || !classId) return;
+
+    const limit = currentClass.max_concurrent_bathroom ?? settings?.max_concurrent_bathroom ?? 2;
+    // Count active restroom passes (excluding any that might have just been returned - though this function is usually called after return)
+    const restroomActiveCount = currentActivePasses.filter(p => p.destination === 'Restroom').length;
+
+    if (restroomActiveCount < limit && currentPendingPasses.length > 0) {
+      const nextPass = currentPendingPasses.find(p => p.destination === 'Restroom');
+
+      if (nextPass) {
+        console.log(`🤖 Auto-approving next student: ${nextPass.student_name}`);
+        const { error: approveError } = await supabase
+          .from('passes')
+          .update({ status: 'approved', approved_at: new Date().toISOString() })
+          .eq('id', nextPass.id);
+
+        if (!approveError) {
+          toast({ title: "Auto-Approved", description: `${nextPass.student_name} is next!` });
+        }
+      }
+    }
+  };
+
   const handleCheckIn = async (passId: string) => {
+    // 1. Return the current pass
     const { error } = await supabase
       .from('passes')
       .update({ status: 'returned', returned_at: new Date().toISOString() })
       .eq('id', passId);
-    if (error) toast({ title: "Error", description: "Failed to return pass", variant: "destructive" });
-    else toast({ title: "Welcome Back!", description: "Student checked in." });
+
+    if (error) {
+      toast({ title: "Error", description: "Failed to return pass", variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Welcome Back!", description: "Student checked in." });
+
+    // 2. Refresh local state & Trigger Auto-Advance
+    // We optimistic update or just fetch fresh data.
+    // Let's fetch fresh data to be safe, then check advancement.
+    // However, fetchPasses is async and doesn't return data.
+    // We can manually filter the list for the check.
+
+    // Simulate the new state for the check
+    const updatedActivePasses = activePasses.filter(p => p.id !== passId);
+
+    checkAndAdvanceQueue(selectedClassId, updatedActivePasses, pendingPasses);
+
     fetchPasses();
+  };
+
+  // Effect to listen for autonomous check-ins from students
+  useEffect(() => {
+    if (!selectedClassId || !currentClass?.is_queue_autonomous) return;
+
+    const channel = supabase
+      .channel('auto-queue-advance')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'passes',
+        filter: `class_id=eq.${selectedClassId}`
+      }, (payload) => {
+        // If a pass was just marked 'returned' (by student or teacher)
+        if (payload.new.status === 'returned' && payload.old.status !== 'returned') {
+          // We need fresh state to perform the check safely. 
+          // Since we can't easily access the absolute latest state inside this callback without refs or deps,
+          // and adding deps triggers re-subscriptions, a safe bet is to:
+          // 1. Trigger a fetch
+          // 2. Perform the check inside the fetch or separate logic.
+
+          // Actually, simpler: The `fetchPasses` is already called by the main subscription.
+          // We can add a `useEffect` on `activePasses` change? Close but dangerous (loops).
+
+          // Better approach: Let's rely on the main subscription calling `fetchPasses`.
+          // But `fetchPasses` sets state. We need to perform the check AFTER state updates?
+          // Or perform the check HERE using a one-off query?
+
+          // Strategy:
+          // When 'returned' event is seen:
+          // Query the DB for current counts (source of truth).
+          checkQueueFromDB(selectedClassId);
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [selectedClassId, currentClass?.is_queue_autonomous]);
+
+  const checkQueueFromDB = async (classId: string) => {
+    // 1. Get active restroom count
+    const { count: activeCount } = await supabase
+      .from('passes')
+      .select('*', { count: 'exact', head: true })
+      .eq('class_id', classId)
+      .in('status', ['approved', 'pending_return']) // pending_return shouldn't happen in auto mode but good to include
+      .eq('destination', 'Restroom');
+
+    // 2. Get pending restroom count/list
+    const { data: pending } = await supabase
+      .from('passes')
+      .select('id, student_id, profiles(full_name)')
+      .eq('class_id', classId)
+      .eq('status', 'pending')
+      .eq('destination', 'Restroom')
+      .order('requested_at', { ascending: true })
+      .limit(1);
+
+    const limit = currentClass?.max_concurrent_bathroom ?? settings?.max_concurrent_bathroom ?? 2;
+
+    if (activeCount !== null && activeCount < limit && pending && pending.length > 0) {
+      const nextPass = pending[0];
+      console.log(`🤖 Realtime Auto-Advance for: ${nextPass.profiles?.full_name}`);
+
+      await supabase
+        .from('passes')
+        .update({ status: 'approved', approved_at: new Date().toISOString() })
+        .eq('id', nextPass.id);
+
+      toast({ title: "Auto-Approved", description: `${nextPass.profiles?.full_name} is next!` });
+    }
   };
 
   const handleRemoveStudent = async (student: Student) => {
@@ -414,7 +530,7 @@ export const TeacherDashboard = () => {
     );
   }
 
-  const currentClass = classes.find(c => c.id === selectedClassId);
+
   const maxConcurrent = settings?.max_concurrent_bathroom ?? 2;
 
   return (
