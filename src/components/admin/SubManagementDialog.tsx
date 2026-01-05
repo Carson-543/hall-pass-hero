@@ -94,6 +94,9 @@ export const SubManagementDialog = ({ date, open, onOpenChange, organizationId }
             .select('user_id')
             .eq('organization_id', organizationId);
 
+        console.log(`🔍 Fetching teachers. Memberships found: ${memberships?.length}`);
+        if (memberships) console.log("Ids:", memberships.map(m => m.user_id));
+
         if (!memberships) return;
         const memberIds = memberships.map(m => m.user_id);
 
@@ -102,6 +105,8 @@ export const SubManagementDialog = ({ date, open, onOpenChange, organizationId }
             .select('user_id, role')
             .in('role', ['teacher', 'admin'])
             .in('user_id', memberIds);
+
+        console.log(`🔍 Roles found (teacher/admin): ${roles?.length}`, roles);
 
         if (!roles || roles.length === 0) return;
 
