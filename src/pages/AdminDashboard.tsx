@@ -454,14 +454,17 @@ const AdminDashboard = () => {
       }
 
       const periodsToSave = periods.map(p => ({
-        ...(p.id ? { id: p.id } : {}),
-        schedule_id: scheduleId,
+        id: p.id || crypto.randomUUID(),
+        schedule_id: scheduleId!,
         name: p.name,
         period_order: p.period_order,
         start_time: p.start_time,
         end_time: p.end_time,
         is_passing_period: p.is_passing_period
       }));
+
+      // Ensure scheduleId is a string for Typescript safety although we check it above
+      if (!scheduleId) return;
 
       if (periodsToSave.length > 0) {
         console.log("💾 Payload being sent to Supabase:", JSON.stringify(periodsToSave, null, 2));
