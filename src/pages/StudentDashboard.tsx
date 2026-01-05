@@ -344,10 +344,10 @@ const StudentDashboard = () => {
           {/* Period & Quota Row */}
           <StaggerItem>
             <div className="grid grid-cols-2 gap-4">
-              <GlassCard variant="frosted" className="p-4">
+              <GlassCard className="p-6 bg-slate-900/60 border-2 border-white/10 shadow-xl">
                 <PeriodDisplay />
               </GlassCard>
-              <GlassCard variant="frosted" className="p-4">
+              <GlassCard className="p-6 bg-slate-900/60 border-2 border-white/10 shadow-xl">
                 <QuotaDisplay />
               </GlassCard>
             </div>
@@ -552,7 +552,7 @@ const StudentDashboard = () => {
 
           {/* Pass History */}
           <StaggerItem>
-            <GlassCard variant="frosted" className="p-4">
+            <GlassCard className="p-6 bg-slate-900/60 border-2 border-white/10 shadow-xl">
               <PassHistory />
             </GlassCard>
           </StaggerItem>
