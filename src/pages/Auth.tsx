@@ -219,7 +219,7 @@ const Auth = () => {
                 >
                   <Sparkles className="w-10 h-10 text-primary-foreground" />
                 </motion.div>
-                <h1 className="text-4xl font-black tracking-tight mb-3">SmartPass</h1>
+                <h1 className="text-4xl font-black tracking-tight mb-3">ClassPass Pro</h1>
                 <p className="text-lg text-muted-foreground max-w-xs mx-auto">
                   Digital Hall Pass Management System for Modern Schools
                 </p>
@@ -232,7 +232,7 @@ const Auth = () => {
                  <div className="w-12 h-12 mb-3 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/30">
                   <Sparkles className="w-6 h-6 text-primary-foreground" />
                 </div>
-                <h1 className="text-2xl font-bold">SmartPass</h1>
+                <h1 className="text-2xl font-bold">ClassPass Pro</h1>
               </div>
 
               <Tabs defaultValue="login" className="space-y-6 w-full">

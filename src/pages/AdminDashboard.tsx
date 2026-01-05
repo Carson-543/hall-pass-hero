@@ -356,6 +356,42 @@ const AdminDashboard = () => {
     setPeriods([]);
   };
 
+  const generateDefaultPeriods = (): Period[] => {
+    const count = defaultPeriodCount || 7;
+    const generatedPeriods: Period[] = [];
+    
+    let currentTime = 8 * 60; // Start at 8:00 AM in minutes
+    const periodLength = 50; // 50 minute periods
+    const passingTime = 5; // 5 minute passing periods
+    
+    for (let i = 1; i <= count; i++) {
+      const startHour = Math.floor(currentTime / 60);
+      const startMin = currentTime % 60;
+      const endTime = currentTime + periodLength;
+      const endHour = Math.floor(endTime / 60);
+      const endMin = endTime % 60;
+      
+      generatedPeriods.push({
+        schedule_id: '',
+        name: `Period ${i}`,
+        period_order: i,
+        start_time: `${String(startHour).padStart(2, '0')}:${String(startMin).padStart(2, '0')}`,
+        end_time: `${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`,
+        is_passing_period: false
+      });
+      
+      currentTime = endTime + passingTime;
+    }
+    
+    return generatedPeriods;
+  };
+
+  const openNewSchedule = () => {
+    resetScheduleForm();
+    setPeriods(generateDefaultPeriods());
+    setScheduleDialogOpen(true);
+  };
+
   const openEditSchedule = (schedule: Schedule) => {
     console.log(`🔄 Opening editor for schedule: ${schedule.name}`);
     setEditingSchedule(schedule);
@@ -592,7 +628,7 @@ const AdminDashboard = () => {
                         School Schedule
                       </CardTitle>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="outline" onClick={() => { resetScheduleForm(); setScheduleDialogOpen(true); }}>
+                        <Button size="sm" variant="outline" onClick={openNewSchedule}>
                           <Plus className="h-4 w-4 mr-1" /> New Schedule Type
                         </Button>
                       </div>
@@ -731,7 +767,7 @@ const AdminDashboard = () => {
                         </div>
                       </div>
                     ))}
-                    <Button variant="outline" className="w-full border-dashed" onClick={() => { resetScheduleForm(); setScheduleDialogOpen(true); }}>
+                    <Button variant="outline" className="w-full border-dashed" onClick={openNewSchedule}>
                       <Plus className="h-4 w-4 mr-2" /> Create New Schedule
                     </Button>
                   </CardContent>
