@@ -121,7 +121,7 @@ export const FreezeIndicator = ({ classId }: FreezeIndicatorProps) => {
           <div className="relative p-3 rounded-full bg-gradient-to-br from-cyan-400/30 to-blue-500/30 border border-cyan-300/50 shadow-lg shadow-cyan-500/20">
             <Snowflake className="h-7 w-7 text-blue-800 animate-spin" style={{ animationDuration: '8s' }} />
             {/* Inner glow */}
-            <div className="absolute inset-0 rounded-full bg-cyan-400/40 blur-md" />
+            <div className="absolute inset-0 rounded-full bg-yellow-800 blur-md" />
 
           </div>
           <div className="flex-1">
