@@ -352,12 +352,8 @@ const StudentDashboard = () => {
                 >
                   <FloatingElement distance={5} duration={4}>
                     <GlassCard
-                      glow={activePass.status !== 'pending'}
-                      glowColor={
-                        (activePass.expected_return_at && isPast(new Date(activePass.expected_return_at)))
-                          ? 'destructive'
-                          : 'success'
-                      }
+                      glow
+                      glowColor="destructive"
                       className="relative overflow-hidden border-2 border-primary/30"
                     >
                       {/* Animated gradient background */}
