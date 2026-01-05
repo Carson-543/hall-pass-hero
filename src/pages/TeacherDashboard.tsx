@@ -7,6 +7,7 @@ import { ClassManagementDialog } from '@/components/teacher/ClassManagementDialo
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // Components
+import { PeriodDisplay } from '@/components/PeriodDisplay';
 import { TeacherHeader } from '@/components/teacher/TeacherHeader';
 import { TeacherControls } from '@/components/teacher/TeacherControls';
 import { RequestQueue } from '@/components/teacher/RequestQueue';
@@ -535,6 +536,10 @@ export const TeacherDashboard = () => {
     <PageTransition className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
       <div className="p-4 sm:p-6 pb-24 max-w-7xl mx-auto">
         <TeacherHeader signOut={signOut} />
+
+        <div className="mb-6">
+          <PeriodDisplay />
+        </div>
 
         <Tabs defaultValue="dashboard" className="space-y-6">
           <TabsList className="grid w-full max-w-sm grid-cols-2 rounded-xl bg-muted/50 p-1">
