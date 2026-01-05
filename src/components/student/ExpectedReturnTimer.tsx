@@ -43,9 +43,9 @@ export const ExpectedReturnTimer = ({ expectedReturnAt }: ExpectedReturnTimerPro
   const isWarning = timeRemaining < 60;
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${isWarning
-      ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
-      : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+    <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 shadow-lg ${isWarning
+      ? 'bg-amber-400 text-slate-950 border-white/40 animate-pulse'
+      : 'bg-blue-600/30 text-blue-400 border-white/20 backdrop-blur-md'
       }`}>
       {isWarning ? (
         <Timer className="h-4 w-4 animate-pulse" />

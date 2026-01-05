@@ -288,52 +288,52 @@ const StudentDashboard = () => {
   };
 
   return (
-    <PageTransition className="min-h-screen bg-slate-950 text-slate-100 selection:bg-red-500/30">
-      {/* Visual Background (Sync with Auth.tsx but in Red) */}
+    <PageTransition className="min-h-screen bg-slate-950 text-slate-100 selection:bg-blue-500/30">
+      {/* Visual Background (Sync with Auth.tsx - Pro Blue) */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute -top-1/4 -right-1/4 w-[80%] h-[80%] rounded-full bg-red-600/10 blur-[80px]"
+          className="absolute -top-1/4 -right-1/4 w-[80%] h-[80%] rounded-full bg-blue-600/15 blur-[100px]"
           style={{ willChange: "transform" }}
           animate={{
-            x: [0, 30, 0],
-            y: [0, -20, 0]
-          }}
-          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-        />
-        <motion.div
-          className="absolute -bottom-1/4 -left-1/4 w-[70%] h-[70%] rounded-full bg-red-400/5 blur-[70px]"
-          style={{ willChange: "transform" }}
-          animate={{
-            x: [0, -20, 0],
-            y: [0, 40, 0]
+            x: [0, 20, 0],
+            y: [0, -10, 0]
           }}
           transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
         />
-        <div className="absolute inset-0 bg-black/40" />
+        <motion.div
+          className="absolute -bottom-1/4 -left-1/4 w-[70%] h-[70%] rounded-full bg-blue-400/5 blur-[80px]"
+          style={{ willChange: "transform" }}
+          animate={{
+            x: [0, -15, 0],
+            y: [0, 25, 0]
+          }}
+          transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+        />
+        <div className="absolute inset-0 bg-black/60" />
       </div>
 
       <div className="relative z-10 p-4 max-w-2xl mx-auto pb-24">
         {/* Header */}
         <FadeIn>
-          <header className="flex items-center justify-between mb-8 pt-4">
+          <header className="flex items-center justify-between mb-10 pt-4">
             <div className="flex items-center gap-4">
               <motion.div
-                className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center shadow-lg shadow-red-500/30 border border-white/20"
+                className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-2xl shadow-blue-500/40 border-2 border-white/20"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <School className="w-6 h-6 text-white" />
+                <School className="w-7 h-7 text-white" />
               </motion.div>
               <div>
-                <h1 className="text-2xl font-black tracking-tight text-white leading-none mb-1">ClassPass <span className="text-red-500">Pro</span></h1>
-                <p className="text-sm text-slate-400 font-bold">{organization?.name}</p>
+                <h1 className="text-3xl font-black tracking-tighter text-white leading-none mb-1">ClassPass <span className="text-blue-500">Pro</span></h1>
+                <p className="text-sm text-slate-300 font-extrabold tracking-wide">{organization?.name}</p>
               </div>
             </div>
             <div className="flex gap-2">
-              <Button variant="ghost" size="icon" className="rounded-xl hover:bg-white/10 text-slate-300 hover:text-white" onClick={() => navigate('/settings')}>
+              <Button variant="ghost" size="icon" className="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/15 text-white shadow-sm" onClick={() => navigate('/settings')}>
                 <SettingsIcon className="h-5 w-5" />
               </Button>
-              <Button variant="ghost" size="icon" className="rounded-xl hover:bg-white/10 text-slate-300 hover:text-white" onClick={signOut}>
+              <Button variant="ghost" size="icon" className="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/15 text-white shadow-sm" onClick={signOut}>
                 <LogOut className="h-5 w-5" />
               </Button>
             </div>
@@ -373,37 +373,39 @@ const StudentDashboard = () => {
                     <GlassCard
                       glow
                       glowColor="primary"
-                      className="relative overflow-hidden border-2 border-red-500/40"
+                      className="relative overflow-hidden border-[3px] border-blue-600/50 bg-slate-900/40"
                     >
                       {/* Animated gradient background */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-red-600/10 via-transparent to-red-600/20 animate-pulse" />
+                      <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 via-transparent to-blue-600/30 animate-pulse" />
 
                       <div className="relative space-y-6">
                         {/* Header */}
                         <div className="flex items-start justify-between">
                           <div>
-                            <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-400 mb-2">
+                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400 mb-2">
                               Live Pass
                             </p>
-                            <h2 className="text-4xl font-black tracking-tight text-white">{activePass.destination}</h2>
-                            <p className="text-sm text-slate-400 font-bold mt-1">
-                              From: {activePass.class_name}
+                            <h2 className="text-5xl font-black tracking-tight text-white drop-shadow-sm">{activePass.destination}</h2>
+                            <p className="text-base text-slate-200 font-black mt-2 flex items-center gap-2">
+                              <span className="text-blue-500">at</span> {activePass.class_name}
                             </p>
                           </div>
                           <StatusBadge
                             status={activePass.status === 'pending' ? 'pending' : 'active'}
                             pulse
-                            className={activePass.status === 'approved' ? 'bg-red-600 border-red-500/50 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]' : ''}
+                            className={activePass.status === 'approved' ? 'bg-blue-600 border-2 border-white/30 text-white shadow-[0_0_20px_rgba(37,99,235,0.6)] px-4 py-1.5' : ''}
                           />
                         </div>
 
                         {/* Timer */}
                         {activePass.status === 'approved' && activePass.approved_at && (
-                          <div className="p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
+                          <div className="p-5 rounded-2xl bg-white/10 border-2 border-white/10 backdrop-blur-md shadow-inner">
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Clock className="w-5 h-5 text-red-500" />
-                                <span className="text-sm font-black text-slate-200 uppercase tracking-wider">Time Out</span>
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-xl bg-blue-600/20">
+                                  <Clock className="w-6 h-6 text-blue-400" />
+                                </div>
+                                <span className="text-sm font-black text-white uppercase tracking-[0.2em]">Time Out</span>
                               </div>
                               <ElapsedTimer startTime={activePass.approved_at} destination={activePass.destination} />
                             </div>
@@ -438,10 +440,10 @@ const StudentDashboard = () => {
                           <GlowButton
                             variant="primary"
                             size="lg"
-                            className="w-full bg-red-600 hover:bg-red-500 text-white shadow-red-500/30 border border-white/20"
+                            className="w-full h-16 text-xl font-black bg-blue-600 hover:bg-blue-500 text-white shadow-2xl shadow-blue-600/40 border-2 border-white/30 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98]"
                             onClick={handleCheckIn}
                           >
-                            <ArrowLeft className="w-5 h-5 mr-2" />
+                            <ArrowLeft className="w-6 h-6 mr-3" />
                             Check Back In
                           </GlowButton>
                         )}
@@ -457,25 +459,25 @@ const StudentDashboard = () => {
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <GlassCard hover3D className="space-y-6 border border-white/10">
-                    <div>
-                      <h2 className="text-xl font-black mb-1 text-white tracking-tight">Request Pass</h2>
-                      <p className="text-sm text-slate-400 font-bold">Select your class and destination</p>
+                  <GlassCard hover3D className="space-y-8 border-2 border-white/10 bg-slate-900/60 shadow-xl">
+                    <div className="border-b border-white/10 pb-4">
+                      <h2 className="text-2xl font-black text-white tracking-tighter">Request Pass</h2>
+                      <p className="text-sm text-slate-300 font-bold tracking-wide">Ready to go? Select your options below.</p>
                     </div>
 
                     {/* Class Selection */}
-                    <div className="space-y-2">
-                      <Label className="text-xs font-black uppercase tracking-[0.15em] text-slate-500">
-                        Class
+                    <div className="space-y-3">
+                      <Label className="text-xs font-black uppercase tracking-[0.2em] text-blue-400">
+                        Select Class
                       </Label>
                       <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-                        <SelectTrigger className="h-14 rounded-xl text-base font-bold bg-white/5 border-white/20 text-white focus:ring-red-500/50 transition-all hover:bg-white/10">
-                          <SelectValue placeholder="Select your class" />
+                        <SelectTrigger className="h-16 rounded-2xl text-lg font-black bg-white/10 border-2 border-white/20 text-white focus:ring-blue-500 transition-all hover:bg-white/20">
+                          <SelectValue placeholder="Which class are you in?" />
                         </SelectTrigger>
-                        <SelectContent className="bg-slate-900 border-white/20 text-white">
+                        <SelectContent className="bg-slate-900 border-2 border-white/20 text-white p-2">
                           {enrolledClasses.map(c => (
-                            <SelectItem key={c.id} value={c.id} className="text-base font-medium focus:bg-red-600 focus:text-white">
-                              <span className="font-black text-red-500">P{c.period_order}:</span> {c.name}
+                            <SelectItem key={c.id} value={c.id} className="text-base font-black p-3 rounded-xl focus:bg-blue-600 focus:text-white mb-1">
+                              <span className="text-blue-400 mr-2 uppercase tracking-tighter">P{c.period_order}</span> {c.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -483,11 +485,11 @@ const StudentDashboard = () => {
                     </div>
 
                     {/* Destination Grid */}
-                    <div className="space-y-2">
-                      <Label className="text-xs font-black uppercase tracking-[0.15em] text-slate-500">
+                    <div className="space-y-3">
+                      <Label className="text-xs font-black uppercase tracking-[0.2em] text-blue-400">
                         Destination
                       </Label>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-4">
                         {DESTINATIONS.map((dest, i) => {
                           const Icon = dest.icon;
                           const disabled = isDestinationDisabled(dest.id);
@@ -499,14 +501,14 @@ const StudentDashboard = () => {
                               onClick={() => !disabled && setSelectedDestination(dest.id)}
                               disabled={disabled}
                               className={`
-                                relative p-4 rounded-xl border-2 transition-all duration-300
-                                flex flex-col items-center gap-2
+                                relative p-6 rounded-2xl border-[3px] transition-all duration-300
+                                flex flex-col items-center gap-3
                                 overflow-hidden
                                 ${selected
-                                  ? 'border-red-500 bg-red-600/20 text-white shadow-[0_0_20px_rgba(220,38,38,0.2)]'
-                                  : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10 text-slate-400'
+                                  ? 'border-blue-500 bg-blue-600 text-white shadow-2xl shadow-blue-600/30 scale-[1.02]'
+                                  : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/15 text-white'
                                 }
-                                ${disabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
+                                ${disabled ? 'opacity-20 cursor-not-allowed grayscale' : 'cursor-pointer hover:translate-y-[-2px]'}
                               `}
                               whileHover={!disabled ? { scale: 1.02 } : undefined}
                               whileTap={!disabled ? { scale: 0.98 } : undefined}
@@ -515,8 +517,8 @@ const StudentDashboard = () => {
                               transition={{ delay: i * 0.05 }}
                             >
                               {disabled && <MiniSnowflakes />}
-                              <Icon className={`w-6 h-6 transition-colors duration-300 ${selected ? 'text-white' : 'text-slate-500'}`} />
-                              <span className={`text-sm font-black transition-colors duration-300 ${selected ? 'text-white' : 'text-slate-400'}`}>
+                              <Icon className={`w-8 h-8 transition-colors duration-300 ${selected ? 'text-white' : 'text-blue-400'}`} />
+                              <span className={`text-base font-black transition-colors duration-300 tracking-tight ${selected ? 'text-white' : 'text-slate-300'}`}>
                                 {dest.label}
                               </span>
                               {selected && (
@@ -534,7 +536,7 @@ const StudentDashboard = () => {
                     {/* Submit Button */}
                     <GlowButton
                       variant="primary"
-                      className="w-full bg-red-600 hover:bg-red-500 text-white shadow-red-500/30 border border-white/20"
+                      className="w-full h-16 text-xl font-black bg-blue-600 hover:bg-blue-500 text-white shadow-2xl shadow-blue-600/40 border-2 border-white/30 rounded-2xl transition-all hover:scale-[1.01] active:scale-[0.99] mt-4"
                       size="lg"
                       onClick={handleRequest}
                       loading={requestLoading}

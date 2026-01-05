@@ -47,11 +47,11 @@ export const ElapsedTimer = ({ startTime, destination, className, showWarning = 
   return (
     <div
       className={cn(
-        "flex items-center gap-2 text-sm font-black font-mono px-3 py-1 rounded-lg transition-all",
-        !showWarning && "bg-white/5 text-slate-400 border border-white/10",
-        showWarning && !isWarning && !isOverdue && "bg-red-600/20 text-red-400 border border-red-500/30",
-        showWarning && isWarning && "bg-amber-400 text-slate-900 shadow-[0_0_15px_rgba(251,191,36,0.3)]",
-        showWarning && isOverdue && "bg-red-600 text-white border border-red-500 shadow-[0_0_20px_rgba(220,38,38,0.4)] animate-pulse",
+        "flex items-center gap-2 text-base font-black font-mono px-4 py-2 rounded-xl border-2 transition-all shadow-lg",
+        !showWarning && "bg-white/10 text-slate-100 border-white/20 backdrop-blur-md",
+        showWarning && !isWarning && !isOverdue && "bg-blue-600/40 text-blue-100 border-blue-400/50 backdrop-blur-md",
+        showWarning && isWarning && "bg-amber-400 text-slate-950 border-white/40 animate-pulse",
+        showWarning && isOverdue && "bg-blue-600 text-white border-white/40 shadow-[0_0_30px_rgba(37,99,235,0.6)] animate-pulse",
         className
       )}
     >
@@ -63,8 +63,8 @@ export const ElapsedTimer = ({ startTime, destination, className, showWarning = 
         </>
       ) : (
         <>
-          <Clock className={cn("h-3.5 w-3.5", showWarning && !isWarning && !isOverdue ? "text-red-500" : "text-current")} />
-          <span>{formatElapsed(Math.max(0, elapsed))}</span>
+          <Clock className={cn("h-4 w-4", showWarning && !isWarning && !isOverdue ? "text-blue-400" : "text-current")} />
+          <span className="tracking-tighter">{formatElapsed(Math.max(0, elapsed))}</span>
         </>
       )}
     </div>

@@ -62,26 +62,29 @@ export const QueuePosition = ({ passId, classId, maxConcurrent = 2 }: QueuePosit
   const estimatedWait = position <= maxConcurrent ? 0 : (position - maxConcurrent) * 5;
 
   return (
-    <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/30">
+    <div className="p-5 rounded-2xl bg-blue-600/10 border-2 border-blue-500/40 shadow-xl shadow-blue-900/20">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-red-600/20 border border-red-500/20">
-            <Users className="h-5 w-5 text-red-500" />
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-2xl bg-blue-600/30 border-2 border-white/20 shadow-lg">
+            <Users className="h-6 w-6 text-blue-400" />
           </div>
           <div>
-            <p className="font-black text-red-500 text-sm tracking-tight">
-              Queue Position: #{position}
+            <p className="font-black text-blue-400 text-base tracking-tight mb-0.5">
+              Queue Position: <span className="text-white text-lg">#{position}</span>
             </p>
-            <p className="text-xs text-slate-400 font-bold">
-              Currently out: {activeCount}/{maxConcurrent}
+            <p className="text-xs text-slate-300 font-black uppercase tracking-widest">
+              Live: {activeCount}/{maxConcurrent} Out
             </p>
           </div>
         </div>
         {estimatedWait > 0 && (
           <div className="text-right">
-            <div className="flex items-center gap-1.5 text-slate-300">
-              <Clock className="h-3.5 w-3.5 text-red-500" />
-              <span className="text-xs font-black font-mono tracking-tighter">~{estimatedWait}m wait</span>
+            <div className="flex flex-col items-end">
+              <div className="flex items-center gap-1.5 text-blue-400">
+                <Clock className="h-4 w-4" />
+                <span className="text-sm font-black font-mono tracking-tighter">~{estimatedWait}m wait</span>
+              </div>
+              <span className="text-[10px] text-slate-500 font-black uppercase tracking-tighter">ESTIMATED</span>
             </div>
           </div>
         )}

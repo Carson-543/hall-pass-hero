@@ -48,8 +48,8 @@ export const PeriodDisplay = () => {
           <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">School starts in</p>
           <h3 className="text-lg font-black text-white">{nextPeriod.name}</h3>
         </div>
-        <div className="flex items-center gap-2 text-2xl font-black text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.2)]">
-          <Clock className="h-5 w-5" />
+        <div className="flex items-center gap-3 text-3xl font-black text-blue-500 drop-shadow-[0_0_15px_rgba(37,99,235,0.3)]">
+          <Clock className="h-6 w-6" />
           {formatTime(timeRemaining)}
         </div>
       </div>
@@ -66,15 +66,15 @@ export const PeriodDisplay = () => {
             </p>
             <h3 className="text-lg font-black text-white">{currentPeriod.name}</h3>
           </div>
-          <div className="flex items-center gap-2 text-2xl font-black text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.2)]">
-            <Clock className="h-5 w-5" />
+          <div className="flex items-center gap-3 text-3xl font-black text-blue-500 drop-shadow-[0_0_15px_rgba(37,99,235,0.3)]">
+            <Clock className="h-6 w-6" />
             {formatTime(timeRemaining)}
           </div>
         </div>
         {nextPeriod && (
-          <p className="text-xs font-black text-slate-500 flex items-center gap-1.5 uppercase tracking-wider">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500/50" />
-            Next: {nextPeriod.name}
+          <p className="text-xs font-black text-slate-400 flex items-center gap-1.5 uppercase tracking-widest">
+            <span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(37,99,235,0.4)]" />
+            Next Up: {nextPeriod.name}
           </p>
         )}
       </div>

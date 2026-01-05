@@ -101,7 +101,7 @@ export const PassHistory = () => {
     switch (status) {
       case 'approved':
       case 'pending_return':
-        return 'text-red-500';
+        return 'text-blue-500';
       case 'returned':
         return 'text-slate-500';
       case 'denied':
@@ -116,14 +116,14 @@ export const PassHistory = () => {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">Pass History</h3>
         <Select value={timeFilter} onValueChange={(v) => setTimeFilter(v as TimeFilter)}>
-          <SelectTrigger className="w-32 h-9 text-xs font-black bg-white/5 border-white/20 text-white rounded-lg focus:ring-red-500/50">
+          <SelectTrigger className="w-36 h-10 text-xs font-black bg-white/10 border-2 border-white/20 text-white rounded-xl focus:ring-blue-500 shadow-sm">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="bg-slate-900 border-white/20 text-white">
-            <SelectItem value="this_week" className="text-xs font-bold focus:bg-red-600">This Week</SelectItem>
-            <SelectItem value="last_week" className="text-xs font-bold focus:bg-red-600">Last Week</SelectItem>
-            <SelectItem value="this_month" className="text-xs font-bold focus:bg-red-600">This Month</SelectItem>
-            <SelectItem value="all" className="text-xs font-bold focus:bg-red-600">All Time</SelectItem>
+          <SelectContent className="bg-slate-900 border-2 border-white/20 text-white">
+            <SelectItem value="this_week" className="text-xs font-black focus:bg-blue-600">This Week</SelectItem>
+            <SelectItem value="last_week" className="text-xs font-black focus:bg-blue-600">Last Week</SelectItem>
+            <SelectItem value="this_month" className="text-xs font-black focus:bg-blue-600">This Month</SelectItem>
+            <SelectItem value="all" className="text-xs font-black focus:bg-blue-600">All Time</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -145,12 +145,12 @@ export const PassHistory = () => {
           {passes.map(pass => (
             <div
               key={pass.id}
-              className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors"
+              className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border-2 border-white/5 hover:border-white/20 hover:bg-white/10 transition-all shadow-sm"
             >
               <div>
-                <p className="font-black text-sm text-white tracking-tight">{pass.destination}</p>
-                <p className="text-[11px] font-bold text-slate-400 mt-0.5">
-                  {pass.class_name} • {format(new Date(pass.requested_at), 'MMM d, h:mm a')}
+                <p className="font-black text-base text-white tracking-tighter">{pass.destination}</p>
+                <p className="text-xs font-black text-slate-300 mt-1 flex items-center gap-2">
+                  <span className="text-blue-500 opacity-60">•</span> {pass.class_name} <span className="text-slate-500">•</span> {format(new Date(pass.requested_at), 'MMM d, h:mm a')}
                 </p>
               </div>
               <span className={`text-[11px] font-black uppercase tracking-wider ${getStatusColor(pass.status)}`}>
