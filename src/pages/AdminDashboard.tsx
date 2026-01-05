@@ -359,18 +359,18 @@ const AdminDashboard = () => {
   const generateDefaultPeriods = (): Period[] => {
     const count = defaultPeriodCount || 7;
     const generatedPeriods: Period[] = [];
-    
+
     let currentTime = 8 * 60; // Start at 8:00 AM in minutes
     const periodLength = 50; // 50 minute periods
     const passingTime = 5; // 5 minute passing periods
-    
+
     for (let i = 1; i <= count; i++) {
       const startHour = Math.floor(currentTime / 60);
       const startMin = currentTime % 60;
       const endTime = currentTime + periodLength;
       const endHour = Math.floor(endTime / 60);
       const endMin = endTime % 60;
-      
+
       generatedPeriods.push({
         schedule_id: '',
         name: `Period ${i}`,
@@ -379,10 +379,10 @@ const AdminDashboard = () => {
         end_time: `${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`,
         is_passing_period: false
       });
-      
+
       currentTime = endTime + passingTime;
     }
-    
+
     return generatedPeriods;
   };
 
@@ -405,6 +405,7 @@ const AdminDashboard = () => {
   const handleSaveSchedule = async () => {
     if (!newScheduleName.trim() || !organizationId) return;
     console.log(`🔄 Saving schedule: ${newScheduleName}`);
+    console.log("💾 Current periods state in AdminDashboard before save:", periods);
 
     let scheduleId = editingSchedule?.id;
 
