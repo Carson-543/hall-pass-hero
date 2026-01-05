@@ -78,12 +78,13 @@ const Auth = () => {
 
   if (loading || orgLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/30">
+      <div className="h-screen w-full flex bg-slate-950 items-center justify-center">
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          className="relative z-10"
         >
-          <Loader2 className="w-8 h-8 text-primary" />
+          <Loader2 className="w-8 h-8 text-primary shadow-glow" />
         </motion.div>
       </div>
     );
@@ -259,9 +260,9 @@ const Auth = () => {
       <div className="flex-1 flex flex-col justify-center items-center p-8 md:p-12 lg:p-24 bg-background relative z-20 overflow-y-auto">
         <motion.div
           className="w-full max-w-md"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
         >
           <div className="mb-10 text-center md:text-left">
             <h2 className="text-3xl font-black tracking-tight mb-2">Welcome Back</h2>
