@@ -202,33 +202,26 @@ const AdminDashboard = () => {
     if (!organizationId) return;
     console.log(`🔄 Fetching pending user approvals for: ${organizationId}`);
 
-    const { data: profiles, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, full_name, email')
-      .eq('organization_id', organizationId)
-      .eq('is_approved', false);
+    // Use RPC to fetch pending users with emails (securely from auth.users)
+    const { data, error } = await supabase
+      .rpc('get_organization_pending_users', { _org_id: organizationId });
 
-    if (profileError) console.error("❌ Error fetching pending profiles:", profileError);
-    if (!profiles || profiles.length === 0) {
+    if (error) {
+      console.error("❌ Error fetching pending users:", error);
+      return;
+    }
+
+    if (!data || data.length === 0) {
       setPendingUsers([]);
       return;
     }
 
-    const userIds = profiles.map(p => p.id);
-    const { data: roles, error: rolesError } = await supabase
-      .from('user_roles')
-      .select('user_id, role')
-      .in('user_id', userIds);
-
-    if (rolesError) console.error("❌ Error fetching user roles:", rolesError);
-    const roleMap = new Map(roles?.map(r => [r.user_id, r.role]) || []);
-
-    console.log(`📥 ${profiles.length} pending users found.`);
-    setPendingUsers(profiles.map(p => ({
-      id: p.id,
-      full_name: p.full_name,
-      email: p.email,
-      role: roleMap.get(p.id) ?? 'unknown'
+    console.log(`📥 ${data.length} pending users found.`);
+    setPendingUsers(data.map((u: any) => ({
+      id: u.id,
+      full_name: u.full_name,
+      email: u.email,
+      role: u.role
     })));
   };
 
