@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useCurrentPeriod } from '@/hooks/useCurrentPeriod';
 import { ClassManagementDialog } from '@/components/teacher/ClassManagementDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -86,6 +87,8 @@ export const TeacherDashboard = () => {
 
   const currentClass = classes.find(c => c.id === selectedClassId);
 
+  const { currentPeriod } = useCurrentPeriod();
+
   useEffect(() => {
     checkUser();
   }, []);
@@ -150,9 +153,25 @@ export const TeacherDashboard = () => {
       .order('period_order');
     if (data && data.length > 0) {
       setClasses(data);
-      if (!selectedClassId) setSelectedClassId(data[0].id);
+      // Don't set default here, let the useEffect with currentPeriod do it
     }
-  }, [profile, selectedClassId]);
+  }, [profile]);
+
+  // Auto-select class based on current period
+  useEffect(() => {
+    if (classes.length > 0 && !selectedClassId) {
+      if (currentPeriod) {
+        const matchingClass = classes.find(c => c.period_order === currentPeriod.period_order);
+        if (matchingClass) {
+          setSelectedClassId(matchingClass.id);
+          return;
+        }
+      }
+
+      // Fallback if no current period or no matching class
+      setSelectedClassId(classes[0].id);
+    }
+  }, [classes, currentPeriod, selectedClassId]);
 
   const signOut = async () => { await supabase.auth.signOut(); navigate('/auth'); };
 
