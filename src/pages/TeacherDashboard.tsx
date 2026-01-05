@@ -278,6 +278,22 @@ export const TeacherDashboard = () => {
     }
   };
 
+  const handleDeleteClass = async (classId: string) => {
+    const { error } = await supabase.from('classes').delete().eq('id', classId);
+    if (error) {
+      toast({ title: "Error", description: "Failed to delete class", variant: "destructive" });
+    } else {
+      toast({ title: "Class Deleted", description: "The class and all its data have been removed." });
+      const updatedClasses = classes.filter(c => c.id !== classId);
+      setClasses(updatedClasses);
+      if (updatedClasses.length > 0) {
+        setSelectedClassId(updatedClasses[0].id);
+      } else {
+        setSelectedClassId('');
+      }
+    }
+  };
+
   const fetchPasses = async () => {
     if (!selectedClassId) return;
     const { data: passes, error: passError } = await supabase
@@ -414,6 +430,7 @@ export const TeacherDashboard = () => {
                 currentClass={currentClass}
                 maxConcurrent={maxConcurrent}
                 onToggleAutoQueue={handleToggleAutoQueue}
+                onDeleteClass={handleDeleteClass}
               />
             </GlassCard>
           </StaggerItem>

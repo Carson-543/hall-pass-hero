@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Loader2, Snowflake, Bot } from 'lucide-react';
+import { Plus, Loader2, Snowflake, Bot, Trash2 } from 'lucide-react';
 
 interface ClassInfo {
     id: string;
@@ -31,6 +31,7 @@ interface TeacherControlsProps {
     currentClass: ClassInfo | undefined;
     onToggleAutoQueue?: (newMaxConcurrent?: number) => void;
     maxConcurrent: number;
+    onDeleteClass: (id: string) => void;
 }
 
 export const TeacherControls = ({
@@ -48,7 +49,8 @@ export const TeacherControls = ({
     onUnfreeze,
     currentClass,
     onToggleAutoQueue,
-    maxConcurrent
+    maxConcurrent,
+    onDeleteClass
 }: TeacherControlsProps) => {
     const [tempMaxConcurrent, setTempMaxConcurrent] = useState<string>('2');
 
@@ -94,6 +96,37 @@ export const TeacherControls = ({
                 >
                     <Plus className="h-6 w-6" />
                 </Button>
+
+                {selectedClassId && (
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-14 w-14 rounded-2xl bg-red-500/10 border-2 border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all shrink-0"
+                            >
+                                <Trash2 className="h-6 w-6" />
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="rounded-[2rem] bg-slate-900 border-white/10 text-white shadow-2xl">
+                            <AlertDialogHeader>
+                                <AlertDialogTitle className="text-2xl font-black">Delete Class?</AlertDialogTitle>
+                                <AlertDialogDescription className="text-slate-300 font-medium pt-2">
+                                    This will permanently remove <span className="text-white font-bold">{currentClass?.name}</span> and all associated hall pass history. This action cannot be undone.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter className="pt-4">
+                                <AlertDialogCancel className="rounded-xl bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={() => onDeleteClass(selectedClassId)}
+                                    className="rounded-xl bg-red-600 hover:bg-red-700 text-white font-black px-6"
+                                >
+                                    Delete Permanently
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                )}
             </div>
 
             {/* Controls Row - Only show if class selected */}
@@ -112,7 +145,7 @@ export const TeacherControls = ({
                                     className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-44 rounded-full border-2 shadow-lg ${!!activeFreeze ? 'bg-red-600 border-red-500 text-white' : 'bg-white/10 border-white/20 text-blue-400 hover:border-blue-400/50 hover:bg-white/15'}`}
                                     disabled={isFreezeLoading}
                                 >
-                                    <div className="absolute inset-y-0 left-0 flex items-center justify-center w-10">
+                                    <div className="absolute inset-0 flex items-center justify-center w-10 h-10">
                                         {isFreezeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Snowflake className={`h-4 w-4 ${activeFreeze ? 'animate-pulse' : ''}`} />}
                                     </div>
                                     <span className="ml-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[10px] font-black uppercase tracking-widest">
@@ -167,7 +200,7 @@ export const TeacherControls = ({
                                     variant="outline"
                                     className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-48 rounded-full border-2 shadow-lg ${currentClass?.is_queue_autonomous ? 'bg-blue-600 border-blue-500 text-white hover:bg-blue-700' : 'bg-white/10 border-white/20 text-slate-400 hover:border-blue-400/50 hover:bg-white/15'}`}
                                 >
-                                    <div className="absolute inset-y-0 left-0 flex items-center justify-center w-10">
+                                    <div className="absolute inset-0 flex items-center justify-center w-10 h-10">
                                         <Bot className={`h-4 w-4 ${currentClass?.is_queue_autonomous ? 'text-white' : ''}`} />
                                     </div>
                                     <span className="ml-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[10px] font-black uppercase tracking-widest">
