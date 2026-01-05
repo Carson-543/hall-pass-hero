@@ -12,6 +12,7 @@ interface ClassInfo {
     name: string;
     period_order: number;
     is_queue_autonomous?: boolean;
+    max_concurrent_bathroom?: number;
 }
 
 interface TeacherControlsProps {
@@ -58,10 +59,8 @@ export const TeacherControls = ({
     const handleToggle = () => {
         if (onToggleAutoQueue) {
             if (!currentClass?.is_queue_autonomous) {
-                // Enabling: pass the new limit
                 onToggleAutoQueue(parseInt(tempMaxConcurrent) || 2);
             } else {
-                // Disabling: no new limit needed
                 onToggleAutoQueue();
             }
         }
@@ -70,12 +69,12 @@ export const TeacherControls = ({
     return (
         <div className="flex flex-col gap-4">
             {/* Class Selector Row */}
-            <div className="flex gap-2 w-full">
+            <div className="flex gap-3 w-full">
                 <Select value={selectedClassId} onValueChange={onClassChange}>
-                    <SelectTrigger className="h-14 rounded-2xl bg-card border-none shadow-sm text-lg font-bold px-6 flex-1">
+                    <SelectTrigger className="h-14 rounded-2xl bg-white/10 border-2 border-white/20 shadow-xl text-lg font-bold px-6 flex-1 text-white hover:bg-white/15 transition-all">
                         <SelectValue placeholder="Select Class" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-slate-900 border-white/20 text-white rounded-2xl">
                         {classes.map(c => (
                             <SelectItem key={c.id} value={c.id}>
                                 Period {c.period_order}: {c.name}
@@ -86,18 +85,18 @@ export const TeacherControls = ({
                 <Button
                     size="icon"
                     variant="outline"
-                    className="h-14 w-14 rounded-2xl border-dashed shrink-0"
+                    className="h-14 w-14 rounded-2xl border-2 border-dashed border-white/20 bg-white/5 hover:bg-white/10 hover:border-blue-500/50 text-white transition-all shrink-0"
                     onClick={onAddClass}
                 >
-                    <Plus className="h-5 w-5" />
+                    <Plus className="h-6 w-6" />
                 </Button>
             </div>
 
             {/* Controls Row - Only show if class selected */}
             {selectedClassId && (
                 <div className="flex items-center justify-between gap-2 overflow-x-auto pb-2">
-                    <div className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground whitespace-nowrap hidden sm:block">
-                        Controls
+                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60 whitespace-nowrap hidden sm:block">
+                        Quick Controls
                     </div>
 
                     <div className="flex items-center gap-2 ml-auto">
@@ -106,50 +105,50 @@ export const TeacherControls = ({
                             <PopoverTrigger asChild>
                                 <Button
                                     variant={!!activeFreeze ? "destructive" : "outline"}
-                                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-44 rounded-full border shadow-sm ${!!activeFreeze ? 'bg-destructive text-destructive-foreground' : 'bg-background text-blue-500 hover:border-blue-300'}`}
+                                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-44 rounded-full border-2 shadow-lg ${!!activeFreeze ? 'bg-red-600 border-red-500 text-white' : 'bg-white/10 border-white/20 text-blue-400 hover:border-blue-400/50 hover:bg-white/15'}`}
                                     disabled={isFreezeLoading}
                                 >
                                     <div className="absolute left-0 flex items-center justify-center w-10 h-10">
                                         {isFreezeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Snowflake className={`h-4 w-4 ${activeFreeze ? 'animate-pulse' : ''}`} />}
                                     </div>
-                                    <span className="ml-8 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-xs font-bold uppercase tracking-tighter">
+                                    <span className="ml-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[10px] font-black uppercase tracking-widest">
                                         {activeFreeze ? "Unfreeze Queue" : "Freeze Controls"}
                                     </span>
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-72 rounded-3xl" align="end">
+                            <PopoverContent className="w-72 rounded-3xl bg-slate-900 border-white/20 text-white shadow-2xl" align="end">
                                 {activeFreeze ? (
                                     <div className="space-y-3 text-center p-2">
-                                        <p className="font-bold text-destructive">
+                                        <p className="font-bold text-red-500">
                                             {activeFreeze.freeze_type === 'bathroom' ? 'Restroom' : 'All'} Passes are Frozen
                                         </p>
-                                        <Button variant="destructive" className="w-full rounded-xl font-bold" onClick={onUnfreeze}>
+                                        <Button variant="destructive" className="w-full rounded-xl font-bold bg-red-600 hover:bg-red-700" onClick={onUnfreeze}>
                                             Unfreeze Now
                                         </Button>
                                     </div>
                                 ) : (
                                     <div className="space-y-4 p-2">
                                         <div className="space-y-2">
-                                            <Label className="text-[10px] font-bold uppercase text-muted-foreground">Freeze Type</Label>
+                                            <Label className="text-[10px] font-bold uppercase text-slate-400">Freeze Type</Label>
                                             <Select value={freezeType} onValueChange={(v) => onFreezeTypeChange(v as 'bathroom' | 'all')}>
-                                                <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
-                                                <SelectContent>
+                                                <SelectTrigger className="rounded-xl bg-white/5 border-white/10 text-white"><SelectValue /></SelectTrigger>
+                                                <SelectContent className="bg-slate-900 border-white/20 text-white">
                                                     <SelectItem value="bathroom">Restroom Only</SelectItem>
                                                     <SelectItem value="all">All Passes</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>
                                         <div className="space-y-2">
-                                            <Label className="text-[10px] font-bold uppercase text-muted-foreground">Timer (Minutes)</Label>
+                                            <Label className="text-[10px] font-bold uppercase text-slate-400">Timer (Minutes)</Label>
                                             <Input
                                                 type="number"
-                                                placeholder="Stay frozen until manually cleared"
+                                                placeholder="Manual clear"
                                                 value={timerMinutes}
                                                 onChange={(e) => onTimerChange(e.target.value)}
-                                                className="rounded-xl"
+                                                className="rounded-xl bg-white/5 border-white/10 text-white placeholder:text-slate-500"
                                             />
                                         </div>
-                                        <Button className="w-full font-bold rounded-xl" onClick={onFreeze}>
+                                        <Button className="w-full font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30" onClick={onFreeze}>
                                             Freeze Pass Queue
                                         </Button>
                                     </div>
@@ -162,23 +161,23 @@ export const TeacherControls = ({
                             <AlertDialogTrigger asChild>
                                 <Button
                                     variant="outline"
-                                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-48 rounded-full border shadow-sm ${currentClass?.is_queue_autonomous ? 'bg-purple-100 text-purple-700 border-purple-200 hover:border-purple-300' : 'bg-background text-muted-foreground'}`}
+                                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-48 rounded-full border-2 shadow-lg ${currentClass?.is_queue_autonomous ? 'bg-blue-600 border-blue-500 text-white' : 'bg-white/10 border-white/20 text-slate-400 hover:border-blue-400/50 hover:bg-white/15'}`}
                                 >
                                     <div className="absolute left-0 flex items-center justify-center w-10 h-10">
-                                        <Bot className={`h-4 w-4 ${currentClass?.is_queue_autonomous ? 'text-purple-600' : ''}`} />
+                                        <Bot className={`h-4 w-4 ${currentClass?.is_queue_autonomous ? 'text-white' : ''}`} />
                                     </div>
-                                    <span className="ml-8 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-xs font-bold uppercase tracking-tighter">
+                                    <span className="ml-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[10px] font-black uppercase tracking-widest">
                                         {currentClass?.is_queue_autonomous ? "Auto-Queue Active" : "Enable Auto-Queue"}
                                     </span>
                                 </Button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent className="rounded-3xl">
+                            <AlertDialogContent className="rounded-[2rem] bg-slate-900 border-white/10 text-white shadow-2xl">
                                 <AlertDialogHeader>
-                                    <AlertDialogTitle className="flex items-center gap-2">
-                                        <Bot className="h-5 w-5 text-purple-600" />
-                                        {currentClass?.is_queue_autonomous ? "Disable Autonomous Queue?" : "Enable Autonomous Queue?"}
+                                    <AlertDialogTitle className="flex items-center gap-2 text-2xl font-black">
+                                        <Bot className="h-6 w-6 text-blue-500" />
+                                        {currentClass?.is_queue_autonomous ? "Disable Auto-Queue?" : "Enable Auto-Queue?"}
                                     </AlertDialogTitle>
-                                    <AlertDialogDescription className="space-y-2 pt-2">
+                                    <AlertDialogDescription className="space-y-4 pt-2 text-slate-300 font-medium">
                                         <p>
                                             {currentClass?.is_queue_autonomous
                                                 ? "Turning this off will require you to manually approve every student request from now on. Existing approved passes will remain valid."
@@ -187,34 +186,43 @@ export const TeacherControls = ({
                                         {!currentClass?.is_queue_autonomous && (
                                             <>
                                                 <div className="space-y-2 pt-2">
-                                                    <Label>Max Concurrent Restroom Users</Label>
+                                                    <Label className="text-white font-bold">Max Concurrent Restroom Users</Label>
                                                     <Input
                                                         type="number"
                                                         min="1"
                                                         max="10"
                                                         value={tempMaxConcurrent}
                                                         onChange={(e) => setTempMaxConcurrent(e.target.value)}
-                                                        className="rounded-xl"
+                                                        className="rounded-xl bg-white/5 border-white/10 text-white h-12"
                                                     />
                                                 </div>
 
-                                                <div className="bg-muted/50 p-3 rounded-xl text-xs space-y-1 mt-2">
-                                                    <p className="font-bold">How it works:</p>
-                                                    <ul className="list-disc pl-4 space-y-0.5 text-muted-foreground">
-                                                        <li>If active passes {'<'} Limit ({tempMaxConcurrent}), request is approved instantly.</li>
-                                                        <li>If full, student joins the queue as "Pending".</li>
-                                                        <li>When a student returns, the next person in line is automatically approved.</li>
+                                                <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-2xl text-xs space-y-2 mt-2">
+                                                    <p className="font-bold text-blue-400 uppercase tracking-wider">How it works:</p>
+                                                    <ul className="space-y-1.5 text-slate-300">
+                                                        <li className="flex gap-2">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1 shrink-0" />
+                                                            <span>If active passes {'<'} Limit, request is approved instantly.</span>
+                                                        </li>
+                                                        <li className="flex gap-2">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1 shrink-0" />
+                                                            <span>If full, student joins the queue as "Pending".</span>
+                                                        </li>
+                                                        <li className="flex gap-2">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1 shrink-0" />
+                                                            <span>When a student returns, the next person is automatically approved.</span>
+                                                        </li>
                                                     </ul>
                                                 </div>
                                             </>
                                         )}
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+                                <AlertDialogFooter className="pt-4">
+                                    <AlertDialogCancel className="rounded-xl bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
                                     <AlertDialogAction
                                         onClick={handleToggle}
-                                        className={`rounded-xl font-bold ${currentClass?.is_queue_autonomous ? 'bg-destructive hover:bg-destructive/90' : 'bg-purple-600 hover:bg-purple-700'}`}
+                                        className={`rounded-xl font-black px-6 h-11 ${currentClass?.is_queue_autonomous ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} text-white shadow-lg`}
                                     >
                                         {currentClass?.is_queue_autonomous ? "Disable Auto-Queue" : "Yes, Enable It"}
                                     </AlertDialogAction>
