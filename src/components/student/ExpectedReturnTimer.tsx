@@ -44,8 +44,8 @@ export const ExpectedReturnTimer = ({ expectedReturnAt }: ExpectedReturnTimerPro
 
   return (
     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${isWarning
-        ? 'bg-amber-500/10 text-amber-600'
-        : 'bg-primary/10 text-primary'
+      ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
+      : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
       }`}>
       {isWarning ? (
         <Timer className="h-4 w-4 animate-pulse" />

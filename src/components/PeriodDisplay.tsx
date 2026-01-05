@@ -9,88 +9,75 @@ const formatTime = (seconds: number) => {
 };
 
 export const PeriodDisplay = () => {
-  const { 
-    currentPeriod, 
-    nextPeriod, 
-    timeRemaining, 
-    isSchoolDay, 
-    isBeforeSchool, 
+  const {
+    currentPeriod,
+    nextPeriod,
+    timeRemaining,
+    isSchoolDay,
+    isBeforeSchool,
     isAfterSchool,
-    loading 
+    loading
   } = useCurrentPeriod();
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="p-4">
-          <div className="animate-pulse h-16 bg-muted rounded" />
-        </CardContent>
-      </Card>
+      <div className="animate-pulse h-16 bg-white/5 rounded-xl" />
     );
   }
 
   if (!isSchoolDay) {
     return (
-      <Card>
-        <CardContent className="p-4 text-center">
-          <h3 className="text-lg font-semibold text-muted-foreground">No School Today</h3>
-        </CardContent>
-      </Card>
+      <div className="text-center py-2">
+        <h3 className="text-lg font-semibold text-slate-400">No School Today</h3>
+      </div>
     );
   }
 
   if (isAfterSchool) {
     return (
-      <Card>
-        <CardContent className="p-4 text-center">
-          <h3 className="text-lg font-semibold text-muted-foreground">School Day Ended</h3>
-        </CardContent>
-      </Card>
+      <div className="text-center py-2">
+        <h3 className="text-lg font-semibold text-slate-400">School Day Ended</h3>
+      </div>
     );
   }
 
   if (isBeforeSchool && nextPeriod) {
     return (
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">School starts in</p>
-              <h3 className="text-lg font-semibold">{nextPeriod.name}</h3>
-            </div>
-            <div className="flex items-center gap-2 text-2xl font-mono font-bold text-primary">
-              <Clock className="h-5 w-5" />
-              {formatTime(timeRemaining)}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">School starts in</p>
+          <h3 className="text-lg font-black text-white">{nextPeriod.name}</h3>
+        </div>
+        <div className="flex items-center gap-2 text-2xl font-black text-blue-400">
+          <Clock className="h-5 w-5" />
+          {formatTime(timeRemaining)}
+        </div>
+      </div>
     );
   }
 
   if (currentPeriod) {
     return (
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">
-                {currentPeriod.is_passing_period ? 'Passing Period' : 'Current Period'}
-              </p>
-              <h3 className="text-lg font-semibold">{currentPeriod.name}</h3>
-            </div>
-            <div className="flex items-center gap-2 text-2xl font-mono font-bold text-primary">
-              <Clock className="h-5 w-5" />
-              {formatTime(timeRemaining)}
-            </div>
-          </div>
-          {nextPeriod && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Next: {nextPeriod.name}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+              {currentPeriod.is_passing_period ? 'Passing Period' : 'Current Period'}
             </p>
-          )}
-        </CardContent>
-      </Card>
+            <h3 className="text-lg font-black text-white">{currentPeriod.name}</h3>
+          </div>
+          <div className="flex items-center gap-2 text-2xl font-black text-blue-400">
+            <Clock className="h-5 w-5" />
+            {formatTime(timeRemaining)}
+          </div>
+        </div>
+        {nextPeriod && (
+          <p className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500/50" />
+            Next: {nextPeriod.name}
+          </p>
+        )}
+      </div>
     );
   }
 

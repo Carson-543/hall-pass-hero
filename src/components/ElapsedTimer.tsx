@@ -47,11 +47,11 @@ export const ElapsedTimer = ({ startTime, destination, className, showWarning = 
   return (
     <div
       className={cn(
-        "flex items-center gap-2 text-sm font-mono px-2 py-1 rounded-full transition-all",
-        !showWarning && "bg-muted text-muted-foreground",
-        showWarning && !isWarning && !isOverdue && "bg-muted text-muted-foreground",
-        showWarning && isWarning && "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-        showWarning && isOverdue && "bg-destructive/10 text-destructive animate-pulse",
+        "flex items-center gap-2 text-sm font-black font-mono px-3 py-1 rounded-lg transition-all",
+        !showWarning && "bg-white/5 text-slate-400",
+        showWarning && !isWarning && !isOverdue && "bg-white/5 text-blue-400",
+        showWarning && isWarning && "bg-amber-400/10 text-amber-400 border border-amber-400/20",
+        showWarning && isOverdue && "bg-red-500/20 text-red-100 border border-red-500/30 animate-pulse",
         className
       )}
     >

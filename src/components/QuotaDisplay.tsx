@@ -6,45 +6,32 @@ export const QuotaDisplay = () => {
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-center">Weekly Restroom Passes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="animate-pulse h-8 bg-muted rounded w-3/4 mx-auto" />
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-500 text-center">Weekly Passes</p>
+        <div className="animate-pulse h-8 bg-white/5 rounded-xl w-3/4 mx-auto" />
+      </div>
     );
   }
 
   const boxes = Array.from({ length: weeklyLimit }, (_, i) => i < weeklyLimit - usedPasses);
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        {/* Centered the Title */}
-        <CardTitle className="text-sm font-medium text-center">Weekly Restroom Passes</CardTitle>
-      </CardHeader>
-      {/* Corrected "className" typo and centered content */}
-      <CardContent className="flex flex-col items-center justify-center">
-        {/* Added justify-center and flex-wrap for the boxes */}
-        <div className="flex flex-wrap gap-2 justify-center">
-          {boxes.map((available, i) => (
-            <div
-              key={i}
-              className={`w-8 h-8 rounded ${
-                available 
-                  ? 'bg-primary' 
-                  : 'bg-muted'
+    <div className="flex flex-col items-center justify-center space-y-3">
+      <p className="text-xs font-bold uppercase tracking-wider text-slate-500 text-center">Weekly Passes</p>
+      <div className="flex flex-wrap gap-1.5 justify-center">
+        {boxes.map((available, i) => (
+          <div
+            key={i}
+            className={`w-7 h-7 rounded-lg border transition-all duration-300 ${available
+                ? 'bg-blue-600 border-blue-400/30 shadow-lg shadow-blue-500/20'
+                : 'bg-white/5 border-white/10'
               }`}
-            />
-          ))}
-        </div>
-        {/* Added text-center to the text below */}
-        <p className="text-xs text-muted-foreground mt-3 text-center">
-          {Math.max(0, weeklyLimit - usedPasses)} passes remaining this week
-        </p>
-      </CardContent>
-    </Card>
+          />
+        ))}
+      </div>
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">
+        {Math.max(0, weeklyLimit - usedPasses)} Left
+      </p>
+    </div>
   );
 };
