@@ -151,47 +151,42 @@ const AdminDashboard = () => {
     if (!organizationId) return;
     console.log(`🔄 Fetching active passes for organization: ${organizationId}`);
 
-    // Get classes in this organization
-    const { data: orgClasses, error: classError } = await supabase
-      .from('classes')
-      .select('id')
-      .eq('organization_id', organizationId);
-
-    if (classError) console.error("❌ Error fetching classes:", classError);
-    if (!orgClasses || orgClasses.length === 0) {
-      console.log("ℹ️ No classes found for this organization.");
-      setActivePasses([]);
-      return;
-    }
-
-    const classIds = orgClasses.map(c => c.id);
-
+    // Simplified query using join to fetch passes for the current organization
     const { data: passes, error: passError } = await supabase
       .from('passes')
-      .select('id, student_id, destination, status, approved_at, class_id')
-      .in('class_id', classIds)
+      .select(`
+        id, 
+        student_id, 
+        destination, 
+        status, 
+        approved_at, 
+        class_id,
+        classes!inner(id, name, organization_id)
+      `)
+      .eq('classes.organization_id', organizationId)
       .in('status', ['approved', 'pending_return'])
       .order('approved_at', { ascending: true });
 
-    if (passError) console.error("❌ Error fetching passes:", passError);
+    if (passError) {
+      console.error("[AdminDashboard] Error fetching active passes:", passError);
+      return;
+    }
+
     if (!passes || passes.length === 0) {
-      console.log("ℹ️ No active hallway passes found.");
+      console.log("[AdminDashboard] No active passes found for this organization.");
       setActivePasses([]);
       return;
     }
 
-    console.log(`📥 ${passes.length} active passes found. Resolving names...`);
     const studentIds = [...new Set(passes.map(p => p.student_id))];
+    console.log(`[AdminDashboard] Resolving names for ${studentIds.length} students...`);
     const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', studentIds);
     const profileMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
-
-    const { data: classesData } = await supabase.from('classes').select('id, name').in('id', classIds);
-    const classMap = new Map(classesData?.map(c => [c.id, c.name]) || []);
 
     setActivePasses(passes.map(p => ({
       id: p.id,
       student_name: profileMap.get(p.student_id) ?? 'Unknown',
-      from_class: classMap.get(p.class_id) ?? 'Unknown',
+      from_class: (p.classes as any)?.name ?? 'Unknown',
       destination: p.destination,
       approved_at: p.approved_at,
       status: p.status
