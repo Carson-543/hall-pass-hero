@@ -416,7 +416,7 @@ const StudentDashboard = () => {
                         {/* Check In Button */}
                         {activePass.status === 'approved' && (
                           <GlowButton
-                            variant="success"
+                            variant="destructive"
                             size="lg"
                             className="w-full"
                             onClick={handleCheckIn}
