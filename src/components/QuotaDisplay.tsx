@@ -17,19 +17,19 @@ export const QuotaDisplay = () => {
 
   return (
     <div className="flex flex-col items-center justify-center space-y-3">
-      <p className="text-xs font-bold uppercase tracking-wider text-slate-500 text-center">Weekly Passes</p>
+      <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500 text-center">Weekly Passes</p>
       <div className="flex flex-wrap gap-1.5 justify-center">
         {boxes.map((available, i) => (
           <div
             key={i}
             className={`w-7 h-7 rounded-lg border transition-all duration-300 ${available
-                ? 'bg-blue-600 border-blue-400/30 shadow-lg shadow-blue-500/20'
-                : 'bg-white/5 border-white/10'
+              ? 'bg-red-600 border-red-500 shadow-lg shadow-red-500/30'
+              : 'bg-white/5 border-white/10'
               }`}
           />
         ))}
       </div>
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">
+      <p className="text-[10px] font-black text-red-500 uppercase tracking-[0.2em] text-center">
         {Math.max(0, weeklyLimit - usedPasses)} Left
       </p>
     </div>

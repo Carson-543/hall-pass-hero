@@ -62,26 +62,26 @@ export const QueuePosition = ({ passId, classId, maxConcurrent = 2 }: QueuePosit
   const estimatedWait = position <= maxConcurrent ? 0 : (position - maxConcurrent) * 5;
 
   return (
-    <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/20">
+    <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/30">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-blue-500/20">
-            <Users className="h-5 w-5 text-blue-400" />
+          <div className="p-2 rounded-xl bg-red-600/20 border border-red-500/20">
+            <Users className="h-5 w-5 text-red-500" />
           </div>
           <div>
-            <p className="font-bold text-blue-400 text-sm">
+            <p className="font-black text-red-500 text-sm tracking-tight">
               Queue Position: #{position}
             </p>
-            <p className="text-xs text-slate-500 font-medium">
+            <p className="text-xs text-slate-400 font-bold">
               Currently out: {activeCount}/{maxConcurrent}
             </p>
           </div>
         </div>
         {estimatedWait > 0 && (
           <div className="text-right">
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <Clock className="h-3.5 w-3.5" />
-              <span className="text-xs font-bold font-mono">~{estimatedWait}m wait</span>
+            <div className="flex items-center gap-1.5 text-slate-300">
+              <Clock className="h-3.5 w-3.5 text-red-500" />
+              <span className="text-xs font-black font-mono tracking-tighter">~{estimatedWait}m wait</span>
             </div>
           </div>
         )}

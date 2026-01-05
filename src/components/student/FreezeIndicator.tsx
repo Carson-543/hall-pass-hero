@@ -87,16 +87,16 @@ export const FreezeIndicator = ({ classId }: FreezeIndicatorProps) => {
   const isBathroomOnly = freeze.freeze_type === 'bathroom';
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border-2 border-cyan-500/30 bg-gradient-to-br from-cyan-900/20 via-blue-900/10 to-indigo-900/20 backdrop-blur-md animate-in fade-in duration-500">
+    <div className="relative overflow-hidden rounded-2xl border-2 border-red-500/40 bg-gradient-to-br from-red-950/30 via-slate-900/60 to-slate-900/80 backdrop-blur-md animate-in fade-in duration-500">
       {/* 1. Frosted glass overlay - Optimized for dark theme */}
-      <div className="absolute inset-0 bg-blue-500/10 pointer-events-none backdrop-blur-[1px]" />
+      <div className="absolute inset-0 bg-red-500/5 pointer-events-none backdrop-blur-[1px]" />
 
       {/* 2. Animated ice crystals */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(12)].map((_, i) => (
           <Snowflake
             key={i}
-            className="absolute text-cyan-200/20 animate-pulse"
+            className="absolute text-white/10 animate-pulse"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
@@ -111,33 +111,33 @@ export const FreezeIndicator = ({ classId }: FreezeIndicatorProps) => {
       </div>
 
       {/* 3. Pulsing border effect */}
-      <div className="absolute inset-0 rounded-2xl border-2 border-cyan-400/20 animate-pulse pointer-events-none" />
+      <div className="absolute inset-0 rounded-2xl border-2 border-red-500/30 animate-pulse pointer-events-none" />
 
       <div className="relative p-5">
         <div className="flex items-center gap-4">
           {/* Icon Container */}
-          <div className="relative p-3 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-white/10 shadow-lg shadow-cyan-900/40">
-            <Snowflake className="h-6 w-6 text-cyan-200 animate-spin" style={{ animationDuration: '10s' }} />
+          <div className="relative p-3 rounded-2xl bg-gradient-to-br from-red-600/20 to-slate-800/60 border border-white/20 shadow-lg shadow-red-950/50">
+            <Snowflake className="h-6 w-6 text-red-500 animate-spin" style={{ animationDuration: '10s' }} />
           </div>
 
           {/* Text Content */}
           <div className="flex-1">
             <p className="font-black text-xl text-white tracking-tight">
-              {isBathroomOnly ? 'Restroom Passes' : 'All Passes'} <span className="text-cyan-400">Frozen</span>
+              {isBathroomOnly ? 'Restroom' : 'All Passes'} <span className="text-red-500 shadow-sm">Frozen</span>
             </p>
 
             {timeRemaining !== null ? (
               <div className="flex items-center gap-2 mt-1">
-                <Timer className="h-4 w-4 text-cyan-400/70" />
-                <p className="text-cyan-200 font-mono text-xl font-black tracking-tighter">
+                <Timer className="h-4 w-4 text-red-500/80" />
+                <p className="text-red-300 font-mono text-xl font-black tracking-tighter">
                   {formatTime(timeRemaining)}
                 </p>
-                <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
+                <span className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em]">
                   remaining
                 </span>
               </div>
             ) : (
-              <p className="text-sm text-slate-400 font-bold mt-1">
+              <p className="text-sm text-slate-400 font-black mt-1">
                 Requests are temporarily paused
               </p>
             )}
@@ -145,7 +145,7 @@ export const FreezeIndicator = ({ classId }: FreezeIndicatorProps) => {
         </div>
 
         {/* Ice crack decorations - Subtler for dark theme */}
-        <svg className="absolute bottom-0 right-0 w-20 h-20 text-cyan-400/5 pointer-events-none" viewBox="0 0 100 100">
+        <svg className="absolute bottom-0 right-0 w-20 h-20 text-white/5 pointer-events-none" viewBox="0 0 100 100">
           <path d="M0 100 L30 70 L25 50 L40 30 L35 10 L50 0" fill="none" stroke="currentColor" strokeWidth="1" />
           <path d="M30 70 L45 75 L60 60" fill="none" stroke="currentColor" strokeWidth="1" />
         </svg>
@@ -154,7 +154,7 @@ export const FreezeIndicator = ({ classId }: FreezeIndicatorProps) => {
       {/* Shimmer Effect */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div
-          className="w-1/2 h-full bg-gradient-to-r from-transparent via-cyan-400/5 to-transparent"
+          className="w-1/2 h-full bg-gradient-to-r from-transparent via-red-500/10 to-transparent"
           style={{
             animation: 'shimmer-slide 4s infinite linear',
           }}
