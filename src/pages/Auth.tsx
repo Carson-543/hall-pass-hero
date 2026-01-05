@@ -216,8 +216,8 @@ const Auth = () => {
         <div className="relative z-10 flex flex-col items-center max-w-lg">
           <motion.div
             className="w-24 h-24 mb-10 rounded-[2.5rem] bg-gradient-to-br from-primary via-blue-500 to-primary flex items-center justify-center shadow-lg shadow-primary/20 border border-white/10"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             transition={{ duration: 0.4, ease: "easeOut", delay: 0.2 }}
             whileHover={{ scale: 1.05 }}
           >
@@ -225,8 +225,8 @@ const Auth = () => {
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
           >
             <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-6 text-white leading-none">
