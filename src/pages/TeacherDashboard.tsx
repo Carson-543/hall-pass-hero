@@ -318,29 +318,38 @@ export const TeacherDashboard = () => {
     if (!selectedClassId) return;
     console.log(`[TeacherDashboard] Fetching passes for class ${selectedClassId}`);
 
-    // Also fetch class settings for debug
-    const { data: classData } = await supabase.from('classes').select('is_queue_autonomous, max_concurrent_bathroom').eq('id', selectedClassId).single();
-    if (classData) {
-      console.log(`[TeacherDashboard] Class Autonomous: ${classData.is_queue_autonomous}`);
-    }
-
-    const { data } = await supabase
+    const { data: passes, error: passError } = await supabase
       .from('passes')
-      .select('id, student_id, class_id, destination, status, requested_at, approved_at, profiles:student_id(full_name)')
+      .select('id, student_id, class_id, destination, status, requested_at, approved_at')
       .eq('class_id', selectedClassId)
       .in('status', ['pending', 'approved', 'pending_return'])
       .order('requested_at', { ascending: true });
 
-    if (data) {
-      console.log(`[TeacherDashboard] Fetched ${data.length} active/pending passes`);
-      setPendingPasses(data.filter(p => p.status === 'pending').map(p => ({
+    if (passError) {
+      console.error("[TeacherDashboard] Error fetching passes:", passError);
+      return;
+    }
+
+    if (passes) {
+      console.log(`[TeacherDashboard] Fetched ${passes.length} active/pending passes. Resolving student names...`);
+
+      const studentIds = [...new Set(passes.map(p => p.student_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', studentIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
+
+      setPendingPasses(passes.filter(p => p.status === 'pending').map(p => ({
         ...p,
-        student_name: (p.profiles as { full_name: string })?.full_name || 'Unknown',
+        student_name: profileMap.get(p.student_id) || 'Unknown',
         is_quota_exceeded: false
       })) as PendingPass[]);
-      setActivePasses(data.filter(p => ['approved', 'pending_return'].includes(p.status)).map(p => ({
+
+      setActivePasses(passes.filter(p => ['approved', 'pending_return'].includes(p.status)).map(p => ({
         ...p,
-        student_name: (p.profiles as { full_name: string })?.full_name || 'Unknown',
+        student_name: profileMap.get(p.student_id) || 'Unknown',
       })) as ActivePass[]);
     }
   };
