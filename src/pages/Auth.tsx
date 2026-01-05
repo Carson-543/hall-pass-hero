@@ -192,26 +192,24 @@ const Auth = () => {
         {/* Animated Background Orbs for "Popping" effect */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div
-            className="absolute -top-1/4 -right-1/4 w-[80%] h-[80%] rounded-full bg-primary/20 blur-[120px]"
+            className="absolute -top-1/4 -right-1/4 w-[80%] h-[80%] rounded-full bg-primary/20 blur-[64px]"
+            style={{ willChange: "transform" }}
             animate={{
-              scale: [1, 1.2, 1],
-              opacity: [0.3, 0.6, 0.3],
-              x: [0, 50, 0],
-              y: [0, -30, 0]
+              x: [0, 30, 0],
+              y: [0, -20, 0]
             }}
-            transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
           />
           <motion.div
-            className="absolute -bottom-1/4 -left-1/4 w-[70%] h-[70%] rounded-full bg-blue-600/10 blur-[100px]"
+            className="absolute -bottom-1/4 -left-1/4 w-[70%] h-[70%] rounded-full bg-blue-600/10 blur-[60px]"
+            style={{ willChange: "transform" }}
             animate={{
-              scale: [1.2, 1, 1.2],
-              opacity: [0.2, 0.4, 0.2],
-              x: [0, -40, 0],
-              y: [0, 60, 0]
+              x: [0, -20, 0],
+              y: [0, 40, 0]
             }}
-            transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
+            transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
           />
-          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay pointer-events-none" />
+          <div className="absolute inset-0 bg-black/40 pointer-events-none" />
         </div>
 
         <div className="relative z-10 flex flex-col items-center max-w-lg">
