@@ -112,14 +112,14 @@ export const StudentHistoryDialog = ({
                             <p className="text-muted-foreground font-medium">No recent pass history found.</p>
                         </div>
                     ) : (
-                        <ScrollArea className="h-[450px] pr-6 relative z-10">
-                            <div className="space-y-6">
+                        <ScrollArea className="h-[450px] px-6 relative z-10">
+                            <div className="space-y-6 pl-4">
                                 {passes.map((pass) => (
                                     <div key={pass.id} className="relative pl-10 pb-6 border-l-2 border-primary/10 last:border-0 last:pb-0">
                                         {/* Timeline Marker */}
                                         <div className={`absolute left-[-13px] top-0 p-1.5 rounded-full border-4 border-background shadow-lg z-20 ${pass.status === 'returned' ? 'bg-success' :
-                                                pass.status === 'denied' ? 'bg-destructive' :
-                                                    'bg-primary'
+                                            pass.status === 'denied' ? 'bg-destructive' :
+                                                'bg-primary'
                                             }`}>
                                             <div className="text-white flex items-center justify-center">
                                                 {getStatusIcon(pass.status)}
@@ -139,8 +139,8 @@ export const StudentHistoryDialog = ({
                                                 </div>
                                                 <div className="flex flex-col items-end gap-2">
                                                     <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${pass.status === 'returned' ? 'bg-success/10 text-success border border-success/20' :
-                                                            pass.status === 'denied' ? 'bg-destructive/10 text-destructive border border-destructive/20' :
-                                                                'bg-primary/10 text-primary border border-primary/20'
+                                                        pass.status === 'denied' ? 'bg-destructive/10 text-destructive border border-destructive/20' :
+                                                            'bg-primary/10 text-primary border border-primary/20'
                                                         }`}>
                                                         {pass.status.replace('_', ' ')}
                                                     </span>
