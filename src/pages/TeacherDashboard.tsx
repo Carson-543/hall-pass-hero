@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useCurrentPeriod } from '@/hooks/useCurrentPeriod';
 import { ClassManagementDialog } from '@/components/teacher/ClassManagementDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { StudentHistoryDialog } from '@/components/teacher/StudentHistoryDialog';
 import { useOrganization } from '@/contexts/OrganizationContext';
 
 // Components
@@ -86,6 +87,8 @@ export const TeacherDashboard = () => {
   const [timerMinutes, setTimerMinutes] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [selectedStudentForHistory, setSelectedStudentForHistory] = useState<Student | null>(null);
 
   const currentClass = classes.find(c => c.id === selectedClassId);
 
@@ -567,7 +570,8 @@ export const TeacherDashboard = () => {
   };
 
   const handleViewHistory = (student: Student) => {
-    toast({ title: "History feature coming soon", description: `Viewing history for ${student.name}` });
+    setSelectedStudentForHistory(student);
+    setHistoryDialogOpen(true);
   };
 
   if (loading) {
@@ -688,6 +692,13 @@ export const TeacherDashboard = () => {
           organizationId={organizationId}
           editingClass={null}
           onSaved={() => { fetchClasses(profile?.id); toast({ title: "Class Saved" }); }}
+        />
+
+        <StudentHistoryDialog
+          open={historyDialogOpen}
+          onOpenChange={setHistoryDialogOpen}
+          studentId={selectedStudentForHistory?.id || null}
+          studentName={selectedStudentForHistory?.name || null}
         />
       </div>
     </PageTransition>
