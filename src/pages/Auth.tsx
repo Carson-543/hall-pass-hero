@@ -214,13 +214,13 @@ const Auth = () => {
 
         <div className="relative z-10 flex flex-col items-center max-w-lg">
           <motion.div
-            className="w-24 h-24 mb-10 rounded-[2.5rem] bg-gradient-to-br from-primary via-blue-500 to-primary flex items-center justify-center shadow-[0_0_50px_-12px_rgba(59,130,246,0.5)] border border-white/10"
-            initial={{ scale: 0.5, opacity: 0, rotate: -20 }}
-            animate={{ scale: 1, opacity: 1, rotate: 0 }}
-            transition={{ type: "spring", damping: 15, stiffness: 200, delay: 0.2 }}
-            whileHover={{ scale: 1.1, rotate: 5 }}
+            className="w-24 h-24 mb-10 rounded-[2.5rem] bg-gradient-to-br from-primary via-blue-500 to-primary flex items-center justify-center shadow-lg shadow-primary/20 border border-white/10"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4, ease: "easeOut", delay: 0.2 }}
+            whileHover={{ scale: 1.05 }}
           >
-            <School className="w-12 h-12 text-white drop-shadow-glow" />
+            <School className="w-12 h-12 text-white" />
           </motion.div>
 
           <motion.div
