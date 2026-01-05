@@ -152,6 +152,7 @@ export const TeacherDashboard = () => {
       .eq('teacher_id', uid)
       .order('period_order');
     if (data && data.length > 0) {
+      console.log(`[TeacherDashboard] Found ${data.length} classes for teacher`);
       setClasses(data);
       // Don't set default here, let the useEffect with currentPeriod do it
     }
@@ -384,8 +385,13 @@ export const TeacherDashboard = () => {
       .from('passes')
       .update({ status: 'approved', approved_at: new Date().toISOString() })
       .eq('id', passId);
-    if (error) toast({ title: "Error", description: "Failed to approve pass", variant: "destructive" });
-    else toast({ title: "Pass Approved" });
+    if (error) {
+      console.error("[TeacherDashboard] Error approving pass:", error);
+      toast({ title: "Error", description: "Failed to approve pass", variant: "destructive" });
+    } else {
+      console.log(`[TeacherDashboard] Pass ${passId} approved`);
+      toast({ title: "Pass Approved" });
+    }
     fetchPasses();
   };
 
@@ -394,8 +400,13 @@ export const TeacherDashboard = () => {
       .from('passes')
       .update({ status: 'denied', denied_at: new Date().toISOString() })
       .eq('id', passId);
-    if (error) toast({ title: "Error", description: "Failed to deny pass", variant: "destructive" });
-    else toast({ title: "Pass Denied" });
+    if (error) {
+      console.error("[TeacherDashboard] Error denying pass:", error);
+      toast({ title: "Error", description: "Failed to deny pass", variant: "destructive" });
+    } else {
+      console.log(`[TeacherDashboard] Pass ${passId} denied`);
+      toast({ title: "Pass Denied" });
+    }
     fetchPasses();
   };
 
@@ -431,10 +442,12 @@ export const TeacherDashboard = () => {
       .eq('id', passId);
 
     if (error) {
+      console.error("[TeacherDashboard] Error checking in student:", error);
       toast({ title: "Error", description: "Failed to return pass", variant: "destructive" });
       return;
     }
 
+    console.log(`[TeacherDashboard] Student checked in for pass ${passId}`);
     toast({ title: "Welcome Back!", description: "Student checked in." });
 
     // 2. Refresh local state & Trigger Auto-Advance

@@ -219,12 +219,18 @@ const StudentDashboard = () => {
 
   const handleRequest = async () => {
     if (!user?.id || !selectedClassId || !selectedDestination) return;
-    setRequestLoading(true);
-    await supabase.from('passes').insert({
+    const { error } = await supabase.from('passes').insert({
       student_id: user.id,
       class_id: selectedClassId,
       destination: selectedDestination
     });
+
+    if (error) {
+      console.error("[StudentDashboard] Error requesting pass:", error);
+    } else {
+      console.log(`[StudentDashboard] Pass requested to ${selectedDestination}`);
+    }
+
     setRequestLoading(false);
     fetchActivePass();
   };
@@ -235,7 +241,10 @@ const StudentDashboard = () => {
     const { error } = await supabase.rpc('student_check_in', { p_pass_id: activePass.id });
 
     if (error) {
+      console.error("[StudentDashboard] Error checking in:", error);
       toast({ title: "Error checking in", description: error.message, variant: "destructive" });
+    } else {
+      console.log(`[StudentDashboard] Student checked in pass ${activePass.id}`);
     }
   };
 
@@ -248,8 +257,11 @@ const StudentDashboard = () => {
       .eq('status', 'pending');
 
     if (!error) {
+      console.log(`[StudentDashboard] Pending request ${activePass.id} cancelled`);
       toast({ title: 'Request Cancelled' });
       setActivePass(null);
+    } else {
+      console.error("[StudentDashboard] Error cancelling request:", error);
     }
   };
 

@@ -109,7 +109,7 @@ const AdminDashboard = () => {
   // Load settings from organization context
   useEffect(() => {
     if (settings) {
-      console.log("⚙️ Loading organization settings into admin state:", settings);
+      console.log("[AdminDashboard] Loading organization settings into state:", settings);
       setWeeklyQuota(settings.weekly_bathroom_limit);
       setDefaultPeriodCount(settings.default_period_count);
 
@@ -515,10 +515,10 @@ const AdminDashboard = () => {
       channelRef.current = supabase
         .channel('admin-passes')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'passes' }, (payload) => {
-          console.log("🔔 Global pass update received:", payload);
+          console.log("[AdminDashboard] Global pass update received:", payload);
           fetchActivePasses();
         })
-        .subscribe((status) => console.log("📡 Admin channel status:", status));
+        .subscribe((status) => console.log(`[AdminDashboard] Admin channel status: ${status}`));
     }
 
     return () => {
