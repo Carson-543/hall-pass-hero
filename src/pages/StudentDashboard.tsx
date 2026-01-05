@@ -158,15 +158,18 @@ const StudentDashboard = () => {
   }, [fetchEnrolledClasses, fetchActivePass]);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || !activePass) return;
+
+    // We only subscribe if we have an active pass
     const channelName = `student-pass-${user.id}`;
-    console.log(`[StudentDashboard] Subscribing to: ${channelName}`);
+    console.log(`[StudentDashboard] Subscribing to: ${channelName} (Active Pass: ${activePass.id})`);
 
     const channel = supabase
       .channel(channelName)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'passes', filter: `student_id=eq.${user.id}` },
         (payload) => {
           console.log('[StudentDashboard] Pass update:', payload);
+          // Refresh active pass logic
           fetchActivePass();
           if (payload.eventType === 'UPDATE' && ['returned', 'completed', 'denied'].includes((payload.new as any).status)) {
             refreshQuota();
@@ -175,11 +178,12 @@ const StudentDashboard = () => {
       .subscribe((status) => {
         console.log(`[StudentDashboard] Channel ${channelName} status: ${status}`);
       });
+
     return () => {
       console.log(`[StudentDashboard] Unsubscribing from: ${channelName}`);
       supabase.removeChannel(channel);
     };
-  }, [user?.id, fetchActivePass, refreshQuota]);
+  }, [user?.id, activePass?.id, fetchActivePass, refreshQuota]);
 
   useEffect(() => {
     if (!selectedClassId) return;

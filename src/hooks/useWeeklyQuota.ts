@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -8,7 +8,7 @@ export const useWeeklyQuota = () => {
   const [usedPasses, setUsedPasses] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const fetchQuotaData = async () => {
+  const fetchQuotaData = useCallback(async () => {
     if (!user) return;
 
     // Get weekly limit setting
@@ -41,11 +41,11 @@ export const useWeeklyQuota = () => {
 
     setUsedPasses(count ?? 0);
     setLoading(false);
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchQuotaData();
-  }, [user]);
+  }, [fetchQuotaData]);
 
   return {
     weeklyLimit,
