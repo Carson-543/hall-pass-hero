@@ -125,19 +125,19 @@ export const FreezeIndicator = ({ classId }: FreezeIndicatorProps) => {
 
           </div>
           <div className="flex-1">
-            <p className="font-bold text-lg text-cyan-100 drop-shadow-md">
-              {isBathroomOnly ? '🚽 Bathroom Passes' : '🔒 All Passes'} Frozen
+            <p className="font-bold text-lg text-blue-800 drop-shadow-md">
+              {isBathroomOnly ? 'Restroom Passes' : '🔒 All Passes'} Frozen
             </p>
             {timeRemaining !== null ? (
               <div className="flex items-center gap-2 mt-1">
-                <Timer className="h-4 w-4 text-cyan-300" />
-                <p className="text-cyan-200 font-mono text-lg font-bold tracking-wider">
+                <Timer className="h-4 w-4 text-blue-800" />
+                <p className="text-blue-800 font-mono text-lg font-bold tracking-wider">
                   {formatTime(timeRemaining)}
                 </p>
-                <span className="text-cyan-300/80 text-sm">remaining</span>
+                <span className="text-blue-800/80 text-sm">remaining</span>
               </div>
             ) : (
-              <p className="text-sm text-cyan-200/80 mt-1">
+              <p className="text-sm text-blue-800/80 mt-1">
                 Your teacher has temporarily paused pass requests
               </p>
             )}
