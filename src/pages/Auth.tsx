@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { GlassCard } from '@/components/ui/glass-card';
 import { GlowButton } from '@/components/ui/glow-button';
 import { z } from 'zod';
-import { Loader2, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Loader2, Eye, EyeOff, School } from 'lucide-react';
 
 const emailSchema = z.string().email('Invalid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
@@ -186,9 +186,9 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col md:flex-row bg-background overflow-hidden relative">
+    <div className="min-h-screen md:h-screen w-full flex flex-col md:flex-row bg-background overflow-hidden relative">
       {/* Left Panel: Visual/Branding - Full Screen on Desktop */}
-      <div className="relative w-full md:w-1/2 lg:w-[60%] bg-slate-950 flex flex-col items-center justify-center p-8 md:p-24 text-center overflow-hidden border-b md:border-b-0 md:border-r border-white/5">
+      <div className="relative w-full md:w-1/2 lg:w-[60%] h-auto md:h-full bg-slate-950 flex flex-col items-center justify-center p-8 md:p-24 text-center overflow-hidden border-b md:border-b-0 md:border-r border-white/5 shrink-0">
         {/* Animated Background Orbs for "Popping" effect */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div
@@ -222,7 +222,7 @@ const Auth = () => {
             transition={{ type: "spring", damping: 15, stiffness: 200, delay: 0.2 }}
             whileHover={{ scale: 1.1, rotate: 5 }}
           >
-            <Sparkles className="w-12 h-12 text-white drop-shadow-glow" />
+            <School className="w-12 h-12 text-white drop-shadow-glow" />
           </motion.div>
 
           <motion.div
@@ -230,8 +230,8 @@ const Auth = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <h1 className="text-5xl md:text-7xl font-black tracking-tighter mb-6 text-white leading-none">
-              ClassPass <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-blue-600">Pro</span>
+            <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-6 text-white leading-none">
+              ClassPass <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-blue-600 px-1">Pro</span>
             </h1>
             <p className="text-xl md:text-2xl text-slate-400 font-medium max-w-md mx-auto leading-relaxed">
               The next generation of <span className="text-white font-bold">digital hall pass</span> management for modern schools.
@@ -258,7 +258,7 @@ const Auth = () => {
       </div>
 
       {/* Right Panel: Auth Form */}
-      <div className="flex-1 flex flex-col justify-center items-center p-8 md:p-12 lg:p-24 bg-background relative z-20">
+      <div className="flex-1 flex flex-col justify-center items-center p-8 md:p-12 lg:p-24 bg-background relative z-20 overflow-y-auto">
         <motion.div
           className="w-full max-w-md"
           initial={{ opacity: 0, x: 20 }}
@@ -412,10 +412,7 @@ const Auth = () => {
           </Tabs>
         </motion.div>
 
-        {/* Footer info */}
-        <p className="mt-12 text-sm text-muted-foreground font-medium text-center">
-          &copy; {new Date().getFullYear()} ClassPass Pro. All rights reserved.
-        </p>
+
       </div>
 
       <Dialog open={forgotPasswordOpen} onOpenChange={setForgotPasswordOpen}>
