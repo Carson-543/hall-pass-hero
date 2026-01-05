@@ -14,7 +14,7 @@ export const ExpectedReturnTimer = ({ expectedReturnAt }: ExpectedReturnTimerPro
     const updateTimer = () => {
       const target = new Date(expectedReturnAt);
       const remaining = differenceInSeconds(target, new Date());
-      
+
       if (remaining <= 0) {
         setIsOverdue(true);
         setTimeRemaining(Math.abs(remaining));
@@ -36,25 +36,17 @@ export const ExpectedReturnTimer = ({ expectedReturnAt }: ExpectedReturnTimerPro
   };
 
   if (isOverdue) {
-    return (
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-destructive/10 text-destructive">
-        <AlertTriangle className="h-4 w-4 animate-pulse" />
-        <span className="text-sm font-semibold">
-          Overdue by {formatTime(timeRemaining)}
-        </span>
-      </div>
-    );
+    return null;
   }
 
   // Warning when less than 1 minute remaining
   const isWarning = timeRemaining < 60;
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${
-      isWarning 
-        ? 'bg-amber-500/10 text-amber-600' 
+    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${isWarning
+        ? 'bg-amber-500/10 text-amber-600'
         : 'bg-primary/10 text-primary'
-    }`}>
+      }`}>
       {isWarning ? (
         <Timer className="h-4 w-4 animate-pulse" />
       ) : (

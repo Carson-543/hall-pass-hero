@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { isPast } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -351,8 +352,12 @@ const StudentDashboard = () => {
                 >
                   <FloatingElement distance={5} duration={4}>
                     <GlassCard
-                      glow
-                      glowColor={activePass.status === 'approved' ? 'success' : 'warning'}
+                      glow={activePass.status !== 'pending'}
+                      glowColor={
+                        (activePass.expected_return_at && isPast(new Date(activePass.expected_return_at)))
+                          ? 'destructive'
+                          : 'success'
+                      }
                       className="relative overflow-hidden border-2 border-primary/30"
                     >
                       {/* Animated gradient background */}
