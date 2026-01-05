@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -27,7 +28,7 @@ interface TeacherControlsProps {
     onFreeze: () => void;
     onUnfreeze: () => void;
     currentClass: ClassInfo | undefined;
-    onToggleAutoQueue?: () => void;
+    onToggleAutoQueue?: (newMaxConcurrent?: number) => void;
     maxConcurrent: number;
 }
 
@@ -48,6 +49,24 @@ export const TeacherControls = ({
     onToggleAutoQueue,
     maxConcurrent
 }: TeacherControlsProps) => {
+    const [tempMaxConcurrent, setTempMaxConcurrent] = useState<string>('2');
+
+    useEffect(() => {
+        setTempMaxConcurrent(maxConcurrent.toString());
+    }, [maxConcurrent]);
+
+    const handleToggle = () => {
+        if (onToggleAutoQueue) {
+            if (!currentClass?.is_queue_autonomous) {
+                // Enabling: pass the new limit
+                onToggleAutoQueue(parseInt(tempMaxConcurrent) || 2);
+            } else {
+                // Disabling: no new limit needed
+                onToggleAutoQueue();
+            }
+        }
+    };
+
     return (
         <div className="flex flex-col gap-4">
             {/* Class Selector Row */}
@@ -102,7 +121,7 @@ export const TeacherControls = ({
                                 {activeFreeze ? (
                                     <div className="space-y-3 text-center p-2">
                                         <p className="font-bold text-destructive">
-                                            {activeFreeze.freeze_type === 'bathroom' ? 'Bathroom' : 'All'} Passes are Frozen
+                                            {activeFreeze.freeze_type === 'bathroom' ? 'Restroom' : 'All'} Passes are Frozen
                                         </p>
                                         <Button variant="destructive" className="w-full rounded-xl font-bold" onClick={onUnfreeze}>
                                             Unfreeze Now
@@ -115,7 +134,7 @@ export const TeacherControls = ({
                                             <Select value={freezeType} onValueChange={(v) => onFreezeTypeChange(v as 'bathroom' | 'all')}>
                                                 <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="bathroom">Bathroom Only</SelectItem>
+                                                    <SelectItem value="bathroom">Restroom Only</SelectItem>
                                                     <SelectItem value="all">All Passes</SelectItem>
                                                 </SelectContent>
                                             </Select>
@@ -166,21 +185,35 @@ export const TeacherControls = ({
                                                 : "When enabled, the system will automatically approve student restroom requests if there is space available."}
                                         </p>
                                         {!currentClass?.is_queue_autonomous && (
-                                            <div className="bg-muted/50 p-3 rounded-xl text-xs space-y-1">
-                                                <p className="font-bold">How it works:</p>
-                                                <ul className="list-disc pl-4 space-y-0.5 text-muted-foreground">
-                                                    <li>If active passes {'<'} Limit ({maxConcurrent}), request is approved instantly.</li>
-                                                    <li>If full, student joins the queue as "Pending".</li>
-                                                    <li>When a student returns, the next person in line is automatically approved.</li>
-                                                </ul>
-                                            </div>
+                                            <>
+                                                <div className="space-y-2 pt-2">
+                                                    <Label>Max Concurrent Restroom Users</Label>
+                                                    <Input
+                                                        type="number"
+                                                        min="1"
+                                                        max="10"
+                                                        value={tempMaxConcurrent}
+                                                        onChange={(e) => setTempMaxConcurrent(e.target.value)}
+                                                        className="rounded-xl"
+                                                    />
+                                                </div>
+
+                                                <div className="bg-muted/50 p-3 rounded-xl text-xs space-y-1 mt-2">
+                                                    <p className="font-bold">How it works:</p>
+                                                    <ul className="list-disc pl-4 space-y-0.5 text-muted-foreground">
+                                                        <li>If active passes {'<'} Limit ({tempMaxConcurrent}), request is approved instantly.</li>
+                                                        <li>If full, student joins the queue as "Pending".</li>
+                                                        <li>When a student returns, the next person in line is automatically approved.</li>
+                                                    </ul>
+                                                </div>
+                                            </>
                                         )}
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                     <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
                                     <AlertDialogAction
-                                        onClick={onToggleAutoQueue}
+                                        onClick={handleToggle}
                                         className={`rounded-xl font-bold ${currentClass?.is_queue_autonomous ? 'bg-destructive hover:bg-destructive/90' : 'bg-purple-600 hover:bg-purple-700'}`}
                                     >
                                         {currentClass?.is_queue_autonomous ? "Disable Auto-Queue" : "Yes, Enable It"}

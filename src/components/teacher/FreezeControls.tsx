@@ -92,8 +92,8 @@ export const FreezeControls = ({ classId, teacherId }: FreezeControlsProps) => {
 
   const handleFreeze = async () => {
     setLoading(true);
-    
-    const endsAt = timerMinutes 
+
+    const endsAt = timerMinutes
       ? addMinutes(new Date(), parseInt(timerMinutes)).toISOString()
       : null;
 
@@ -110,7 +110,7 @@ export const FreezeControls = ({ classId, teacherId }: FreezeControlsProps) => {
     if (error) {
       toast({ title: 'Error', description: 'Failed to freeze passes', variant: 'destructive' });
     } else {
-      toast({ title: freezeType === 'bathroom' ? 'Bathroom Passes Frozen' : 'All Passes Frozen' });
+      toast({ title: freezeType === 'bathroom' ? 'Restroom Passes Frozen' : 'All Passes Frozen' });
     }
 
     setTimerMinutes('');
@@ -148,7 +148,7 @@ export const FreezeControls = ({ classId, teacherId }: FreezeControlsProps) => {
               </div>
               <div>
                 <p className="font-semibold text-destructive">
-                  {activeFreeze.freeze_type === 'bathroom' ? 'Bathroom' : 'All'} Passes Frozen
+                  {activeFreeze.freeze_type === 'bathroom' ? 'Restroom' : 'All'} Passes Frozen
                 </p>
                 {timeRemaining !== null && (
                   <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -158,9 +158,9 @@ export const FreezeControls = ({ classId, teacherId }: FreezeControlsProps) => {
                 )}
               </div>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleUnfreeze}
               className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
             >
@@ -213,8 +213,8 @@ export const FreezeControls = ({ classId, teacherId }: FreezeControlsProps) => {
             </p>
           </div>
 
-          <Button 
-            className="w-full" 
+          <Button
+            className="w-full"
             onClick={handleFreeze}
             disabled={loading}
           >

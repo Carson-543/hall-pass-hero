@@ -252,25 +252,25 @@ export const TeacherDashboard = () => {
 
   const fetchStudents = async () => {
     if (!selectedClassId || !isValidUUID(selectedClassId)) return;
-    
+
     // Step 1: Get enrollments
     const { data: enrollments } = await supabase
       .from('class_enrollments')
       .select('student_id')
       .eq('class_id', selectedClassId);
-    
+
     if (!enrollments || enrollments.length === 0) {
       setStudents([]);
       return;
     }
-    
+
     // Step 2: Get profiles for enrolled students (no email for privacy)
     const studentIds = enrollments.map(e => e.student_id);
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, full_name')
       .in('id', studentIds);
-    
+
     if (profiles) {
       setStudents(profiles.map(p => ({
         id: p.id,
@@ -280,23 +280,36 @@ export const TeacherDashboard = () => {
     }
   };
 
-  const handleToggleAutoQueue = async () => {
+  const handleToggleAutoQueue = async (newMaxConcurrent?: number) => {
     if (!selectedClassId || !currentClass) return;
-    
+
     const newValue = !currentClass.is_queue_autonomous;
-    
+
+    const updates: any = { is_queue_autonomous: newValue };
+
+    // If enabling and a limit is provided, update that too
+    if (newValue && newMaxConcurrent) {
+      updates.max_concurrent_bathroom = newMaxConcurrent;
+    }
+
     const { error } = await supabase
       .from('classes')
-      .update({ is_queue_autonomous: newValue })
+      .update(updates)
       .eq('id', selectedClassId);
-    
+
     if (error) {
       toast({ title: "Error", description: "Failed to update queue setting", variant: "destructive" });
     } else {
       toast({ title: newValue ? "Auto-Queue Enabled" : "Auto-Queue Disabled" });
-      setClasses(prev => prev.map(c => 
-        c.id === selectedClassId ? { ...c, is_queue_autonomous: newValue } : c
+      setClasses(prev => prev.map(c =>
+        c.id === selectedClassId ? { ...c, ...updates } : c
       ));
+
+      // Update local settings context if relevant, though this is class-specific override
+      if (newValue && newMaxConcurrent && settings) {
+        // Note: settings.max_concurrent_bathroom is org level, we don't update that here.
+        // But we could update a local class override state if we had one separate from 'classes'
+      }
     }
   };
 

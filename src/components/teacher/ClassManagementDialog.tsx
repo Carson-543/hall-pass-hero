@@ -160,7 +160,7 @@ export const ClassManagementDialog = ({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Max Concurrent Bathroom Users</Label>
+            <Label>Max Concurrent Restroom Users</Label>
             <Input
               type="number"
               min="1"

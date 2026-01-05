@@ -834,7 +834,7 @@ const AdminDashboard = () => {
                   <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Expected Return Times (minutes)</Label>
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Bathroom</Label>
+                      <Label className="text-xs text-muted-foreground">Restroom</Label>
                       <Input type="number" min={1} value={bathroomExpectedMinutes} onChange={(e) => setBathroomExpectedMinutes(parseInt(e.target.value) || 5)} />
                     </div>
                     <div className="space-y-2">
