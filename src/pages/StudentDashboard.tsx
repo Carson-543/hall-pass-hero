@@ -23,7 +23,7 @@ import { GlowButton } from '@/components/ui/glow-button';
 import { PageTransition, FadeIn, StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
 import { FloatingElement } from '@/components/ui/floating-element';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { LogOut, Clock, MapPin, Settings as SettingsIcon, Loader2, ArrowLeft, Sparkles, DoorOpen, KeyRound, Building2, MoreHorizontal, Snowflake } from 'lucide-react';
+import { LogOut, Clock, MapPin, Settings as SettingsIcon, Loader2, ArrowLeft, Sparkles, DoorOpen, KeyRound, Building2, MoreHorizontal, Snowflake, X } from 'lucide-react';
 
 const DESTINATIONS = [
   { id: 'Restroom', icon: DoorOpen, label: 'Restroom' },
@@ -199,6 +199,20 @@ const MiniSnowflakes = () => {
     }).eq('id', activePass.id);
   };
 
+  const handleCancelRequest = async () => {
+    if (!activePass) return;
+    const { error } = await supabase
+      .from('passes')
+      .update({ status: 'denied', denied_at: new Date().toISOString() })
+      .eq('id', activePass.id)
+      .eq('status', 'pending');
+    
+    if (!error) {
+      toast({ title: 'Request Cancelled' });
+      setActivePass(null);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -239,7 +253,7 @@ const MiniSnowflakes = () => {
                 <Sparkles className="w-7 h-7 text-primary-foreground" />
               </motion.div>
               <div>
-                <h1 className="text-2xl font-black tracking-tight">SmartPass</h1>
+                <h1 className="text-2xl font-black tracking-tight">ClassPass Pro</h1>
                 <p className="text-sm text-muted-foreground font-medium">{organization?.name}</p>
               </div>
             </div>
@@ -326,6 +340,19 @@ const MiniSnowflakes = () => {
                         {/* Queue Position */}
                         {activePass.status === 'pending' && (
                           <QueuePosition classId={activePass.class_id} passId={activePass.id} />
+                        )}
+
+                        {/* Cancel Button for Pending */}
+                        {activePass.status === 'pending' && (
+                          <GlowButton
+                            variant="destructive"
+                            size="md"
+                            className="w-full"
+                            onClick={handleCancelRequest}
+                          >
+                            <X className="w-4 h-4 mr-2" />
+                            Cancel Request
+                          </GlowButton>
                         )}
 
                         {/* Expected Return */}

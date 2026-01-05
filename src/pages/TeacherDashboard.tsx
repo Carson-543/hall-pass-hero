@@ -28,6 +28,7 @@ interface ClassInfo {
   name: string;
   period_order: number;
   join_code: string;
+  is_queue_autonomous?: boolean;
 }
 
 interface PendingPass {
@@ -174,7 +175,7 @@ export const TeacherDashboard = () => {
     if (!uid) return;
     const { data } = await supabase
       .from('classes')
-      .select('id, name, period_order, join_code')
+      .select('id, name, period_order, join_code, is_queue_autonomous')
       .eq('teacher_id', uid)
       .order('period_order');
     if (data && data.length > 0) {
@@ -251,20 +252,51 @@ export const TeacherDashboard = () => {
 
   const fetchStudents = async () => {
     if (!selectedClassId || !isValidUUID(selectedClassId)) return;
-    const { data } = await supabase
+    
+    // Step 1: Get enrollments
+    const { data: enrollments } = await supabase
       .from('class_enrollments')
-      .select('profiles:student_id(id, full_name, email)')
+      .select('student_id')
       .eq('class_id', selectedClassId);
-    if (data) {
-      setStudents(
-        data
-          .filter((d: any) => d.profiles)
-          .map((d: any) => ({
-            id: d.profiles.id,
-            name: d.profiles.full_name,
-            email: d.profiles.email
-          }))
-      );
+    
+    if (!enrollments || enrollments.length === 0) {
+      setStudents([]);
+      return;
+    }
+    
+    // Step 2: Get profiles for enrolled students (no email for privacy)
+    const studentIds = enrollments.map(e => e.student_id);
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', studentIds);
+    
+    if (profiles) {
+      setStudents(profiles.map(p => ({
+        id: p.id,
+        name: p.full_name,
+        email: '' // Hidden for privacy
+      })));
+    }
+  };
+
+  const handleToggleAutoQueue = async () => {
+    if (!selectedClassId || !currentClass) return;
+    
+    const newValue = !currentClass.is_queue_autonomous;
+    
+    const { error } = await supabase
+      .from('classes')
+      .update({ is_queue_autonomous: newValue })
+      .eq('id', selectedClassId);
+    
+    if (error) {
+      toast({ title: "Error", description: "Failed to update queue setting", variant: "destructive" });
+    } else {
+      toast({ title: newValue ? "Auto-Queue Enabled" : "Auto-Queue Disabled" });
+      setClasses(prev => prev.map(c => 
+        c.id === selectedClassId ? { ...c, is_queue_autonomous: newValue } : c
+      ));
     }
   };
 
@@ -403,6 +435,7 @@ export const TeacherDashboard = () => {
                     onUnfreeze={handleUnfreeze}
                     currentClass={currentClass}
                     maxConcurrent={maxConcurrent}
+                    onToggleAutoQueue={handleToggleAutoQueue}
                   />
                 </GlassCard>
               </StaggerItem>

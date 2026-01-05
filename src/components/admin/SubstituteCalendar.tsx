@@ -84,35 +84,61 @@ export const SubstituteCalendar = () => {
   const fetchTeachers = async () => {
     if (!organizationId) return;
     
-    // Get teachers in this organization
-    const { data: memberships } = await supabase
-      .from('organization_memberships')
-      .select('user_id')
-      .eq('organization_id', organizationId);
-    
-    if (!memberships) return;
-    const memberIds = memberships.map(m => m.user_id);
+    try {
+      // Get teachers in this organization
+      const { data: memberships, error: memberError } = await supabase
+        .from('organization_memberships')
+        .select('user_id')
+        .eq('organization_id', organizationId);
+      
+      if (memberError) {
+        console.error("Error fetching memberships:", memberError);
+        return;
+      }
+      if (!memberships || memberships.length === 0) {
+        console.log("No memberships found for organization");
+        setTeachers([]);
+        return;
+      }
+      
+      const memberIds = memberships.map(m => m.user_id);
 
-    const { data: roles } = await supabase
-      .from('user_roles')
-      .select('user_id')
-      .eq('role', 'teacher')
-      .in('user_id', memberIds);
+      const { data: roles, error: roleError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'teacher')
+        .in('user_id', memberIds);
 
-    if (!roles || roles.length === 0) return;
+      if (roleError) {
+        console.error("Error fetching roles:", roleError);
+        return;
+      }
+      if (!roles || roles.length === 0) {
+        console.log("No teachers found in organization");
+        setTeachers([]);
+        return;
+      }
 
-    const userIds = roles.map(r => r.user_id);
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .in('id', userIds);
+      const userIds = roles.map(r => r.user_id);
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds);
 
-    if (profiles) {
-      setTeachers(profiles.map(p => ({ 
-        id: p.id, 
-        name: p.full_name,
-        lastName: getLastName(p.full_name)
-      })));
+      if (profileError) {
+        console.error("Error fetching profiles:", profileError);
+        return;
+      }
+
+      if (profiles) {
+        setTeachers(profiles.map(p => ({ 
+          id: p.id, 
+          name: p.full_name,
+          lastName: getLastName(p.full_name)
+        })));
+      }
+    } catch (error) {
+      console.error("Error in fetchTeachers:", error);
     }
   };
 
