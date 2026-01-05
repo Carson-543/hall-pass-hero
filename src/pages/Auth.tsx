@@ -186,227 +186,268 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/30 p-4 relative overflow-hidden">
+    <div className="min-h-screen w-full flex flex-col md:flex-row bg-background overflow-hidden relative">
+      {/* Left Panel: Visual/Branding - Full Screen on Desktop */}
+      <div className="relative w-full md:w-1/2 lg:w-[60%] bg-slate-950 flex flex-col items-center justify-center p-8 md:p-24 text-center overflow-hidden border-b md:border-b-0 md:border-r border-white/5">
+        {/* Animated Background Orbs for "Popping" effect */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <motion.div
+            className="absolute -top-1/4 -right-1/4 w-[80%] h-[80%] rounded-full bg-primary/20 blur-[120px]"
+            animate={{
+              scale: [1, 1.2, 1],
+              opacity: [0.3, 0.6, 0.3],
+              x: [0, 50, 0],
+              y: [0, -30, 0]
+            }}
+            transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div
+            className="absolute -bottom-1/4 -left-1/4 w-[70%] h-[70%] rounded-full bg-blue-600/10 blur-[100px]"
+            animate={{
+              scale: [1.2, 1, 1.2],
+              opacity: [0.2, 0.4, 0.2],
+              x: [0, -40, 0],
+              y: [0, 60, 0]
+            }}
+            transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay pointer-events-none" />
+        </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 30, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className="relative z-10 w-full flex justify-center"
-      >
-        <GlassCard className="w-full max-w-5xl p-0 overflow-hidden">
-          <div className="grid grid-cols-1 md:grid-cols-2 min-h-[600px]">
-            {/* Left Panel: Visual/Branding */}
-            <div className="relative hidden md:flex flex-col items-center justify-center p-12 bg-primary/5 text-center overflow-hidden">
-              {/* Decorative background elements moved here */}
-              <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <motion.div
-                  className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-primary/10 blur-3xl"
-                  animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
-                  transition={{ duration: 8, repeat: Infinity }}
-                />
-                <motion.div
-                  className="absolute -bottom-20 -left-20 w-80 h-80 rounded-full bg-primary/5 blur-3xl"
-                  animate={{ scale: [1.2, 1, 1.2], opacity: [0.2, 0.4, 0.2] }}
-                  transition={{ duration: 10, repeat: Infinity }}
-                />
-              </div>
+        <div className="relative z-10 flex flex-col items-center max-w-lg">
+          <motion.div
+            className="w-24 h-24 mb-10 rounded-[2.5rem] bg-gradient-to-br from-primary via-blue-500 to-primary flex items-center justify-center shadow-[0_0_50px_-12px_rgba(59,130,246,0.5)] border border-white/10"
+            initial={{ scale: 0.5, opacity: 0, rotate: -20 }}
+            animate={{ scale: 1, opacity: 1, rotate: 0 }}
+            transition={{ type: "spring", damping: 15, stiffness: 200, delay: 0.2 }}
+            whileHover={{ scale: 1.1, rotate: 5 }}
+          >
+            <Sparkles className="w-12 h-12 text-white drop-shadow-glow" />
+          </motion.div>
 
-              <div className="relative z-10 flex flex-col items-center">
-                <motion.div
-                  className="w-20 h-20 mb-6 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/30"
-                  whileHover={{ scale: 1.05, rotate: 5 }}
-                >
-                  <Sparkles className="w-10 h-10 text-primary-foreground" />
-                </motion.div>
-                <h1 className="text-4xl font-black tracking-tight mb-3">ClassPass Pro</h1>
-                <p className="text-lg text-muted-foreground max-w-xs mx-auto">
-                  Digital Hall Pass Management System for Modern Schools
-                </p>
-              </div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <h1 className="text-5xl md:text-7xl font-black tracking-tighter mb-6 text-white leading-none">
+              ClassPass <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-blue-600">Pro</span>
+            </h1>
+            <p className="text-xl md:text-2xl text-slate-400 font-medium max-w-md mx-auto leading-relaxed">
+              The next generation of <span className="text-white font-bold">digital hall pass</span> management for modern schools.
+            </p>
+          </motion.div>
+
+          {/* Feature highlights for "pop" */}
+          <motion.div
+            className="mt-12 grid grid-cols-2 gap-4 w-full"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+          >
+            <div className="p-4 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-sm">
+              <p className="text-blue-400 font-black text-2xl">Real-time</p>
+              <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">Tracking</p>
             </div>
-
-            {/* Right Panel: Form */}
-            <div className="p-8 md:p-12 flex flex-col justify-center h-full bg-background/50 backdrop-blur-sm">
-              <div className="md:hidden flex flex-col items-center mb-8">
-                 <div className="w-12 h-12 mb-3 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/30">
-                  <Sparkles className="w-6 h-6 text-primary-foreground" />
-                </div>
-                <h1 className="text-2xl font-bold">ClassPass Pro</h1>
-              </div>
-
-              <Tabs defaultValue="login" className="space-y-6 w-full">
-                <TabsList className="grid w-full grid-cols-2 rounded-xl bg-muted/50 p-1">
-                  <TabsTrigger value="login" className="rounded-lg font-bold">Login</TabsTrigger>
-                  <TabsTrigger value="signup" className="rounded-lg font-bold">Sign Up</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="login" className="space-y-4">
-                  <form onSubmit={handleLogin} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="login-email" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        Email
-                      </Label>
-                      <Input
-                        id="login-email"
-                        type="email"
-                        value={loginEmail}
-                        onChange={(e) => setLoginEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        className="h-12 rounded-xl"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="login-password" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                          Password
-                        </Label>
-                        <Button
-                          type="button"
-                          variant="link"
-                          className="px-0 h-auto text-xs text-primary"
-                          onClick={() => setForgotPasswordOpen(true)}
-                        >
-                          Forgot password?
-                        </Button>
-                      </div>
-                      <div className="relative">
-                        <Input
-                          id="login-password"
-                          type={showPassword ? "text" : "password"}
-                          value={loginPassword}
-                          onChange={(e) => setLoginPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="h-12 rounded-xl pr-12"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-                    </div>
-                    <GlowButton type="submit" className="w-full" size="lg" loading={isLoading}>
-                      Sign In
-                    </GlowButton>
-                  </form>
-                </TabsContent>
-
-                <TabsContent value="signup" className="space-y-4">
-                  <form onSubmit={handleSignup} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-name" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        Full Name
-                      </Label>
-                      <Input
-                        id="signup-name"
-                        type="text"
-                        value={signupName}
-                        onChange={(e) => setSignupName(e.target.value)}
-                        placeholder="John Doe"
-                        className="h-12 rounded-xl"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-email" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        Email
-                      </Label>
-                      <Input
-                        id="signup-email"
-                        type="email"
-                        value={signupEmail}
-                        onChange={(e) => setSignupEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        className="h-12 rounded-xl"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-password" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        Password
-                      </Label>
-                      <div className="relative">
-                        <Input
-                          id="signup-password"
-                          type={showPassword ? "text" : "password"}
-                          value={signupPassword}
-                          onChange={(e) => setSignupPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="h-12 rounded-xl pr-12"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-role" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        Role
-                      </Label>
-                      <Select value={signupRole} onValueChange={(v) => setSignupRole(v as AppRole)}>
-                        <SelectTrigger className="h-12 rounded-xl">
-                          <SelectValue placeholder="Select your role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="student">Student</SelectItem>
-                          <SelectItem value="teacher">Teacher</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {signupRole !== 'student' && (
-                        <p className="text-xs text-muted-foreground">
-                          Teacher and Admin accounts require approval.
-                        </p>
-                      )}
-                    </div>
-                    <GlowButton type="submit" className="w-full" size="lg" loading={isLoading}>
-                      Create Account
-                    </GlowButton>
-                  </form>
-                </TabsContent>
-              </Tabs>
+            <div className="p-4 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-sm">
+              <p className="text-blue-400 font-black text-2xl">Unlimited</p>
+              <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">Scalability</p>
             </div>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Right Panel: Auth Form */}
+      <div className="flex-1 flex flex-col justify-center items-center p-8 md:p-12 lg:p-24 bg-background relative z-20">
+        <motion.div
+          className="w-full max-w-md"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
+          <div className="mb-10 text-center md:text-left">
+            <h2 className="text-3xl font-black tracking-tight mb-2">Welcome Back</h2>
+            <p className="text-muted-foreground font-medium">Please enter your details to continue.</p>
           </div>
-        </GlassCard>
-      </motion.div>
 
-      {/* Forgot Password Dialog */}
+          <Tabs defaultValue="login" className="space-y-8 w-full">
+            <TabsList className="grid w-full grid-cols-2 rounded-2xl bg-muted/50 p-1.5 h-14">
+              <TabsTrigger value="login" className="rounded-xl font-bold text-base data-[state=active]:shadow-lg">Login</TabsTrigger>
+              <TabsTrigger value="signup" className="rounded-xl font-bold text-base data-[state=active]:shadow-lg">Sign Up</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="login" className="space-y-6">
+              <form onSubmit={handleLogin} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="login-email" className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">
+                    Email Address
+                  </Label>
+                  <Input
+                    id="login-email"
+                    type="email"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder="name@school.edu"
+                    className="h-14 rounded-2xl px-6 text-base border-muted-foreground/20 focus:ring-primary/20 transition-all font-medium"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between ml-1">
+                    <Label htmlFor="login-password" className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                      Password
+                    </Label>
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="px-0 h-auto text-xs font-bold text-primary hover:no-underline"
+                      onClick={() => setForgotPasswordOpen(true)}
+                    >
+                      Forgot password?
+                    </Button>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      id="login-password"
+                      type={showPassword ? "text" : "password"}
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="h-14 rounded-2xl px-6 pr-14 text-base border-muted-foreground/20 focus:ring-primary/20 transition-all font-medium"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+                </div>
+                <GlowButton type="submit" className="w-full h-14 rounded-2xl text-lg font-black" size="lg" loading={isLoading}>
+                  Sign In to Dashboard
+                </GlowButton>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="signup" className="space-y-6">
+              <form onSubmit={handleSignup} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="signup-name" className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">
+                    Full Name
+                  </Label>
+                  <Input
+                    id="signup-name"
+                    type="text"
+                    value={signupName}
+                    onChange={(e) => setSignupName(e.target.value)}
+                    placeholder="Enter your full name"
+                    className="h-14 rounded-2xl px-6 text-base border-muted-foreground/20 transition-all font-medium"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-email" className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">
+                    Email Address
+                  </Label>
+                  <Input
+                    id="signup-email"
+                    type="email"
+                    value={signupEmail}
+                    onChange={(e) => setSignupEmail(e.target.value)}
+                    placeholder="name@school.edu"
+                    className="h-14 rounded-2xl px-6 text-base border-muted-foreground/20 transition-all font-medium"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-password" className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">
+                    Password
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="signup-password"
+                      type={showPassword ? "text" : "password"}
+                      value={signupPassword}
+                      onChange={(e) => setSignupPassword(e.target.value)}
+                      placeholder="Min. 6 characters"
+                      className="h-14 rounded-2xl px-6 pr-14 text-base border-muted-foreground/20 transition-all font-medium"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-role" className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">
+                    I am a...
+                  </Label>
+                  <Select value={signupRole} onValueChange={(v) => setSignupRole(v as AppRole)}>
+                    <SelectTrigger className="h-14 rounded-2xl px-6 text-base border-muted-foreground/20 font-medium">
+                      <SelectValue placeholder="Select your role" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl">
+                      <SelectItem value="student" className="h-12 rounded-xl">Student</SelectItem>
+                      <SelectItem value="teacher" className="h-12 rounded-xl">Teacher</SelectItem>
+                      <SelectItem value="admin" className="h-12 rounded-xl">Administrator</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {signupRole !== 'student' && (
+                    <p className="text-[10px] font-bold text-primary uppercase tracking-widest mt-2 ml-1">
+                      * Teacher and Admin accounts require approval.
+                    </p>
+                  )}
+                </div>
+                <GlowButton type="submit" className="w-full h-14 rounded-2xl text-lg font-black mt-2" size="lg" loading={isLoading}>
+                  Create My Account
+                </GlowButton>
+              </form>
+            </TabsContent>
+          </Tabs>
+        </motion.div>
+
+        {/* Footer info */}
+        <p className="mt-12 text-sm text-muted-foreground font-medium text-center">
+          &copy; {new Date().getFullYear()} ClassPass Pro. All rights reserved.
+        </p>
+      </div>
+
       <Dialog open={forgotPasswordOpen} onOpenChange={setForgotPasswordOpen}>
-        <DialogContent className="rounded-2xl">
+        <DialogContent className="rounded-3xl p-8 border-0 shadow-2xl">
           <DialogHeader>
-            <DialogTitle>Reset Password</DialogTitle>
-            <DialogDescription>
-              Enter your email address and we'll send you a link to reset your password.
+            <DialogTitle className="text-2xl font-black tracking-tight">Reset Password</DialogTitle>
+            <DialogDescription className="text-base font-medium">
+              We'll send a secure link to your email to reset your account access.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="py-6">
             <div className="space-y-2">
-              <Label htmlFor="forgot-email">Email</Label>
+              <Label htmlFor="forgot-email" className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Email Address</Label>
               <Input
                 id="forgot-email"
                 type="email"
                 value={forgotPasswordEmail}
                 onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="h-12 rounded-xl"
+                placeholder="name@school.edu"
+                className="h-14 rounded-2xl px-6 text-base font-medium"
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setForgotPasswordOpen(false)} className="rounded-xl">
-              Cancel
+          <DialogFooter className="flex-col sm:flex-row gap-3">
+            <Button variant="ghost" onClick={() => setForgotPasswordOpen(false)} className="rounded-2xl h-12 px-8 font-bold order-2 sm:order-1">
+              Nevermind
             </Button>
-            <Button onClick={handleForgotPassword} disabled={isSendingReset} className="rounded-xl">
+            <Button
+              onClick={handleForgotPassword}
+              disabled={isSendingReset}
+              className="rounded-2xl h-12 px-8 font-bold bg-primary text-white hover:bg-primary/90 order-1 sm:order-2 shadow-lg shadow-primary/25"
+            >
               {isSendingReset ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
