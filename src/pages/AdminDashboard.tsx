@@ -633,9 +633,7 @@ const AdminDashboard = () => {
                         School Schedule
                       </CardTitle>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="outline" onClick={openNewSchedule}>
-                          <Plus className="h-4 w-4 mr-1" /> New Schedule Type
-                        </Button>
+                        {/* Button removed as per user request */}
                       </div>
                     </div>
                   </CardHeader>

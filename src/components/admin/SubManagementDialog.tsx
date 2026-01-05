@@ -13,6 +13,7 @@ interface Teacher {
     id: string;
     name: string;
     lastName: string;
+    role?: string;
 }
 
 interface ClassInfo {
@@ -98,24 +99,29 @@ export const SubManagementDialog = ({ date, open, onOpenChange, organizationId }
 
         const { data: roles } = await supabase
             .from('user_roles')
-            .select('user_id')
-            .eq('role', 'teacher')
+            .select('user_id, role')
+            .in('role', ['teacher', 'admin'])
             .in('user_id', memberIds);
 
         if (!roles || roles.length === 0) return;
 
+        const roleMap = new Map(roles.map(r => [r.user_id, r.role]));
         const userIds = roles.map(r => r.user_id);
+
         const { data: profiles } = await supabase
             .from('profiles')
             .select('id, full_name')
             .in('id', userIds);
 
         if (profiles) {
-            setTeachers(profiles.map(p => ({
+            const sortedTeachers = profiles.map(p => ({
                 id: p.id,
                 name: p.full_name,
-                lastName: getLastName(p.full_name)
-            })));
+                lastName: getLastName(p.full_name),
+                role: roleMap.get(p.id)
+            })).sort((a, b) => a.lastName.localeCompare(b.lastName));
+
+            setTeachers(sortedTeachers);
         }
     };
 
@@ -308,7 +314,9 @@ export const SubManagementDialog = ({ date, open, onOpenChange, organizationId }
                                     </SelectTrigger>
                                     <SelectContent>
                                         {teachers.map(t => (
-                                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                                            <SelectItem key={t.id} value={t.id}>
+                                                {t.name} {t.role === 'admin' ? '(Admin)' : ''}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -322,7 +330,9 @@ export const SubManagementDialog = ({ date, open, onOpenChange, organizationId }
                                     </SelectTrigger>
                                     <SelectContent>
                                         {teachers.filter(t => t.id !== originalTeacherId).map(t => (
-                                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                                            <SelectItem key={t.id} value={t.id}>
+                                                {t.name} {t.role === 'admin' ? '(Admin)' : ''}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
