@@ -96,6 +96,41 @@ const StudentDashboard = () => {
     }
   }, [user?.id]);
 
+const MiniSnowflakes = () => {
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      <motion.div 
+        className="absolute inset-0 flex items-center justify-center opacity-20"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 0.2 }}
+      >
+        <div className="relative w-full h-full">
+          {/* Top Left Snowflake */}
+          <motion.div 
+            className="absolute top-1 left-1"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+          >
+            <Snowflake size={12} className="text-blue-400" />
+          </motion.div>
+
+          {/* Bottom Right Snowflake */}
+          <motion.div 
+            className="absolute bottom-1 right-1"
+            animate={{ rotate: -360 }}
+            transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+          >
+            <Snowflake size={14} className="text-blue-300" />
+          </motion.div>
+
+          {/* Center Pulsing Glow */}
+          <div className="absolute inset-0 bg-blue-500/5 animate-pulse" />
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+  
   const fetchActiveFreeze = useCallback(async (id: string) => {
     if (!id) return;
     const { data } = await supabase.from('pass_freezes').select('freeze_type, ends_at').eq('class_id', id).eq('is_active', true).maybeSingle();
