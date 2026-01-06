@@ -140,11 +140,11 @@ export const OrganizationSelector = ({ userId, isAdmin, onComplete }: Organizati
       <CardContent>
         <Tabs defaultValue="join" className="w-full">
           <TabsList className="grid w-full grid-cols-2 rounded-xl h-12 p-1 bg-white/5 border border-white/10">
-            <TabsTrigger value="join" className="rounded-lg gap-2 font-bold data-[state=active]:bg-primary">
+            <TabsTrigger value="join" className="rounded-lg gap-2 font-bold data-[state=active]:bg-blue-600">
               <Users className="h-4 w-4" /> Join
             </TabsTrigger>
             {isAdmin && (
-              <TabsTrigger value="create" className="rounded-lg gap-2 font-bold data-[state=active]:bg-primary">
+              <TabsTrigger value="create" className="rounded-lg gap-2 font-bold data-[state=active]:bg-blur-600">
                 <Plus className="h-4 w-4" /> Create
               </TabsTrigger>
             )}
@@ -152,17 +152,17 @@ export const OrganizationSelector = ({ userId, isAdmin, onComplete }: Organizati
 
           <TabsContent value="join" className="space-y-6 mt-8">
             <div className="space-y-2">
-              <Label className="text-xs font-black uppercase text-slate-500 ml-1">Search Schools</Label>
+              <Label className="text-xs font-black uppercase text-white ml-1">Search Schools</Label>
               <Input
                 placeholder="Lincoln High School..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-12 rounded-xl bg-white/5 border-white/10 focus:ring-primary/20"
+                className="h-12 rounded-xl bg-white/5 border-white/10 focus:ring-blue-600"
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-black uppercase text-slate-500 ml-1">Select School</Label>
+              <Label className="text-xs font-black uppercase text-white ml-1">Select School</Label>
               <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
                 <SelectTrigger className="h-12 rounded-xl bg-white/5 border-white/10">
                   <SelectValue placeholder="Choose a school" />
@@ -171,13 +171,13 @@ export const OrganizationSelector = ({ userId, isAdmin, onComplete }: Organizati
                   {filteredOrganizations.map(org => (
                     <SelectItem key={org.id} value={org.id} className="h-10 rounded-lg">{org.name}</SelectItem>
                   ))}
-                  {filteredOrganizations.length === 0 && <div className="p-4 text-sm text-slate-500 text-center">No schools found</div>}
+                  {filteredOrganizations.length === 0 && <div className="p-4 text-sm text-white text-center">No schools found</div>}
                 </SelectContent>
               </Select>
             </div>
 
             <Button
-              className="w-full h-14 rounded-2xl font-black text-lg bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
+              className="w-full h-14 rounded-2xl font-black text-lg bg-blue-600 hover:bg-blue-600/90 shadow-lg shadow-blue-600/20"
               onClick={handleJoinOrganization}
               disabled={!selectedOrgId || loading}
             >
@@ -188,12 +188,12 @@ export const OrganizationSelector = ({ userId, isAdmin, onComplete }: Organizati
           {isAdmin && (
             <TabsContent value="create" className="space-y-6 mt-8">
               <div className="space-y-2">
-                <Label className="text-xs font-black uppercase text-slate-500 ml-1">New School Name</Label>
+                <Label className="text-xs font-black uppercase text-white ml-1">New School Name</Label>
                 <Input
                   placeholder="e.g., Lincoln High School"
                   value={newOrgName}
                   onChange={(e) => setNewOrgName(e.target.value)}
-                  className="h-12 rounded-xl bg-white/5 border-white/10 focus:ring-primary/20"
+                  className="h-12 rounded-xl bg-white/5 border-white/10 focus:ring-blue-600"
                 />
               </div>
 
