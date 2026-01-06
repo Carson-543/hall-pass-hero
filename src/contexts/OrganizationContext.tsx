@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 
@@ -25,6 +24,7 @@ interface OrganizationContextType {
   settings: OrganizationSettings | null;
   loading: boolean;
   refreshSettings: () => Promise<void>;
+  setOrganization: (org: Organization) => void;
 }
 
 const defaultSettings: OrganizationSettings = {
@@ -49,49 +49,80 @@ export const useOrganization = () => {
 
 export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
+  const [organization, setOrganization] = useState<Organization | null>(null);
+  const [settings, setSettings] = useState<OrganizationSettings | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Query for organization membership and details
-  const { data: organization, isLoading: isOrgLoading } = useQuery({
-    queryKey: ['organization', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
+  const fetchOrganization = useCallback(async () => {
+    if (!user?.id) {
+      setOrganization(null);
+      setSettings(null);
+      setLoading(false);
+      return;
+    }
 
+    try {
+      // Fetch membership
       const { data: membership } = await supabase
         .from('organization_memberships')
         .select('organization_id')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (!membership?.organization_id) return null;
+      if (membership?.organization_id) {
+        // Fetch organization details
+        const { data: org } = await supabase
+          .from('organizations')
+          .select('id, name, slug')
+          .eq('id', membership.organization_id)
+          .single();
 
-      const { data: org } = await supabase
-        .from('organizations')
-        .select('id, name, slug')
-        .eq('id', membership.organization_id)
-        .single();
+        if (org) {
+          setOrganization(org);
 
-      return org || null;
-    },
-    enabled: !!user?.id,
-    staleTime: 1000 * 60 * 30, // 30 minutes
-  });
+          // Fetch organization settings
+          const { data: orgSettings } = await supabase
+            .from('organization_settings')
+            .select('*')
+            .eq('organization_id', org.id)
+            .maybeSingle();
 
-  // Query for organization settings
-  const { data: settings, isLoading: isSettingsLoading } = useQuery({
-    queryKey: ['organization-settings', organization?.id],
-    queryFn: async () => {
-      if (!organization?.id) return null;
+          if (orgSettings) {
+            setSettings({
+              weekly_bathroom_limit: orgSettings.weekly_bathroom_limit ?? 4,
+              default_period_count: orgSettings.default_period_count ?? 7,
+              max_concurrent_bathroom: orgSettings.max_concurrent_bathroom ?? 2,
+              require_deletion_approval: orgSettings.require_deletion_approval ?? false,
+              bathroom_expected_minutes: orgSettings.bathroom_expected_minutes ?? 5,
+              locker_expected_minutes: orgSettings.locker_expected_minutes ?? 3,
+              office_expected_minutes: orgSettings.office_expected_minutes ?? 10,
+            });
+          } else {
+            setSettings(defaultSettings);
+          }
+        }
+      } else {
+        setOrganization(null);
+        setSettings(null);
+      }
+    } catch (error) {
+      console.error('Error fetching organization:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
 
-      const { data: orgSettings } = await supabase
-        .from('organization_settings')
-        .select('weekly_bathroom_limit, default_period_count, max_concurrent_bathroom, require_deletion_approval, bathroom_expected_minutes, locker_expected_minutes, office_expected_minutes')
-        .eq('organization_id', organization.id)
-        .maybeSingle();
+  const refreshSettings = useCallback(async () => {
+    if (!organization?.id) return;
 
-      if (!orgSettings) return defaultSettings;
+    const { data: orgSettings } = await supabase
+      .from('organization_settings')
+      .select('*')
+      .eq('organization_id', organization.id)
+      .maybeSingle();
 
-      return {
+    if (orgSettings) {
+      setSettings({
         weekly_bathroom_limit: orgSettings.weekly_bathroom_limit ?? 4,
         default_period_count: orgSettings.default_period_count ?? 7,
         max_concurrent_bathroom: orgSettings.max_concurrent_bathroom ?? 2,
@@ -99,28 +130,23 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         bathroom_expected_minutes: orgSettings.bathroom_expected_minutes ?? 5,
         locker_expected_minutes: orgSettings.locker_expected_minutes ?? 3,
         office_expected_minutes: orgSettings.office_expected_minutes ?? 10,
-      };
-    },
-    enabled: !!organization?.id,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
-
-  const refreshSettings = async () => {
-    if (organization?.id) {
-      await queryClient.invalidateQueries({ queryKey: ['organization-settings', organization.id] });
+      });
     }
-  };
+  }, [organization?.id]);
 
-  const contextValue = useMemo(() => ({
-    organization: organization || null,
-    organizationId: organization?.id ?? null,
-    settings: settings || null,
-    loading: isOrgLoading || (isSettingsLoading && !!organization),
-    refreshSettings,
-  }), [organization, isOrgLoading, settings, isSettingsLoading]);
+  useEffect(() => {
+    fetchOrganization();
+  }, [fetchOrganization]);
 
   return (
-    <OrganizationContext.Provider value={contextValue}>
+    <OrganizationContext.Provider value={{
+      organization,
+      organizationId: organization?.id ?? null,
+      settings,
+      loading,
+      refreshSettings,
+      setOrganization,
+    }}>
       {children}
     </OrganizationContext.Provider>
   );
