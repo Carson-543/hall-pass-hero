@@ -142,13 +142,13 @@ export const TeacherControls = ({
                             <PopoverTrigger asChild>
                                 <Button
                                     variant={!!activeFreeze ? "destructive" : "outline"}
-                                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-44 rounded-full border-2 shadow-lg p-0 ${!!activeFreeze ? 'bg-red-600 border-red-500 text-white shadow-red-500/20' : 'bg-white/10 border-white/20 text-blue-400 hover:border-blue-400/50 hover:bg-white/15'}`}
+                                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-44 rounded-full border-2 shadow-lg p-0 flex items-center justify-start ${!!activeFreeze ? 'bg-red-600 border-red-500 text-white shadow-red-500/20' : 'bg-white/10 border-white/20 text-blue-400 hover:border-blue-400/50 hover:bg-white/15'}`}
                                     disabled={isFreezeLoading}
                                 >
-                                    <div className="absolute left-0 top-0 w-10 h-10 flex items-center justify-center pointer-events-none">
+                                    <div className="w-10 h-10 flex items-center justify-center shrink-0">
                                         {isFreezeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Snowflake className={`h-4 w-4 ${activeFreeze ? 'animate-pulse' : ''}`} />}
                                     </div>
-                                    <span className="ml-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[10px] font-black uppercase tracking-widest">
+                                    <span className="opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[10px] font-black uppercase tracking-widest pl-2">
                                         {activeFreeze ? "Unfreeze Queue" : "Freeze Controls"}
                                     </span>
                                 </Button>
@@ -198,12 +198,12 @@ export const TeacherControls = ({
                             <AlertDialogTrigger asChild>
                                 <Button
                                     variant="outline"
-                                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-48 rounded-full border-2 shadow-lg p-0 ${currentClass?.is_queue_autonomous ? 'bg-blue-600 border-blue-500 text-white hover:bg-blue-700' : 'bg-white/10 border-white/20 text-slate-400 hover:border-blue-400/50 hover:bg-white/15'}`}
+                                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-48 rounded-full border-2 shadow-lg p-0 flex items-center justify-start ${currentClass?.is_queue_autonomous ? 'bg-blue-600 border-blue-500 text-white hover:bg-blue-700' : 'bg-white/10 border-white/20 text-slate-400 hover:border-blue-400/50 hover:bg-white/15'}`}
                                 >
-                                    <div className="absolute left-0 top-0 w-10 h-10 flex items-center justify-center pointer-events-none">
+                                    <div className="w-10 h-10 flex items-center justify-center shrink-0">
                                         <Bot className={`h-4 w-4 ${currentClass?.is_queue_autonomous ? 'text-white' : ''}`} />
                                     </div>
-                                    <span className="ml-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[10px] font-black uppercase tracking-widest">
+                                    <span className="opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[10px] font-black uppercase tracking-widest pl-2">
                                         {currentClass?.is_queue_autonomous ? "Auto-Queue Active" : "Enable Auto-Queue"}
                                     </span>
                                 </Button>

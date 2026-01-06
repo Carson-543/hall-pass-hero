@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { LogOut, Sparkles } from 'lucide-react';
+import { LogOut, Zap } from 'lucide-react';
 
 interface TeacherHeaderProps {
   signOut: () => void;
@@ -20,10 +20,10 @@ export const TeacherHeader = ({ signOut }: TeacherHeaderProps) => {
           whileHover={{ scale: 1.05, rotate: 5 }}
           whileTap={{ scale: 0.95 }}
         >
-          <Sparkles className="w-7 h-7 text-white" />
+          <Zap className="w-7 h-7 text-white fill-white/20" />
         </motion.div>
         <div>
-          <h1 className="text-3xl font-black tracking-tighter text-white leading-none mb-1">Teacher <span className="text-blue-500">Pro</span></h1>
+          <h1 className="text-3xl font-black tracking-tighter text-white leading-none mb-1">ClassPass <span className="text-blue-500">Pro</span></h1>
           <p className="text-sm text-slate-300 font-extrabold tracking-wide uppercase">Manage passes & students</p>
         </div>
       </div>

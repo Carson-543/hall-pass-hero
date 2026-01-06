@@ -30,7 +30,7 @@ export const RosterGrid = ({
     const filteredStudents = students.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
     return (
-        <div className="space-y-6 pt-4">
+        <div className="space-y-6">
             <div className="flex flex-col gap-1 mb-4">
                 <h2 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
                     <div className="w-1.5 h-6 bg-blue-500 rounded-full" />
