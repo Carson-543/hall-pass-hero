@@ -622,6 +622,15 @@ export type Database = {
       is_class_teacher: { Args: { _class_id: string }; Returns: boolean }
       is_enrolled_in_class: { Args: { _class_id: string }; Returns: boolean }
       is_same_organization: { Args: { _user_id: string }; Returns: boolean }
+      lookup_class_by_join_code: {
+        Args: { _join_code: string }
+        Returns: {
+          id: string
+          name: string
+          period_order: number
+          teacher_name: string
+        }[]
+      }
       student_check_in: { Args: { p_pass_id: string }; Returns: undefined }
     }
     Enums: {
