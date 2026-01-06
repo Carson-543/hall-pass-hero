@@ -288,28 +288,21 @@ const StudentDashboard = () => {
   };
 
   return (
-    <PageTransition className="min-h-screen bg-slate-950 text-slate-100 selection:bg-blue-500/30">
+    <PageTransition className="min-h-screen bg-slate-950 text-slate-100 selection:bg-blue-500/30 overflow-x-hidden">
       {/* Visual Background (Sync with Auth.tsx - Pro Blue) */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <motion.div
           className="absolute -top-1/4 -right-1/4 w-[80%] h-[80%] rounded-full bg-blue-600/15 blur-[100px]"
           style={{ willChange: "transform" }}
-          animate={{
-            x: [0, 20, 0],
-            y: [0, -10, 0]
-          }}
+          animate={{ x: [0, 20, 0], y: [0, -10, 0] }}
           transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
         />
         <motion.div
           className="absolute -bottom-1/4 -left-1/4 w-[70%] h-[70%] rounded-full bg-blue-400/5 blur-[80px]"
           style={{ willChange: "transform" }}
-          animate={{
-            x: [0, -15, 0],
-            y: [0, 25, 0]
-          }}
+          animate={{ x: [0, -20, 0], y: [0, 15, 0] }}
           transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
         />
-        <div className="absolute inset-0 bg-black/60" />
       </div>
 
       <div className="relative z-10 p-4 max-w-2xl mx-auto pb-24">

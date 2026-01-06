@@ -399,10 +399,9 @@ export const TeacherDashboard = () => {
         <motion.div
           className="absolute -bottom-1/4 -left-1/4 w-[70%] h-[70%] rounded-full bg-blue-400/5 blur-[80px]"
           style={{ willChange: "transform" }}
-          animate={{ x: [0, -15, 0], y: [0, 25, 0] }}
+          animate={{ x: [0, -20, 0], y: [0, 15, 0] }}
           transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
         />
-        <div className="absolute inset-0 bg-black/60" />
       </div>
 
       <div className="relative p-4 sm:p-6 pb-24 max-w-7xl mx-auto z-10">
