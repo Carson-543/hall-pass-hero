@@ -73,7 +73,7 @@ export const FreezeControls = ({ classId, teacherId }: FreezeControlsProps) => {
   const fetchActiveFreeze = async () => {
     const { data } = await supabase
       .from('pass_freezes')
-      .select('*')
+      .select('id, freeze_type, started_at, ends_at')
       .eq('class_id', classId)
       .eq('is_active', true)
       .maybeSingle();

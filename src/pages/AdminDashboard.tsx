@@ -128,7 +128,11 @@ const AdminDashboard = () => {
 
   const fetchSchedules = async () => {
     if (!organizationId) return;
-    const { data } = await supabase.from('schedules').select('*').eq('organization_id', organizationId).order('name');
+    const { data } = await supabase
+      .from('schedules')
+      .select('id, name, is_school_day, color')
+      .eq('organization_id', organizationId)
+      .order('name');
     if (data) {
       setSchedules(data);
     }
@@ -137,7 +141,7 @@ const AdminDashboard = () => {
   const fetchPeriodsForStaging = async (scheduleId: string) => {
     const { data } = await supabase
       .from('periods')
-      .select('*')
+      .select('id, schedule_id, name, period_order, start_time, end_time, is_passing_period')
       .eq('schedule_id', scheduleId)
       .order('period_order');
     if (data) {
@@ -148,45 +152,30 @@ const AdminDashboard = () => {
   const fetchActivePasses = async () => {
     if (!organizationId) return;
 
-    // 1. Fetch all classes in this organization
-    const { data: classesData, error: classError } = await supabase
-      .from('classes')
-      .select('id, name')
-      .eq('organization_id', organizationId);
-
-    if (classError || !classesData || classesData.length === 0) {
-      setActivePasses([]);
-      return;
-    }
-
-    const classIds = classesData.map(c => c.id);
-    const classMap = new Map(classesData.map(c => [c.id, c.name]));
-
-    // 2. Fetch passes for these classes
     const { data: passes, error: passError } = await supabase
       .from('passes')
-      .select('id, student_id, destination, status, approved_at, class_id')
-      .in('class_id', classIds)
+      .select(`
+        id, 
+        destination, 
+        status, 
+        approved_at, 
+        student_id,
+        profiles!passes_student_id_fkey (full_name),
+        classes (name)
+      `)
+      .eq('organization_id', organizationId)
       .in('status', ['approved', 'pending_return'])
       .order('approved_at', { ascending: true });
 
-    if (passError || !passes || passes.length === 0) {
+    if (passError || !passes) {
       setActivePasses([]);
       return;
     }
 
-    const studentIds = [...new Set(passes.map(p => p.student_id))];
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .in('id', studentIds);
-
-    const profileMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
-
-    setActivePasses(passes.map(p => ({
+    setActivePasses(passes.map((p: any) => ({
       id: p.id,
-      student_name: profileMap.get(p.student_id) ?? 'Unknown',
-      from_class: classMap.get(p.class_id) ?? 'Unknown',
+      student_name: p.profiles?.full_name ?? 'Unknown',
+      from_class: p.classes?.name ?? 'Unknown',
       destination: p.destination,
       approved_at: p.approved_at,
       status: p.status
@@ -500,7 +489,12 @@ const AdminDashboard = () => {
       console.log("📡 Opening admin-passes realtime channel...");
       channelRef.current = supabase
         .channel('admin-passes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'passes' }, (payload) => {
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'passes',
+          filter: `organization_id=eq.${organizationId}`
+        }, (payload) => {
           console.log("[AdminDashboard] Global pass update received:", payload);
           fetchActivePasses();
         })
