@@ -22,10 +22,11 @@ import { ExpectedReturnTimer } from '@/components/student/ExpectedReturnTimer';
 
 import { GlassCard } from '@/components/ui/glass-card';
 import { GlowButton } from '@/components/ui/glow-button';
+import { JoinClassDialog } from '@/components/student/JoinClassDialog';
 import { PageTransition, FadeIn, StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
 import { FloatingElement } from '@/components/ui/floating-element';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { LogOut, Clock, MapPin, Settings as SettingsIcon, Loader2, ArrowLeft, School, DoorOpen, KeyRound, Building2, MoreHorizontal, Snowflake, X } from 'lucide-react';
+import { LogOut, Clock, MapPin, Settings as SettingsIcon, Loader2, ArrowLeft, School, DoorOpen, KeyRound, Building2, MoreHorizontal, Snowflake, X, Plus } from 'lucide-react';
 
 const DESTINATIONS = [
   { id: 'Restroom', icon: DoorOpen, label: 'Restroom' },
@@ -82,6 +83,7 @@ const StudentDashboard = () => {
   const [customDestination, setCustomDestination] = useState<string>('');
   const [requestLoading, setRequestLoading] = useState(false);
   const [activeFreeze, setActiveFreeze] = useState<{ freeze_type: string; ends_at?: string | null } | null>(null);
+  const [joinDialogOpen, setJoinDialogOpen] = useState(false);
 
   const fetchEnrolledClasses = useCallback(async () => {
     if (!user?.id) return;
@@ -328,6 +330,14 @@ const StudentDashboard = () => {
               </div>
             </div>
             <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                className="h-11 rounded-2xl bg-blue-600/10 border border-blue-500/20 text-blue-400 font-bold px-4 hover:bg-blue-600/20"
+                onClick={() => setJoinDialogOpen(true)}
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                Join Class
+              </Button>
               <Button variant="ghost" size="icon" className="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/15 text-white shadow-sm" onClick={() => navigate('/settings')}>
                 <SettingsIcon className="h-5 w-5" />
               </Button>
@@ -578,6 +588,13 @@ const StudentDashboard = () => {
             </GlassCard>
           </StaggerItem>
         </StaggerContainer>
+
+        <JoinClassDialog
+          open={joinDialogOpen}
+          onOpenChange={setJoinDialogOpen}
+          userId={user.id}
+          onJoined={fetchEnrolledClasses}
+        />
       </div>
     </PageTransition>
   );
