@@ -133,7 +133,7 @@ export const OrganizationSelector = ({ userId, isAdmin, onComplete }: Organizati
           <School className="w-8 h-8 text-blue-400" />
         </div>
         <CardTitle className="text-2xl font-black text-white">Join Your School</CardTitle>
-        <CardDescription className="text-slate-400">
+        <CardDescription className="text-white">
           Please select your organization to continue
         </CardDescription>
       </CardHeader>
@@ -144,7 +144,7 @@ export const OrganizationSelector = ({ userId, isAdmin, onComplete }: Organizati
               <Users className="h-4 w-4" /> Join
             </TabsTrigger>
             {isAdmin && (
-              <TabsTrigger value="create" className="rounded-lg gap-2 font-bold data-[state=active]:bg-blur-600">
+              <TabsTrigger value="create" className="rounded-lg gap-2 font-bold data-[state=active]:bg-blue-600">
                 <Plus className="h-4 w-4" /> Create
               </TabsTrigger>
             )}
