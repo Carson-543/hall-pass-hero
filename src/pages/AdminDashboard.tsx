@@ -504,8 +504,10 @@ const AdminDashboard = () => {
           console.log("[AdminDashboard] Global pass update received:", payload);
           fetchActivePasses();
         })
-        .subscribe((status) => console.log(`[AdminDashboard] Admin channel status: ${status}`));
-    }
+        .subscribe((status) => {
+          const timestamp = new Date().toLocaleTimeString(); // e.g., "2:45:10 PM"
+  console.log(`[${timestamp}] [AdminDashboard] Admin channel status: ${status}`);
+        }}
 
     return () => {
       if (channelRef.current) {
