@@ -143,26 +143,26 @@ export const ClassManagementDialog = ({
           <DialogTitle className="text-3xl font-black tracking-tight text-white mb-1">
             {editingClass ? 'Edit Class' : 'Create Class'}
           </DialogTitle>
-          <p className="text-slate-400 font-medium">
+          <p className="text-slate-300 font-medium">
             {editingClass ? 'Update your class details' : 'Add a new class to your roster'}
           </p>
         </DialogHeader>
 
         <div className="space-y-6 py-8 relative z-10">
           <div className="space-y-3">
-            <Label className="text-xs font-black uppercase tracking-widest text-slate-500 ml-1">
+            <Label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">
               Class Name
             </Label>
             <Input
               value={className}
               onChange={(e) => setClassName(e.target.value)}
               placeholder="e.g., English 101"
-              className="h-14 rounded-2xl bg-white/5 border-white/10 px-6 text-base font-medium text-white placeholder:text-slate-600 focus:ring-primary/20 transition-all border-2 focus:border-primary/50"
+              className="h-14 rounded-2xl bg-white/5 border-white/10 px-6 text-base font-medium text-white placeholder:text-slate-500 focus:ring-primary/20 transition-all border-2 focus:border-primary/50"
             />
           </div>
 
           <div className="space-y-3">
-            <Label className="text-xs font-black uppercase tracking-widest text-slate-500 ml-1">
+            <Label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">
               Schedule Period
             </Label>
             <Select value={periodOrder} onValueChange={setPeriodOrder}>
@@ -171,7 +171,7 @@ export const ClassManagementDialog = ({
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-white/10 bg-slate-900/95 backdrop-blur-xl">
                 {Array.from({ length: defaultPeriodCount }, (_, i) => i + 1).map(num => (
-                  <SelectItem key={num} value={num.toString()} className="h-12 rounded-xl focus:bg-primary/20 focus:text-white transition-colors">
+                  <SelectItem key={num} value={num.toString()} className="h-12 rounded-xl text-slate-200 focus:bg-primary/20 focus:text-white transition-colors">
                     {num === 1 ? '1st' : num === 2 ? '2nd' : num === 3 ? '3rd' : `${num}th`} Period
                   </SelectItem>
                 ))}
