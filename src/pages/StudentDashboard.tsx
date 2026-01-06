@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { PeriodDisplay } from '@/components/PeriodDisplay';
 import { QuotaDisplay } from '@/components/QuotaDisplay';
@@ -78,6 +79,7 @@ const StudentDashboard = () => {
   const [activePass, setActivePass] = useState<any | null>(null);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [selectedDestination, setSelectedDestination] = useState<string>('');
+  const [customDestination, setCustomDestination] = useState<string>('');
   const [requestLoading, setRequestLoading] = useState(false);
   const [activeFreeze, setActiveFreeze] = useState<{ freeze_type: string; ends_at?: string | null } | null>(null);
 
@@ -218,10 +220,13 @@ const StudentDashboard = () => {
 
   const handleRequest = async () => {
     if (!user?.id || !selectedClassId || !selectedDestination) return;
+    const finalDestination = selectedDestination === 'Other' ? customDestination : selectedDestination;
+    if (!finalDestination) return;
+
     const { error } = await supabase.from('passes').insert({
       student_id: user.id,
       class_id: selectedClassId,
-      destination: selectedDestination
+      destination: finalDestination
     });
 
     if (error) {
@@ -516,7 +521,7 @@ const StudentDashboard = () => {
                               </span>
                               {selected && (
                                 <motion.div
-                                  className="absolute inset-0 rounded-xl border-2 border-red-500/50"
+                                  className="absolute inset-0 rounded-xl border-4 border-blue-900/50"
                                   layoutId="destination-highlight"
                                 />
                               )}
@@ -524,6 +529,29 @@ const StudentDashboard = () => {
                           );
                         })}
                       </div>
+
+                      {/* Custom Destination Input */}
+                      <AnimatePresence>
+                        {selectedDestination === 'Other' && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="space-y-3"
+                          >
+                            <Label className="text-xs font-black uppercase tracking-[0.2em] text-blue-400">
+                              Where are you going?
+                            </Label>
+                            <Input
+                              placeholder="Enter destination..."
+                              value={customDestination}
+                              onChange={(e) => setCustomDestination(e.target.value)}
+                              className="h-14 rounded-xl bg-white/5 border-2 border-white/10 text-white font-bold"
+                              autoFocus
+                            />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
 
                     {/* Submit Button */}
@@ -533,7 +561,7 @@ const StudentDashboard = () => {
                       size="lg"
                       onClick={handleRequest}
                       loading={requestLoading}
-                      disabled={!selectedClassId || !selectedDestination || requestLoading}
+                      disabled={!selectedClassId || !selectedDestination || (selectedDestination === 'Other' && !customDestination.trim()) || requestLoading}
                     >
                       {requestLoading ? 'Requesting...' : 'Submit Request'}
                     </GlowButton>
