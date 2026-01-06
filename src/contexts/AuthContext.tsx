@@ -52,8 +52,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (profileData) {
         setIsApproved(profileData.is_approved);
       }
-    } catch (error) {
-      console.error('Error fetching user data:', error);
+    } catch {
+      // Authentication error - fail silently for security
     }
   };
 

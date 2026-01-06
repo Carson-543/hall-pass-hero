@@ -113,15 +113,14 @@ const AdminDashboard = () => {
   // Load settings from organization context
   useEffect(() => {
     if (settings) {
-      console.log("[AdminDashboard] Loading organization settings into state:", settings);
       setWeeklyQuota(settings.weekly_bathroom_limit);
       setDefaultPeriodCount(settings.default_period_count);
-
       setRequireDeletionApproval(settings.require_deletion_approval);
       setBathroomExpectedMinutes(settings.bathroom_expected_minutes);
       setLockerExpectedMinutes(settings.locker_expected_minutes);
       setOfficeExpectedMinutes(settings.office_expected_minutes);
-      setSemesterEndDate(settings.semester_end_date || '');
+      // Use type assertion for fields not yet in generated types
+      setSemesterEndDate((settings as any).semester_end_date || '');
     }
   }, [settings]);
 
@@ -129,32 +128,25 @@ const AdminDashboard = () => {
 
   const fetchSchedules = async () => {
     if (!organizationId) return;
-    console.log(`🔄 Fetching schedules for organization: ${organizationId}`);
-    const { data, error } = await supabase.from('schedules').select('*').eq('organization_id', organizationId).order('name');
-    if (error) console.error("❌ Error fetching schedules:", error);
+    const { data } = await supabase.from('schedules').select('*').eq('organization_id', organizationId).order('name');
     if (data) {
-      console.log(`📥 ${data.length} schedules fetched.`);
       setSchedules(data);
     }
   };
 
   const fetchPeriodsForStaging = async (scheduleId: string) => {
-    console.log(`🔄 Fetching periods for schedule: ${scheduleId}`);
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('periods')
       .select('*')
       .eq('schedule_id', scheduleId)
       .order('period_order');
-    if (error) console.error("❌ Error fetching periods:", error);
     if (data) {
-      console.log(`📥 ${data.length} periods fetched.`);
       setPeriods(data);
     }
   };
 
   const fetchActivePasses = async () => {
     if (!organizationId) return;
-    console.log(`[AdminDashboard] Fetching active passes for organization: ${organizationId}`);
 
     // 1. Fetch all classes in this organization
     const { data: classesData, error: classError } = await supabase
@@ -162,20 +154,13 @@ const AdminDashboard = () => {
       .select('id, name')
       .eq('organization_id', organizationId);
 
-    if (classError) {
-      console.error("[AdminDashboard] Error fetching classes:", classError);
-      return;
-    }
-
-    if (!classesData || classesData.length === 0) {
-      console.log("[AdminDashboard] No classes found for this organization.");
+    if (classError || !classesData || classesData.length === 0) {
       setActivePasses([]);
       return;
     }
 
     const classIds = classesData.map(c => c.id);
     const classMap = new Map(classesData.map(c => [c.id, c.name]));
-    console.log(`[AdminDashboard] Found ${classIds.length} classes. Fetching active passes...`);
 
     // 2. Fetch passes for these classes
     const { data: passes, error: passError } = await supabase
@@ -185,18 +170,11 @@ const AdminDashboard = () => {
       .in('status', ['approved', 'pending_return'])
       .order('approved_at', { ascending: true });
 
-    if (passError) {
-      console.error("[AdminDashboard] Error fetching active passes:", passError);
-      return;
-    }
-
-    if (!passes || passes.length === 0) {
-      console.log("[AdminDashboard] No active hallway passes found.");
+    if (passError || !passes || passes.length === 0) {
       setActivePasses([]);
       return;
     }
 
-    console.log(`[AdminDashboard] Found ${passes.length} active passes. Resolving student names...`);
     const studentIds = [...new Set(passes.map(p => p.student_id))];
     const { data: profiles } = await supabase
       .from('profiles')
@@ -217,23 +195,16 @@ const AdminDashboard = () => {
 
   const fetchPendingUsers = async () => {
     if (!organizationId) return;
-    console.log(`🔄 Fetching pending user approvals for: ${organizationId}`);
 
     // Use RPC to fetch pending users with emails (securely from auth.users)
-    const { data, error } = await supabase
-      .rpc('get_organization_pending_users', { _org_id: organizationId });
+    // Type assertion needed as this function is not in generated types yet
+    const { data, error } = await (supabase.rpc as any)('get_organization_pending_users', { _org_id: organizationId });
 
-    if (error) {
-      console.error("❌ Error fetching pending users:", error);
-      return;
-    }
-
-    if (!data || data.length === 0) {
+    if (error || !data || data.length === 0) {
       setPendingUsers([]);
       return;
     }
 
-    console.log(`📥 ${data.length} pending users found.`);
     setPendingUsers(data.map((u: any) => ({
       id: u.id,
       full_name: u.full_name,
@@ -247,7 +218,6 @@ const AdminDashboard = () => {
 
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
-    console.log(`🔄 Fetching schedule assignments for month: ${format(currentMonth, 'MMMM yyyy')}`);
 
     const { data: orgSchedules } = await supabase
       .from('schedules')
@@ -258,16 +228,14 @@ const AdminDashboard = () => {
 
     const scheduleIds = orgSchedules.map(s => s.id);
 
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('schedule_assignments')
       .select('date, schedule_id')
       .in('schedule_id', scheduleIds)
       .gte('date', format(start, 'yyyy-MM-dd'))
       .lte('date', format(end, 'yyyy-MM-dd'));
 
-    if (error) console.error("❌ Error fetching assignments:", error);
     if (data) {
-      console.log(`📥 ${data.length} schedule assignments fetched for current view.`);
       setScheduleAssignments(data.map(a => ({
         date: a.date,
         schedule_id: a.schedule_id,
