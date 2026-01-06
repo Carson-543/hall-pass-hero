@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { LogOut, Zap } from 'lucide-react';
+import { LogOut, School } from 'lucide-react';
 
 interface TeacherHeaderProps {
   signOut: () => void;
@@ -20,7 +20,7 @@ export const TeacherHeader = ({ signOut }: TeacherHeaderProps) => {
           whileHover={{ scale: 1.05, rotate: 5 }}
           whileTap={{ scale: 0.95 }}
         >
-          <Zap className="w-7 h-7 text-white fill-white/20" />
+          <School className="w-7 h-7 text-white" />
         </motion.div>
         <div>
           <h1 className="text-3xl font-black tracking-tighter text-white leading-none mb-1">ClassPass <span className="text-blue-500">Pro</span></h1>
