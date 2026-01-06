@@ -844,6 +844,7 @@ const AdminDashboard = () => {
                           <Button variant="outline" className="w-full border-2 border-dashed border-white/10 bg-transparent hover:bg-white/5 hover:border-blue-500/30 text-slate-400 hover:text-white font-black h-12 rounded-2xl transition-all" onClick={openNewSchedule}>
                             <Plus className="h-4 w-4 mr-2" /> Create New Schedule
                           </Button>
+                        </div>
                       </GlassCard>
                     </div>
                   </div>
@@ -1030,7 +1031,7 @@ const AdminDashboard = () => {
         date={subDialogDate}
         organizationId={organizationId || null}
       />
-    </PageTransition >
+    </PageTransition>
   );
 };
 
