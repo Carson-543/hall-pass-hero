@@ -230,37 +230,54 @@ const Auth = () => {
                 <GlowButton type="submit" className="w-full h-14 rounded-2xl text-lg font-black" loading={isLoading}>Sign In</GlowButton>
               </form>
             </TabsContent>
-            <TabsContent value="signup" className="space-y-6">
-              <form onSubmit={handleSignup} className="space-y-5">
-                <div className="space-y-2">
-                  <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Full Name</Label>
-                  <Input value={signupName} onChange={(e) => setSignupName(e.target.value)} placeholder="Enter your full name" className="h-14 rounded-2xl px-6 font-medium" required />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Email Address</Label>
-                  <Input type="email" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} placeholder="name@school.edu" className="h-14 rounded-2xl px-6 font-medium" required />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Password</Label>
-                  <Input type={showPassword ? "text" : "password"} value={signupPassword} onChange={(e) => setSignupPassword(e.target.value)} placeholder="Min. 6 characters" className="h-14 rounded-2xl px-6 font-medium" required />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">I am a...</Label>
-                  <Select value={signupRole} onValueChange={(v) => setSignupRole(v as AppRole)}>
-                    <SelectTrigger className="h-14 rounded-2xl px-6 text-base font-medium">
-                      <SelectValue placeholder="Select your role" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-2xl">
-                      <SelectItem value="student" className="h-12 rounded-xl">Student</SelectItem>
-                      <SelectItem value="teacher" className="h-12 rounded-xl">Teacher</SelectItem>
-                      <SelectItem value="admin" className="h-12 rounded-xl">Administrator</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {signupRole !== 'student' && <p className="text-[10px] font-bold text-primary uppercase tracking-widest mt-2">* Requires approval</p>}
-                </div>
-                <GlowButton type="submit" className="w-full h-14 rounded-2xl text-lg font-black" loading={isLoading}>Create Account</GlowButton>
-              </form>
-            </TabsContent>
+           <TabsContent value="signup" className="space-y-6">
+  <form onSubmit={handleSignup} className="space-y-5">
+    <div className="space-y-2">
+      <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Full Name</Label>
+      <Input value={signupName} onChange={(e) => setSignupName(e.target.value)} placeholder="Enter your full name" className="h-14 rounded-2xl px-6 font-medium" required />
+    </div>
+    <div className="space-y-2">
+      <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Email Address</Label>
+      <Input type="email" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} placeholder="name@school.edu" className="h-14 rounded-2xl px-6 font-medium" required />
+    </div>
+    <div className="space-y-2">
+      <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Password</Label>
+      {/* ADDED WRAPPER AND TOGGLE BUTTON BELOW */}
+      <div className="relative">
+        <Input 
+          type={showPassword ? "text" : "password"} 
+          value={signupPassword} 
+          onChange={(e) => setSignupPassword(e.target.value)} 
+          placeholder="Min. 6 characters" 
+          className="h-14 rounded-2xl px-6 font-medium" 
+          required 
+        />
+        <button 
+          type="button" 
+          onClick={() => setShowPassword(!showPassword)} 
+          className="absolute right-5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+        >
+          {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+        </button>
+      </div>
+    </div>
+    <div className="space-y-2">
+      <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">I am a...</Label>
+      <Select value={signupRole} onValueChange={(v) => setSignupRole(v as AppRole)}>
+        <SelectTrigger className="h-14 rounded-2xl px-6 text-base font-medium">
+          <SelectValue placeholder="Select your role" />
+        </SelectTrigger>
+        <SelectContent className="rounded-2xl">
+          <SelectItem value="student" className="h-12 rounded-xl">Student</SelectItem>
+          <SelectItem value="teacher" className="h-12 rounded-xl">Teacher</SelectItem>
+          <SelectItem value="admin" className="h-12 rounded-xl">Administrator</SelectItem>
+        </SelectContent>
+      </Select>
+      {signupRole !== 'student' && <p className="text-[10px] font-bold text-primary uppercase tracking-widest mt-2">* Requires approval</p>}
+    </div>
+    <GlowButton type="submit" className="w-full h-14 rounded-2xl text-lg font-black" loading={isLoading}>Create Account</GlowButton>
+  </form>
+</TabsContent>
           </Tabs>
         </motion.div>
       </div>
