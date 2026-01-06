@@ -546,7 +546,7 @@ const StudentDashboard = () => {
                               placeholder="Enter destination..."
                               value={customDestination}
                               onChange={(e) => setCustomDestination(e.target.value)}
-                              className="h-14 rounded-xl bg-white/5 border-2 border-white/10 text-white font-bold"
+                              className="h-14 rounded-xl bg-white/5 border-2 border-white/10 text-white font-bold focus-visible:ring-blue-900 focus-visible:ring-offset-slate-950"
                               autoFocus
                             />
                           </motion.div>
