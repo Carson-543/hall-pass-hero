@@ -97,6 +97,7 @@ const AdminDashboard = () => {
   // Organization Settings
   const [weeklyQuota, setWeeklyQuota] = useState(4);
   const [defaultPeriodCount, setDefaultPeriodCount] = useState(7);
+  const [semesterEndDate, setSemesterEndDate] = useState<string>('');
 
   const [requireDeletionApproval, setRequireDeletionApproval] = useState(false);
   const [bathroomExpectedMinutes, setBathroomExpectedMinutes] = useState(5);
@@ -120,6 +121,7 @@ const AdminDashboard = () => {
       setBathroomExpectedMinutes(settings.bathroom_expected_minutes);
       setLockerExpectedMinutes(settings.locker_expected_minutes);
       setOfficeExpectedMinutes(settings.office_expected_minutes);
+      setSemesterEndDate(settings.semester_end_date || '');
     }
   }, [settings]);
 
@@ -317,6 +319,7 @@ const AdminDashboard = () => {
         bathroom_expected_minutes: bathroomExpectedMinutes,
         locker_expected_minutes: lockerExpectedMinutes,
         office_expected_minutes: officeExpectedMinutes,
+        semester_end_date: semesterEndDate || null,
       }, { onConflict: 'organization_id' });
 
     if (error) {
@@ -930,6 +933,18 @@ const AdminDashboard = () => {
                           </div>
                         </div>
                       </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                        <div className="space-y-3">
+                          <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Semester End Date</Label>
+                          <Input
+                            type="date"
+                            value={semesterEndDate}
+                            onChange={(e) => setSemesterEndDate(e.target.value)}
+                            className="bg-white/5 border-white/10 text-white font-bold h-12 rounded-xl focus:border-blue-500 [color-scheme:dark]"
+                          />
+                          <p className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wide">On this date, pass history and class enrollments will be wiped.</p>
+                        </div>
+                      </div>
 
                       <div className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/10 transition-all hover:bg-white/10">
                         <div>
@@ -1031,7 +1046,7 @@ const AdminDashboard = () => {
         date={subDialogDate}
         organizationId={organizationId || null}
       />
-    </PageTransition>
+    </PageTransition >
   );
 };
 
