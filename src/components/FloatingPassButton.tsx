@@ -29,43 +29,64 @@ export const FloatingPassButton = ({
     return null;
   }
 
- const handleQuickPass = async () => {
-  setIsLoading(true);
-  setIsPressed(true);
+  const handleQuickPass = async () => {
+    setIsLoading(true);
+    setIsPressed(true);
 
-  try {
-    const { error } = await supabase
-      .from('passes')
-      .insert({
-        student_id: userId,
-        class_id: currentClassId,
-        destination: 'Restroom',
-        status: 'approved',
-        approved_at: new Date().toISOString(),
-        approved_by: userId, 
-        // FIX: The column name in your SQL is is_quota_override, not is_over_limit
-        is_quota_override: isQuotaExceeded, 
-        requested_at: new Date().toISOString()
-      });
+    try {
+      // First check if the class has autonomous queue enabled
+      const { data: classData, error: classError } = await supabase
+        .from('classes')
+        .select('is_queue_autonomous')
+        .eq('id', currentClassId)
+        .single();
 
-    if (error) {
-      console.error('Supabase Error:', error.message);
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      toast({ title: 'Quick Pass Started' });
-      onPassRequested();
+      if (classError || !classData) {
+        toast({
+          title: 'Error',
+          description: 'Could not verify class settings',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Only auto-approve if autonomous queue is enabled
+      const isAutoApproved = classData.is_queue_autonomous === true;
+
+      const { error } = await supabase
+        .from('passes')
+        .insert({
+          student_id: userId,
+          class_id: currentClassId,
+          destination: 'Restroom',
+          status: isAutoApproved ? 'approved' : 'pending',
+          approved_at: isAutoApproved ? new Date().toISOString() : null,
+          approved_by: isAutoApproved ? userId : null,
+          auto_approved: isAutoApproved,
+          is_quota_override: false,
+          requested_at: new Date().toISOString()
+        });
+
+      if (error) {
+        toast({
+          title: 'Error',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({ 
+          title: isAutoApproved ? 'Quick Pass Started' : 'Pass Requested',
+          description: isAutoApproved ? undefined : 'Waiting for teacher approval'
+        });
+        onPassRequested();
+      }
+    } catch (err) {
+      // Silent fail
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => setIsPressed(false), 200);
     }
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setIsLoading(false);
-    setTimeout(() => setIsPressed(false), 200);
-  }
-};
+  };
   
   return (
     <button
