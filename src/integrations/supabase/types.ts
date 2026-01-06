@@ -167,6 +167,7 @@ export type Database = {
           office_expected_minutes: number | null
           organization_id: string
           require_deletion_approval: boolean | null
+          semester_end_date: string | null
           updated_at: string | null
           weekly_bathroom_limit: number | null
         }
@@ -179,6 +180,7 @@ export type Database = {
           office_expected_minutes?: number | null
           organization_id: string
           require_deletion_approval?: boolean | null
+          semester_end_date?: string | null
           updated_at?: string | null
           weekly_bathroom_limit?: number | null
         }
@@ -191,6 +193,7 @@ export type Database = {
           office_expected_minutes?: number | null
           organization_id?: string
           require_deletion_approval?: boolean | null
+          semester_end_date?: string | null
           updated_at?: string | null
           weekly_bathroom_limit?: number | null
         }
@@ -378,7 +381,6 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string | null
-          email: string
           full_name: string
           id: string
           is_approved: boolean | null
@@ -387,7 +389,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          email: string
           full_name: string
           id: string
           is_approved?: boolean | null
@@ -396,7 +397,6 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
-          email?: string
           full_name?: string
           id?: string
           is_approved?: boolean | null
@@ -576,6 +576,8 @@ export type Database = {
         Args: { _class_id: string; _user_id: string }
         Returns: boolean
       }
+      check_and_cleanup_semesters: { Args: never; Returns: undefined }
+      cleanup_semester_data: { Args: { p_org_id: string }; Returns: undefined }
       delete_user_and_data: { Args: { _user_id: string }; Returns: undefined }
       generate_join_code: { Args: never; Returns: string }
       get_bathroom_queue_position: {
@@ -594,6 +596,16 @@ export type Database = {
           slug: string
         }[]
       }
+      get_organization_pending_users: {
+        Args: { _org_id: string }
+        Returns: {
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+        }[]
+      }
       get_user_organization: { Args: { _user_id: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
@@ -610,6 +622,7 @@ export type Database = {
       is_class_teacher: { Args: { _class_id: string }; Returns: boolean }
       is_enrolled_in_class: { Args: { _class_id: string }; Returns: boolean }
       is_same_organization: { Args: { _user_id: string }; Returns: boolean }
+      student_check_in: { Args: { p_pass_id: string }; Returns: undefined }
     }
     Enums: {
       app_role: "student" | "teacher" | "admin"

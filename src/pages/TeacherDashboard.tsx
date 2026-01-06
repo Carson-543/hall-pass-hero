@@ -32,6 +32,7 @@ interface ClassInfo {
   period_order: number;
   join_code: string;
   is_queue_autonomous?: boolean;
+  max_concurrent_bathroom?: number;
 }
 
 interface PendingPass {
