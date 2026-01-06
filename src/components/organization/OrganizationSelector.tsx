@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Users } from 'lucide-react';
+import { Plus, Users, School } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface Organization {
   id: string;
@@ -26,20 +27,23 @@ export const OrganizationSelector = ({ userId, isAdmin, onComplete }: Organizati
   const [newOrgName, setNewOrgName] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchOrganizations();
   }, []);
 
   const fetchOrganizations = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('organizations')
       .select('id, name, slug')
       .order('name');
 
-    if (data) {
-      setOrganizations(data);
+    if (error) {
+      toast({ title: "Error", description: "Failed to load organizations.", variant: "destructive" });
+      return;
     }
+    if (data) setOrganizations(data);
   };
 
   const generateSlug = (name: string) => {
@@ -53,24 +57,28 @@ export const OrganizationSelector = ({ userId, isAdmin, onComplete }: Organizati
     if (!selectedOrgId) return;
     setLoading(true);
 
-    const { error } = await supabase
+    // 1. Join organization memberships
+    const { error: memberError } = await supabase
       .from('organization_memberships')
-      .insert({
-        organization_id: selectedOrgId,
-        user_id: userId,
-      });
+      .insert({ organization_id: selectedOrgId, user_id: userId });
 
-    if (error) {
-      console.error('Error joining organization:', error);
+    if (memberError) {
+      toast({ title: "Error", description: "You might already be a member of this school.", variant: "destructive" });
       setLoading(false);
       return;
     }
 
-    // Update profile with organization_id
-    await supabase
+    // 2. Update the main profile row
+    const { error: profileError } = await supabase
       .from('profiles')
       .update({ organization_id: selectedOrgId })
       .eq('id', userId);
+
+    if (profileError) {
+      toast({ title: "Update Failed", description: "Profile could not be linked.", variant: "destructive" });
+      setLoading(false);
+      return;
+    }
 
     setLoading(false);
     onComplete(selectedOrgId);
@@ -82,43 +90,33 @@ export const OrganizationSelector = ({ userId, isAdmin, onComplete }: Organizati
 
     const slug = generateSlug(newOrgName);
 
-    // Create organization
+    // 1. Create organization
     const { data: org, error: orgError } = await supabase
       .from('organizations')
-      .insert({
-        name: newOrgName.trim(),
-        slug,
-        created_by: userId,
-      })
+      .insert({ name: newOrgName.trim(), slug, created_by: userId })
       .select()
       .single();
 
     if (orgError || !org) {
-      console.error('Error creating organization:', orgError);
+      toast({ title: "Creation Failed", description: orgError?.message || "Could not create school.", variant: "destructive" });
       setLoading(false);
       return;
     }
 
-    // Create membership
-    await supabase
-      .from('organization_memberships')
-      .insert({
-        organization_id: org.id,
-        user_id: userId,
-      });
-
-    // Update profile
-    await supabase
+    // 2. Setup membership & profile link (Admins are auto-approved for orgs they create)
+    await supabase.from('organization_memberships').insert({ organization_id: org.id, user_id: userId });
+    
+    const { error: profileError } = await supabase
       .from('profiles')
-      .update({ organization_id: org.id })
+      .update({ organization_id: org.id, is_approved: true })
       .eq('id', userId);
 
-    // Create default settings
-    await supabase
-      .from('organization_settings')
-      .insert({
-        organization_id: org.id,
-      });
+    if (profileError) {
+      toast({ title: "Linking Error", description: "School created, but profile update failed.", variant: "destructive" });
+    }
+
+    // 3. Setup default settings
+    await supabase.from('organization_settings').insert({ organization_id: org.id });
 
     setLoading(false);
     onComplete(org.id);
@@ -129,92 +127,82 @@ export const OrganizationSelector = ({ userId, isAdmin, onComplete }: Organizati
   );
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader className="text-center">
-        <img src="/logo.png" alt="Logo" className="h-16 w-16 mx-auto mb-4 object-contain drop-shadow-sm" />
-        <CardTitle>Join Your School</CardTitle>
-        <CardDescription>
-          Select your school or create a new organization
+    <Card className="w-full max-w-md mx-auto border-white/10 bg-slate-900/50 backdrop-blur-xl shadow-2xl">
+      <CardHeader className="text-center pb-8">
+        <div className="mx-auto w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center mb-4 border border-blue-500/20">
+          <School className="w-8 h-8 text-blue-400" />
+        </div>
+        <CardTitle className="text-2xl font-black text-white">Join Your School</CardTitle>
+        <CardDescription className="text-slate-400">
+          Please select your organization to continue
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="join" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="join" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Join
+          <TabsList className="grid w-full grid-cols-2 rounded-xl h-12 p-1 bg-white/5 border border-white/10">
+            <TabsTrigger value="join" className="rounded-lg gap-2 font-bold data-[state=active]:bg-primary">
+              <Users className="h-4 w-4" /> Join
             </TabsTrigger>
             {isAdmin && (
-              <TabsTrigger value="create" className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Create
+              <TabsTrigger value="create" className="rounded-lg gap-2 font-bold data-[state=active]:bg-primary">
+                <Plus className="h-4 w-4" /> Create
               </TabsTrigger>
             )}
           </TabsList>
 
-          <TabsContent value="join" className="space-y-4 mt-4">
+          <TabsContent value="join" className="space-y-6 mt-8">
             <div className="space-y-2">
-              <Label>Search Schools</Label>
+              <Label className="text-xs font-black uppercase text-slate-500 ml-1">Search Schools</Label>
               <Input
-                placeholder="Type to search..."
+                placeholder="Lincoln High School..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-12 rounded-xl bg-white/5 border-white/10 focus:ring-primary/20"
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Select School</Label>
+              <Label className="text-xs font-black uppercase text-slate-500 ml-1">Select School</Label>
               <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose your school" />
+                <SelectTrigger className="h-12 rounded-xl bg-white/5 border-white/10">
+                  <SelectValue placeholder="Choose a school" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-xl border-white/10 bg-slate-900">
                   {filteredOrganizations.map(org => (
-                    <SelectItem key={org.id} value={org.id}>
-                      {org.name}
-                    </SelectItem>
+                    <SelectItem key={org.id} value={org.id} className="h-10 rounded-lg">{org.name}</SelectItem>
                   ))}
-                  {filteredOrganizations.length === 0 && (
-                    <div className="p-2 text-sm text-muted-foreground text-center">
-                      No schools found
-                    </div>
-                  )}
+                  {filteredOrganizations.length === 0 && <div className="p-4 text-sm text-slate-500 text-center">No schools found</div>}
                 </SelectContent>
               </Select>
             </div>
 
             <Button
-              className="w-full"
+              className="w-full h-14 rounded-2xl font-black text-lg bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
               onClick={handleJoinOrganization}
               disabled={!selectedOrgId || loading}
             >
-              {loading ? 'Joining...' : 'Join School'}
+              {loading ? <Loader2 className="animate-spin" /> : 'Join School'}
             </Button>
           </TabsContent>
 
           {isAdmin && (
-            <TabsContent value="create" className="space-y-4 mt-4">
+            <TabsContent value="create" className="space-y-6 mt-8">
               <div className="space-y-2">
-                <Label>School Name</Label>
+                <Label className="text-xs font-black uppercase text-slate-500 ml-1">New School Name</Label>
                 <Input
                   placeholder="e.g., Lincoln High School"
                   value={newOrgName}
                   onChange={(e) => setNewOrgName(e.target.value)}
+                  className="h-12 rounded-xl bg-white/5 border-white/10 focus:ring-primary/20"
                 />
               </div>
 
-              {newOrgName && (
-                <p className="text-xs text-muted-foreground">
-                  URL slug: {generateSlug(newOrgName)}
-                </p>
-              )}
-
               <Button
-                className="w-full"
+                className="w-full h-14 rounded-2xl font-black text-lg bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-500/20"
                 onClick={handleCreateOrganization}
                 disabled={!newOrgName.trim() || loading}
               >
-                {loading ? 'Creating...' : 'Create School'}
+                {loading ? <Loader2 className="animate-spin" /> : 'Create School'}
               </Button>
             </TabsContent>
           )}
