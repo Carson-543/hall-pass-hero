@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { usePageVisibility } from '@/hooks/usePageVisibility';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,7 +20,10 @@ import { InlinePeriodTable } from '@/components/admin/InlinePeriodTable';
 
 import { DeletionRequestsList } from '@/components/admin/DeletionRequestsList';
 import { SubManagementDialog } from '@/components/admin/SubManagementDialog';
-import { LogOut, Check, X, Calendar, Clock, Plus, Trash2, Users, Edit, Settings, UserCheck, Building2, ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
+import { LogOut, Check, X, Calendar, Clock, Plus, Trash2, Users, Edit, Settings, UserCheck, Building2, ChevronLeft, ChevronRight, UserPlus, School } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { GlassCard } from '@/components/ui/glass-card';
+import { PageTransition, StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
 
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday } from 'date-fns';
 
@@ -565,366 +568,461 @@ const AdminDashboard = () => {
   const daysInMonth = eachDayOfInterval({ start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) });
 
   return (
-    <div className="min-h-screen bg-background p-4 max-w-6xl mx-auto">
-      <header className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-lg">A</span>
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-            <p className="text-sm text-muted-foreground flex items-center gap-1">
-              <Building2 className="h-3 w-3" />
-              {organization?.name || 'No Organization'}
-            </p>
-          </div>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => {
-          console.log("🚪 Admin signing out...");
-          signOut();
-        }}>
-          <LogOut className="h-4 w-4 mr-2" />Sign Out
-        </Button>
-      </header>
+    <PageTransition className="min-h-screen bg-slate-950 text-slate-100 selection:bg-blue-500/30 overflow-x-hidden">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <motion.div
+          className="absolute -top-1/4 -right-1/4 w-[80%] h-[80%] rounded-full bg-blue-600/15 blur-[100px]"
+          style={{ willChange: "transform" }}
+          animate={{ x: [0, 20, 0], y: [0, -10, 0] }}
+          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+        />
+        <motion.div
+          className="absolute -bottom-1/4 -left-1/4 w-[70%] h-[70%] rounded-full bg-blue-400/5 blur-[80px]"
+          style={{ willChange: "transform" }}
+          animate={{ x: [0, -20, 0], y: [0, 15, 0] }}
+          transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+        />
+      </div>
 
-      <div className="space-y-4">
-        <PeriodDisplay />
-
-        <Tabs defaultValue="hallway">
-          <TabsList className="w-full bg-muted">
-            <TabsTrigger value="hallway" className="flex-1">Hallway</TabsTrigger>
-            <TabsTrigger value="schedule" className="flex-1">Schedule</TabsTrigger>
-            <TabsTrigger value="settings" className="flex-1">
-              Settings {pendingUsers.length > 0 && <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-destructive text-destructive-foreground">{pendingUsers.length}</span>}
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="hallway" className="space-y-2">
-            <p className="text-sm text-muted-foreground mb-4">{activePasses.length} student{activePasses.length !== 1 ? 's' : ''} in the hallway</p>
-            {activePasses.length === 0 ? (
-              <Card><CardContent className="py-8 text-center text-muted-foreground">No students in hallways</CardContent></Card>
-            ) : (
-              <div className="grid gap-2 sm:grid-cols-2">
-                {activePasses.map(pass => (
-                  <Card key={pass.id} className="border-l-4 border-l-primary">
-                    <CardContent className="py-3">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium">{pass.student_name}</p>
-                          <p className="text-sm text-muted-foreground">From: {pass.from_class}</p>
-                          <p className="text-sm font-semibold">To: {pass.destination}</p>
-                        </div>
-                        <div className="text-right space-y-1">
-                          {pass.approved_at && <ElapsedTimer startTime={pass.approved_at} destination={pass.destination} />}
-                          <p className="text-xs text-muted-foreground capitalize font-bold">{pass.status.replace('_', ' ')}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+      <div className="max-w-6xl mx-auto p-4 relative z-10">
+        <StaggerContainer>
+          <StaggerItem>
+            <header className="flex items-center justify-between mb-8 pt-4">
+              <div className="flex items-center gap-5">
+                <motion.div
+                  className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-2xl shadow-blue-500/40 border-2 border-white/20"
+                  whileHover={{ scale: 1.05, rotate: 5 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <School className="w-7 h-7 text-white" />
+                </motion.div>
+                <div>
+                  <h1 className="text-3xl font-black tracking-tighter text-white leading-none mb-1">ClassPass <span className="text-blue-500">Pro</span></h1>
+                  <p className="text-sm text-slate-300 font-extrabold tracking-wide uppercase flex items-center gap-1.5 mt-1">
+                    <Building2 className="h-3.5 w-3.5 text-blue-500" />
+                    {organization?.name || 'No Organization'}
+                  </p>
+                </div>
               </div>
-            )}
-          </TabsContent>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  console.log("🚪 Admin signing out...");
+                  signOut();
+                }}
+                className="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/15 text-white shadow-sm transition-all"
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
+            </header>
+          </StaggerItem>
 
-          <TabsContent value="schedule" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Left Column: Calendar & Controls */}
-              <div className="lg:col-span-8 space-y-6">
-                <Card className="border-none shadow-md overflow-hidden">
-                  <CardHeader className="bg-primary/5 pb-4 border-b">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2 text-xl">
-                        <Calendar className="h-5 w-5 text-primary" />
-                        School Schedule
-                      </CardTitle>
-                      <div className="flex gap-2">
-                        {/* Button removed as per user request */}
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="p-6 flex flex-col items-center">
-                      {/* Custom Navigation for Month */}
-                      <div className="flex items-center justify-between w-full max-w-3xl mb-4 px-4">
-                        <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1))}>
-                          <ChevronLeft className="h-5 w-5" />
-                        </Button>
-                        <h3 className="text-xl font-bold">{format(currentMonth, 'MMMM yyyy')}</h3>
-                        <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1))}>
-                          <ChevronRight className="h-5 w-5" />
-                        </Button>
-                      </div>
+          <StaggerItem>
+            <div className="space-y-4">
+              <GlassCard className="p-4 bg-slate-900/60 border-2 border-white/10 shadow-xl overflow-hidden">
+                <PeriodDisplay />
+              </GlassCard>
 
-                      {selectedDates.length > 0 && (
-                        <div className="w-full max-w-3xl mb-6 p-4 bg-primary/10 rounded-xl border border-primary/20 flex flex-wrap items-center gap-4 animate-in fade-in slide-in-from-top-2">
-                          <span className="font-bold text-primary flex items-center gap-2">
-                            <Check className="h-4 w-4" /> {selectedDates.length} days selected
-                          </span>
-                          <div className="flex-1 flex gap-2">
-                            <Select value={bulkScheduleId} onValueChange={setBulkScheduleId}>
-                              <SelectTrigger className="bg-background border-primary/20"><SelectValue placeholder="Select Schedule to Assign" /></SelectTrigger>
-                              <SelectContent>
-                                {schedules.map(s => (
-                                  <SelectItem key={s.id} value={s.id}>
+              <Tabs defaultValue="hallway" className="space-y-6">
+                <TabsList className="w-full bg-slate-900/60 border-2 border-white/10 h-14 p-1 rounded-2xl backdrop-blur-xl">
+                  <TabsTrigger value="hallway" className="flex-1 rounded-xl font-bold transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white">Hallway</TabsTrigger>
+                  <TabsTrigger value="schedule" className="flex-1 rounded-xl font-bold transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white">Schedule</TabsTrigger>
+                  <TabsTrigger value="settings" className="flex-1 rounded-xl font-bold transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white relative">
+                    Settings
+                    {pendingUsers.length > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white ring-2 ring-slate-950 animate-in zoom-in">
+                        {pendingUsers.length}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="hallway" className="space-y-4 outline-none border-none p-0">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-black uppercase tracking-widest text-slate-400">
+                      <span className="text-blue-500">{activePasses.length}</span> Student{activePasses.length !== 1 ? 's' : ''} in the Hallway
+                    </p>
+                  </div>
+
+                  {activePasses.length === 0 ? (
+                    <GlassCard className="py-12 text-center text-slate-500 font-bold bg-slate-900/40 border-white/5 shadow-inner">
+                      No students in hallways
+                    </GlassCard>
+                  ) : (
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
+                      {activePasses.map(pass => (
+                        <div key={pass.id} className="contents">
+                          <GlassCard className="relative overflow-hidden group hover:border-blue-500/50 transition-all duration-300 bg-slate-900/40">
+                            <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600 shadow-[2px_0_10px_rgba(37,99,235,0.4)]" />
+                            <div className="p-4 pl-6">
+                              <div className="flex items-start justify-between">
+                                <div className="space-y-1">
+                                  <p className="font-black text-white text-lg tracking-tight leading-none mb-2">{pass.student_name}</p>
+                                  <div className="flex flex-col gap-1.5">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1.5">
+                                      <Building2 className="h-3 w-3" /> From: {pass.from_class}
+                                    </p>
                                     <div className="flex items-center gap-2">
-                                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: s.color || '#6B7280' }} />
-                                      {s.name}
+                                      <span className="text-sm font-black text-blue-400">To: {pass.destination}</span>
+                                      <span className="text-[10px] font-black uppercase tracking-widest bg-blue-900/30 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/20">
+                                        {pass.status.replace('_', ' ')}
+                                      </span>
                                     </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Button onClick={handleBulkAssign} disabled={!bulkScheduleId} className="font-bold shadow-sm">
-                              Apply
-                            </Button>
-                            <Button variant="ghost" onClick={() => setSelectedDates([])}>
-                              Clear
-                            </Button>
-                          </div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  {pass.approved_at && (
+                                    <div className="bg-slate-950/50 rounded-xl p-2.5 border border-white/5 shadow-xl">
+                                      <ElapsedTimer startTime={pass.approved_at} destination={pass.destination} />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </GlassCard>
                         </div>
-                      )}
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
 
-                      {/* Calendar Grid - Custom Implementation for specific controls */}
-                      <div className="w-full max-w-3xl grid grid-cols-7 gap-1 sm:gap-2">
-                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                          <div key={day} className="text-center text-xs font-black uppercase text-muted-foreground py-2">
-                            {day}
+                <TabsContent value="schedule" className="space-y-6 outline-none border-none p-0">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Left Column: Calendar & Controls */}
+                    <div className="lg:col-span-8 space-y-6">
+                      <GlassCard className="border-2 border-white/10 shadow-2xl overflow-hidden p-0 bg-slate-900/60">
+                        <div className="p-6 border-b border-white/10 bg-white/5 flex items-center justify-between">
+                          <h3 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
+                            <Calendar className="h-5 w-5 text-blue-500" />
+                            School Schedule
+                          </h3>
+                        </div>
+                        <div className="p-6 flex flex-col items-center">
+                          {/* Custom Navigation for Month */}
+                          <div className="flex items-center justify-between w-full max-w-3xl mb-8 px-4">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1))}
+                              className="w-10 h-10 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-all"
+                            >
+                              <ChevronLeft className="h-6 w-6" />
+                            </Button>
+                            <h3 className="text-2xl font-black tracking-tight text-white">{format(currentMonth, 'MMMM yyyy')}</h3>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1))}
+                              className="w-10 h-10 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-all"
+                            >
+                              <ChevronRight className="h-6 w-6" />
+                            </Button>
                           </div>
-                        ))}
 
-                        {Array.from({ length: daysInMonth[0].getDay() }).map((_, i) => (
-                          <div key={`empty-${i}`} className="aspect-square" />
-                        ))}
+                          {selectedDates.length > 0 && (
+                            <div className="w-full max-w-3xl mb-8 p-6 bg-blue-600/20 rounded-2xl border-2 border-blue-500/30 flex flex-wrap items-center gap-4 animate-in fade-in slide-in-from-top-4 backdrop-blur-md">
+                              <span className="font-black text-blue-400 flex items-center gap-2 text-sm uppercase tracking-widest">
+                                <Check className="h-4 w-4" /> {selectedDates.length} days selected
+                              </span>
+                              <div className="flex-1 flex gap-3 min-w-[300px]">
+                                <Select value={bulkScheduleId} onValueChange={setBulkScheduleId}>
+                                  <SelectTrigger className="bg-slate-950 border-white/10 text-white font-bold h-11 rounded-xl">
+                                    <SelectValue placeholder="Assign Schedule..." />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-slate-900 border-white/10 text-white rounded-xl">
+                                    {schedules.map(s => (
+                                      <SelectItem key={s.id} value={s.id} className="focus:bg-blue-600 focus:text-white font-bold py-2.5">
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: s.color || '#6B7280' }} />
+                                          {s.name}
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Button onClick={handleBulkAssign} disabled={!bulkScheduleId} className="bg-blue-600 hover:bg-blue-700 text-white font-black px-6 h-11 rounded-xl shadow-lg shadow-blue-600/20">
+                                  Apply
+                                </Button>
+                                <Button variant="ghost" onClick={() => setSelectedDates([])} className="text-slate-400 hover:text-white font-bold px-4 h-11 rounded-xl">
+                                  Clear
+                                </Button>
+                              </div>
+                            </div>
+                          )}
 
-                        {daysInMonth.map(day => {
-                          const dateStr = format(day, 'yyyy-MM-dd');
-                          const assignment = scheduleAssignments.find(a => a.date === dateStr);
-                          const schedule = schedules.find(s => s.id === assignment?.schedule_id);
-                          const isSelected = selectedDates.includes(dateStr);
-                          const isTodayDate = isToday(day);
+                          {/* Calendar Grid - Custom Implementation for specific controls */}
+                          <div className="w-full max-w-3xl grid grid-cols-7 gap-1 sm:gap-2">
+                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                              <div key={day} className="text-center text-xs font-black uppercase text-muted-foreground py-2">
+                                {day}
+                              </div>
+                            ))}
 
-                          return (
-                            <div
-                              key={dateStr}
-                              onClick={() => toggleDateSelection(dateStr)}
-                              className={`
+                            {Array.from({ length: daysInMonth[0].getDay() }).map((_, i) => (
+                              <div key={`empty-${i}`} className="aspect-square" />
+                            ))}
+
+                            {daysInMonth.map(day => {
+                              const dateStr = format(day, 'yyyy-MM-dd');
+                              const assignment = scheduleAssignments.find(a => a.date === dateStr);
+                              const schedule = schedules.find(s => s.id === assignment?.schedule_id);
+                              const isSelected = selectedDates.includes(dateStr);
+                              const isTodayDate = isToday(day);
+
+                              return (
+                                <div
+                                  key={dateStr}
+                                  onClick={() => toggleDateSelection(dateStr)}
+                                  className={`
                                   relative aspect-square p-1 rounded-xl border cursor-pointer transition-all duration-200
                                   hover:border-primary/50 hover:shadow-md group flex flex-col justify-between overflow-hidden
                                   ${isSelected ? 'ring-2 ring-primary border-primary bg-primary/5' : 'bg-card border-border'}
                                   ${isTodayDate ? 'ring-1 ring-offset-2 ring-blue-500' : ''}
                                 `}
-                              style={schedule?.color ? { backgroundColor: `${schedule.color}15`, borderColor: isSelected ? undefined : `${schedule.color}40` } : {}}
-                            >
-                              <div className="flex justify-between items-start">
-                                <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full ${isTodayDate ? 'bg-blue-500 text-white' : 'text-muted-foreground'}`}>
-                                  {format(day, 'd')}
-                                </span>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity -mr-1 -mt-1 hover:bg-transparent text-muted-foreground hover:text-primary"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSubDialogDate(day);
-                                    setSubDialogOpen(true);
-                                  }}
+                                  style={schedule?.color ? { backgroundColor: `${schedule.color}15`, borderColor: isSelected ? undefined : `${schedule.color}40` } : {}}
                                 >
-                                  <UserPlus className="h-3 w-3" />
-                                </Button>
-                              </div>
+                                  <div className="flex justify-between items-start">
+                                    <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full ${isTodayDate ? 'bg-blue-500 text-white' : 'text-muted-foreground'}`}>
+                                      {format(day, 'd')}
+                                    </span>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity -mr-1 -mt-1 hover:bg-transparent text-muted-foreground hover:text-primary"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSubDialogDate(day);
+                                        setSubDialogOpen(true);
+                                      }}
+                                    >
+                                      <UserPlus className="h-3 w-3" />
+                                    </Button>
+                                  </div>
 
-                              {schedule ? (
-                                <div className="mt-1">
-                                  <div
-                                    className="text-[10px] font-bold truncate px-1.5 py-0.5 rounded text-white shadow-sm text-center"
-                                    style={{ backgroundColor: schedule.color || '#6B7280' }}
-                                  >
-                                    {schedule.name}
+                                  {schedule ? (
+                                    <div className="mt-1">
+                                      <div
+                                        className="text-[10px] font-bold truncate px-1.5 py-0.5 rounded text-white shadow-sm text-center"
+                                        style={{ backgroundColor: schedule.color || '#6B7280' }}
+                                      >
+                                        {schedule.name}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="flex-1 flex items-center justify-center">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/20" />
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </GlassCard>
+                    </div>
+
+                    {/* Right Column: Legend & Tools */}
+                    <div className="lg:col-span-4 space-y-6">
+                      <GlassCard className="bg-slate-900/60 border-2 border-white/10 shadow-xl overflow-hidden p-0">
+                        <div className="p-4 border-b border-white/10 bg-white/5">
+                          <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Schedule Types</h3>
+                        </div>
+                        <div className="p-4 space-y-3">
+                          {schedules.map(s => (
+                            <div key={s.id} className="flex items-center justify-between group p-3 rounded-2xl hover:bg-white/10 transition-all border border-transparent hover:border-white/5">
+                              <div className="flex items-center gap-3">
+                                <div className="w-4 h-4 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.2)]" style={{ backgroundColor: s.color || '#6B7280' }} />
+                                <span className="font-black text-sm text-white">{s.name}</span>
+                              </div>
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-blue-600/20 text-blue-400" onClick={() => openEditSchedule(s)}><Edit className="h-4 w-4" /></Button>
+                                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-red-600/20 text-red-400" onClick={() => handleDeleteSchedule(s.id)}><Trash2 className="h-4 w-4" /></Button>
+                              </div>
+                            </div>
+                          ))}
+                          <Button variant="outline" className="w-full border-2 border-dashed border-white/10 bg-transparent hover:bg-white/5 hover:border-blue-500/30 text-slate-400 hover:text-white font-black h-12 rounded-2xl transition-all" onClick={openNewSchedule}>
+                            <Plus className="h-4 w-4 mr-2" /> Create New Schedule
+                          </Button>
+                      </GlassCard>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="settings" className="space-y-6 outline-none border-none p-0">
+                  <GlassCard className="bg-slate-900/60 border-2 border-white/10 shadow-xl overflow-hidden p-0">
+                    <div className="p-4 border-b border-white/10 bg-white/5 bg-gradient-to-r from-blue-600/10 to-transparent">
+                      <h3 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
+                        <UserCheck className="h-5 w-5 text-blue-500" />
+                        Staff Approvals
+                      </h3>
+                    </div>
+                    <div className="p-6">
+                      {pendingUsers.length === 0 ? (
+                        <div className="py-8 text-center bg-slate-950/30 rounded-2xl border border-white/5">
+                          <p className="text-slate-500 font-bold">No pending staff registrations</p>
+                        </div>
+                      ) : (
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          {pendingUsers.map(u => (
+                            <div key={u.id} className="contents">
+                              <GlassCard className="bg-slate-950/50 border-white/10 hover:border-blue-500/50 transition-all p-4">
+                                <div className="flex flex-col h-full justify-between gap-4">
+                                  <div>
+                                    <p className="font-black text-white text-lg leading-tight mb-1">{u.full_name}</p>
+                                    <p className="text-xs text-slate-400 font-medium truncate mb-2">{u.email}</p>
+                                    <span className="text-[10px] font-black uppercase tracking-widest bg-blue-600/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/20">
+                                      {u.role}
+                                    </span>
+                                  </div>
+                                  <div className="flex gap-2 pt-2 border-t border-white/5">
+                                    <Button size="sm" onClick={() => handleApproveUser(u.id)} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black rounded-xl border-none">Approve</Button>
+                                    <Button size="sm" variant="ghost" onClick={() => handleDenyUser(u.id)} className="px-3 hover:bg-red-600/20 text-red-500 rounded-xl">Deny</Button>
                                   </div>
                                 </div>
-                              ) : (
-                                <div className="flex-1 flex items-center justify-center">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/20" />
-                                </div>
-                              )}
+                              </GlassCard>
                             </div>
-                          );
-                        })}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
+                  </GlassCard>
 
-              {/* Right Column: Legend & Tools */}
-              <div className="lg:col-span-4 space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm font-black uppercase text-muted-foreground tracking-wider">Schedule Types</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {schedules.map(s => (
-                      <div key={s.id} className="flex items-center justify-between group p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className="w-4 h-4 rounded-full shadow-sm" style={{ backgroundColor: s.color || '#6B7280' }} />
-                          <span className="font-bold">{s.name}</span>
+                  {requireDeletionApproval && (
+                    <DeletionRequestsList />
+                  )}
+
+                  <GlassCard className="bg-slate-900/60 border-2 border-white/10 shadow-xl overflow-hidden p-0">
+                    <div className="p-4 border-b border-white/10 bg-white/5 bg-gradient-to-r from-blue-600/10 to-transparent">
+                      <h3 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
+                        <Settings className="h-5 w-5 text-blue-500" />
+                        Organization Settings
+                      </h3>
+                    </div>
+                    <div className="p-6 space-y-8">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                        <div className="space-y-3">
+                          <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Weekly Restroom Quota</Label>
+                          <Input type="number" min={1} max={50} value={weeklyQuota} onChange={(e) => setWeeklyQuota(parseInt(e.target.value) || 4)} className="bg-white/5 border-white/10 text-white font-bold h-12 rounded-xl focus:border-blue-500" />
+                          <p className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wide">Passes allowed per student per week</p>
                         </div>
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditSchedule(s)}><Edit className="h-3 w-3" /></Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteSchedule(s.id)}><Trash2 className="h-3 w-3" /></Button>
+                        <div className="space-y-3">
+                          <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Default Periods per Day</Label>
+                          <Input type="number" min={1} max={12} value={defaultPeriodCount} onChange={(e) => setDefaultPeriodCount(parseInt(e.target.value) || 7)} className="bg-white/5 border-white/10 text-white font-bold h-12 rounded-xl focus:border-blue-500" />
                         </div>
                       </div>
-                    ))}
-                    <Button variant="outline" className="w-full border-dashed" onClick={openNewSchedule}>
-                      <Plus className="h-4 w-4 mr-2" /> Create New Schedule
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </TabsContent>
 
-          {/* Removed TabsContent for substitutes */}
+                      <div className="space-y-4">
+                        <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Expected Return Times (minutes)</Label>
+                        <div className="grid grid-cols-3 gap-6">
+                          <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Restroom</Label>
+                            <Input type="number" min={1} value={bathroomExpectedMinutes} onChange={(e) => setBathroomExpectedMinutes(parseInt(e.target.value) || 5)} className="bg-white/5 border-white/10 text-white font-bold h-11 rounded-xl" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Locker</Label>
+                            <Input type="number" min={1} value={lockerExpectedMinutes} onChange={(e) => setLockerExpectedMinutes(parseInt(e.target.value) || 3)} className="bg-white/5 border-white/10 text-white font-bold h-11 rounded-xl" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Office</Label>
+                            <Input type="number" min={1} value={officeExpectedMinutes} onChange={(e) => setOfficeExpectedMinutes(parseInt(e.target.value) || 10)} className="bg-white/5 border-white/10 text-white font-bold h-11 rounded-xl" />
+                          </div>
+                        </div>
+                      </div>
 
-          <TabsContent value="settings" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><UserCheck className="h-5 w-5" />Staff Approvals</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {pendingUsers.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-4">No pending staff registrations</p>
-                ) : (
-                  <div className="space-y-2">
-                    {pendingUsers.map(u => (
-                      <div key={u.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                      <div className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/10 transition-all hover:bg-white/10">
                         <div>
-                          <p className="font-medium">{u.full_name}</p>
-                          <p className="text-sm text-muted-foreground">{u.email}</p>
-                          <span className="text-xs font-black uppercase bg-primary/10 text-primary px-2 py-0.5 rounded-full">{u.role}</span>
+                          <Label className="font-black text-white">Require Deletion Approval</Label>
+                          <p className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wide">Ohio SB 29 compliance mode</p>
                         </div>
-                        <div className="flex gap-2">
-                          <Button size="sm" onClick={() => handleApproveUser(u.id)} className="bg-green-600 hover:bg-green-700"><Check className="h-4 w-4" /></Button>
-                          <Button size="sm" variant="outline" onClick={() => handleDenyUser(u.id)} className="text-destructive border-destructive"><X className="h-4 w-4" /></Button>
-                        </div>
+                        <Switch
+                          checked={requireDeletionApproval}
+                          onCheckedChange={(val) => {
+                            console.log(`🔄 Toggling deletion approval setting to: ${val}`);
+                            setRequireDeletionApproval(val);
+                          }}
+                          className="data-[state=checked]:bg-blue-600"
+                        />
                       </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
-            {requireDeletionApproval && (
-              <DeletionRequestsList />
-            )}
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Settings className="h-5 w-5" />Organization Settings</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="font-bold">Weekly Restroom Quota (per student)</Label>
-                    <Input type="number" min={1} max={50} value={weeklyQuota} onChange={(e) => setWeeklyQuota(parseInt(e.target.value) || 4)} />
-                    <p className="text-xs text-muted-foreground">Default restroom passes allowed per student per week</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="font-bold">Default Periods per Day</Label>
-                    <Input type="number" min={1} max={12} value={defaultPeriodCount} onChange={(e) => setDefaultPeriodCount(parseInt(e.target.value) || 7)} />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Expected Return Times (minutes)</Label>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Restroom</Label>
-                      <Input type="number" min={1} value={bathroomExpectedMinutes} onChange={(e) => setBathroomExpectedMinutes(parseInt(e.target.value) || 5)} />
+                      <Button onClick={handleSaveSettings} className="w-full font-black h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/20 text-white mt-4 border-none">Save Organization Settings</Button>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Locker</Label>
-                      <Input type="number" min={1} value={lockerExpectedMinutes} onChange={(e) => setLockerExpectedMinutes(parseInt(e.target.value) || 3)} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Office</Label>
-                      <Input type="number" min={1} value={officeExpectedMinutes} onChange={(e) => setOfficeExpectedMinutes(parseInt(e.target.value) || 10)} />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/20">
-                  <div>
-                    <Label className="font-bold">Require Deletion Approval</Label>
-                    <p className="text-xs text-muted-foreground">Students must request account deletion (Ohio SB 29 compliance)</p>
-                  </div>
-                  <Switch checked={requireDeletionApproval} onCheckedChange={(val) => {
-                    console.log(`🔄 Toggling deletion approval setting to: ${val}`);
-                    setRequireDeletionApproval(val);
-                  }} />
-                </div>
-
-                <Button onClick={handleSaveSettings} className="w-full font-bold">Save Organization Settings</Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                  </GlassCard>
+                </TabsContent>
+              </Tabs>
+            </div>
+          </StaggerItem>
+        </StaggerContainer>
       </div>
 
-      <Dialog
-        open={scheduleDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) resetScheduleForm();
-          setScheduleDialogOpen(open);
-        }}
-      >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingSchedule ? 'Edit Bell Schedule' : 'Create New Bell Schedule'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Schedule Name</Label>
-                <Input value={newScheduleName} onChange={(e) => setNewScheduleName(e.target.value)} placeholder="e.g., Regular, Advisory, Assembly" />
-              </div>
-              <div className="space-y-2">
-                <Label>Color Identifier</Label>
-                <div className="flex gap-2">
-                  {SCHEDULE_COLORS.map(c => (
-                    <button
-                      key={c.value}
-                      className={`w-8 h-8 rounded-full border-2 transition-all ${newScheduleColor === c.value ? 'border-foreground scale-110' : 'border-transparent'}`}
-                      style={{ backgroundColor: c.value }}
-                      onClick={() => setNewScheduleColor(c.value)}
+      <AnimatePresence>
+        {scheduleDialogOpen && (
+          <Dialog
+            open={scheduleDialogOpen}
+            onOpenChange={(open) => {
+              if (!open) resetScheduleForm();
+              setScheduleDialogOpen(open);
+            }}
+          >
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-slate-900 border-white/10 text-white rounded-3xl shadow-2xl">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-black tracking-tight">{editingSchedule ? 'Edit Bell Schedule' : 'Create New Bell Schedule'}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Schedule Name</Label>
+                    <Input
+                      value={newScheduleName}
+                      onChange={(e) => setNewScheduleName(e.target.value)}
+                      placeholder="e.g., Regular, Advisory, Assembly"
+                      className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 font-bold"
                     />
-                  ))}
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Color Identifier</Label>
+                    <div className="flex gap-2">
+                      {SCHEDULE_COLORS.map(c => (
+                        <button
+                          key={c.value}
+                          className={`w-8 h-8 rounded-full border-2 transition-all ${newScheduleColor === c.value ? 'border-blue-500 scale-110 shadow-lg shadow-blue-500/20' : 'border-white/10'}`}
+                          style={{ backgroundColor: c.value }}
+                          onClick={() => setNewScheduleColor(c.value)}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </div>
+
+                <div className="flex items-center space-x-2 p-4 bg-white/5 border border-white/10 rounded-2xl transition-colors hover:bg-white/10">
+                  <Checkbox
+                    id="isSchoolDay"
+                    checked={newScheduleIsSchoolDay}
+                    onCheckedChange={(checked) => setNewScheduleIsSchoolDay(!!checked)}
+                    className="border-white/20 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                  />
+                  <Label htmlFor="isSchoolDay" className="font-bold text-sm text-slate-200">Students can request passes on this day</Label>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Period Timings</Label>
+                  <InlinePeriodTable
+                    periods={periods}
+                    onChange={(updated) => {
+                      console.log("💾 Period table updated in memory.");
+                      setPeriods(updated);
+                    }}
+                  />
+                </div>
+                <DialogFooter className="gap-2">
+                  <Button variant="outline" onClick={() => setScheduleDialogOpen(false)} className="bg-transparent border-white/10 text-white hover:bg-white/5 font-bold rounded-xl">Cancel</Button>
+                  <Button onClick={handleSaveSchedule} className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 px-8">Save Schedule</Button>
+                </DialogFooter>
               </div>
-            </div>
-
-            <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg">
-              <Checkbox id="isSchoolDay" checked={newScheduleIsSchoolDay} onCheckedChange={(checked) => setNewScheduleIsSchoolDay(!!checked)} />
-              <Label htmlFor="isSchoolDay" className="font-medium">Students can request passes on this day</Label>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="font-bold">Period Timings</Label>
-              <InlinePeriodTable
-                periods={periods}
-                onChange={(updated) => {
-                  console.log("💾 Period table updated in memory.");
-                  setPeriods(updated);
-                }}
-              />
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setScheduleDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleSaveSchedule}>Save Schedule</Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
+            </DialogContent>
+          </Dialog>
+        )}
+      </AnimatePresence>
 
       <SubManagementDialog
         open={subDialogOpen}
@@ -932,7 +1030,7 @@ const AdminDashboard = () => {
         date={subDialogDate}
         organizationId={organizationId || null}
       />
-    </div>
+    </PageTransition >
   );
 };
 
