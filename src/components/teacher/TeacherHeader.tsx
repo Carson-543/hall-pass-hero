@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { LogOut, School } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 
 interface TeacherHeaderProps {
   signOut: () => void;
@@ -16,11 +16,11 @@ export const TeacherHeader = ({ signOut }: TeacherHeaderProps) => {
     >
       <div className="flex items-center gap-5">
         <motion.div
-          className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-2xl shadow-blue-500/40 border-2 border-white/20"
+          className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-2xl shadow-blue-500/40 border-2 border-white/20 overflow-hidden p-2"
           whileHover={{ scale: 1.05, rotate: 5 }}
           whileTap={{ scale: 0.95 }}
         >
-          <School className="w-7 h-7 text-white" />
+          <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain drop-shadow-md" />
         </motion.div>
         <div>
           <h1 className="text-3xl font-black tracking-tighter text-white leading-none mb-1">ClassPass <span className="text-blue-500">Pro</span></h1>

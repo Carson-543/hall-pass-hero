@@ -26,7 +26,7 @@ import { JoinClassDialog } from '@/components/student/JoinClassDialog';
 import { PageTransition, FadeIn, StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
 import { FloatingElement } from '@/components/ui/floating-element';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { LogOut, Clock, MapPin, Settings as SettingsIcon, Loader2, ArrowLeft, School, DoorOpen, KeyRound, Building2, MoreHorizontal, Snowflake, X, Plus } from 'lucide-react';
+import { LogOut, Clock, MapPin, Settings as SettingsIcon, Loader2, ArrowLeft, DoorOpen, KeyRound, Building2, MoreHorizontal, Snowflake, X, Plus } from 'lucide-react';
 
 const DESTINATIONS = [
   { id: 'Restroom', icon: DoorOpen, label: 'Restroom' },
@@ -322,7 +322,7 @@ const StudentDashboard = () => {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <School className="w-7 h-7 text-white" />
+                <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain" />
               </motion.div>
               <div>
                 <h1 className="text-3xl font-black tracking-tighter text-white leading-none mb-1">ClassPass <span className="text-blue-500">Pro</span></h1>

@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { GlassCard } from '@/components/ui/glass-card';
 import { GlowButton } from '@/components/ui/glow-button';
 import { z } from 'zod';
-import { Loader2, Eye, EyeOff, School } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 const emailSchema = z.string().email('Invalid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
@@ -221,7 +221,7 @@ const Auth = () => {
             transition={{ duration: 0.4, ease: "easeOut", delay: 0.2 }}
             whileHover={{ scale: 1.05 }}
           >
-            <School className="w-12 h-12 text-white" />
+            <img src="/logo.png" alt="Logo" className="w-16 h-16 object-contain" />
           </motion.div>
 
           <motion.div

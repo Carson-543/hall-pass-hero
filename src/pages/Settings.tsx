@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, AlertTriangle, Trash2, Shield, Loader2, Info, School } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Trash2, Shield, Loader2, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassCard } from '@/components/ui/glass-card';
 import { PageTransition, StaggerContainer, StaggerItem, FadeIn } from '@/components/ui/page-transition';
@@ -112,7 +112,7 @@ const Settings = () => {
             <div>
               <h1 className="text-3xl font-black tracking-tighter text-white leading-none mb-1">Account <span className="text-blue-500">Settings</span></h1>
               <p className="text-sm text-slate-300 font-extrabold tracking-wide uppercase flex items-center gap-1.5 mt-1">
-                <School className="h-3.5 w-3.5 text-blue-500" />
+                <img src="/logo.png" alt="Logo" className="h-4 w-4 object-contain" />
                 {organization?.name || 'SmartPass Pro'}
               </p>
             </div>

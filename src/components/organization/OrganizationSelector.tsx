@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Plus, Users } from 'lucide-react';
+import { Plus, Users } from 'lucide-react';
 
 interface Organization {
   id: string;
@@ -36,7 +36,7 @@ export const OrganizationSelector = ({ userId, isAdmin, onComplete }: Organizati
       .from('organizations')
       .select('id, name, slug')
       .order('name');
-    
+
     if (data) {
       setOrganizations(data);
     }
@@ -131,7 +131,7 @@ export const OrganizationSelector = ({ userId, isAdmin, onComplete }: Organizati
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="text-center">
-        <Building2 className="h-12 w-12 mx-auto text-primary mb-2" />
+        <img src="/logo.png" alt="Logo" className="h-16 w-16 mx-auto mb-4 object-contain drop-shadow-sm" />
         <CardTitle>Join Your School</CardTitle>
         <CardDescription>
           Select your school or create a new organization
@@ -183,8 +183,8 @@ export const OrganizationSelector = ({ userId, isAdmin, onComplete }: Organizati
               </Select>
             </div>
 
-            <Button 
-              className="w-full" 
+            <Button
+              className="w-full"
               onClick={handleJoinOrganization}
               disabled={!selectedOrgId || loading}
             >
@@ -209,8 +209,8 @@ export const OrganizationSelector = ({ userId, isAdmin, onComplete }: Organizati
                 </p>
               )}
 
-              <Button 
-                className="w-full" 
+              <Button
+                className="w-full"
                 onClick={handleCreateOrganization}
                 disabled={!newOrgName.trim() || loading}
               >
