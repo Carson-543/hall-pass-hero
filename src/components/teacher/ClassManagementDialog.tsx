@@ -195,7 +195,7 @@ export const ClassManagementDialog = ({
           <GlowButton
             onClick={handleSave}
             disabled={isLoading || !className.trim()}
-            className="flex-1 h-14 rounded-2xl text-lg text-white"
+            className="flex-1 h-14 rounded-2xl text-lg font-black text-white"
             variant={editingClass ? 'primary' : 'success'}
             loading={isLoading}
           >
