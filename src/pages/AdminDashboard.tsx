@@ -505,9 +505,9 @@ const AdminDashboard = () => {
           fetchActivePasses();
         })
         .subscribe((status) => {
-          const timestamp = new Date().toLocaleTimeString(); // e.g., "2:45:10 PM"
-  console.log(`[${timestamp}] [AdminDashboard] Admin channel status: ${status}`);
-        }}
+        const timestamp = new Date().toLocaleTimeString();
+        console.log(`[${timestamp}] [AdminDashboard] Admin channel status: ${status}`);
+      });}
 
     return () => {
       if (channelRef.current) {
