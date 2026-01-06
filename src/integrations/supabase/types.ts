@@ -283,6 +283,7 @@ export type Database = {
           expected_return_at: string | null
           id: string
           is_quota_override: boolean | null
+          organization_id: string | null
           queue_position: number | null
           requested_at: string | null
           returned_at: string | null
@@ -302,6 +303,7 @@ export type Database = {
           expected_return_at?: string | null
           id?: string
           is_quota_override?: boolean | null
+          organization_id?: string | null
           queue_position?: number | null
           requested_at?: string | null
           returned_at?: string | null
@@ -321,6 +323,7 @@ export type Database = {
           expected_return_at?: string | null
           id?: string
           is_quota_override?: boolean | null
+          organization_id?: string | null
           queue_position?: number | null
           requested_at?: string | null
           returned_at?: string | null
@@ -333,6 +336,13 @@ export type Database = {
             columns: ["class_id"]
             isOneToOne: false
             referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "passes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -622,6 +632,7 @@ export type Database = {
       is_class_teacher: { Args: { _class_id: string }; Returns: boolean }
       is_enrolled_in_class: { Args: { _class_id: string }; Returns: boolean }
       is_same_organization: { Args: { _user_id: string }; Returns: boolean }
+      join_class_by_code: { Args: { p_join_code: string }; Returns: Json }
       lookup_class_by_join_code: {
         Args: { _join_code: string }
         Returns: {

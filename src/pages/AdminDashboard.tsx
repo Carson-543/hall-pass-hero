@@ -152,7 +152,7 @@ const AdminDashboard = () => {
   const fetchActivePasses = async () => {
     if (!organizationId) return;
 
-    const { data: passes, error: passError } = await supabase
+    const { data: passes, error: passError } = await (supabase
       .from('passes')
       .select(`
         id, 
@@ -165,7 +165,7 @@ const AdminDashboard = () => {
       `)
       .eq('organization_id', organizationId)
       .in('status', ['approved', 'pending_return'])
-      .order('approved_at', { ascending: true });
+      .order('approved_at', { ascending: true }) as any);
 
     if (passError || !passes) {
       setActivePasses([]);
