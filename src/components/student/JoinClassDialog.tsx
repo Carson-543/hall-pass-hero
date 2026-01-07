@@ -1,24 +1,21 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Plus, KeyRound } from 'lucide-react';
+import { Plus, KeyRound } from 'lucide-react';
 import { GlowButton } from '@/components/ui/glow-button';
 
 interface JoinClassDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    userId: string;
     onJoined: () => void;
 }
 
 export const JoinClassDialog = ({
     open,
     onOpenChange,
-    userId,
     onJoined
 }: JoinClassDialogProps) => {
     const { toast } = useToast();
@@ -27,71 +24,56 @@ export const JoinClassDialog = ({
 
     const handleJoin = async () => {
         const code = joinCode.trim().toUpperCase();
-        if (!code) return;
+        
+        // Basic client-side validation
+        if (code.length < 4) {
+            toast({
+                title: 'Invalid Code',
+                description: 'Please enter a valid join code.',
+                variant: 'destructive'
+            });
+            return;
+        }
 
         setIsLoading(true);
 
         try {
-            // 1. Find the class by join code
-            const { data: classData, error: classError } = await supabase
-                .from('classes')
-                .select('id, name')
-                .eq('join_code', code)
-                .maybeSingle();
+            /**
+             * We call the PostgreSQL function 'join_class_by_code'.
+             * The function handles checking for the class and existing enrollments 
+             * in a single atomic transaction on the server.
+             */
+            const { data, error } = await supabase.rpc('join_class_by_code', {
+                p_join_code: code
+            });
 
-            if (classError) throw classError;
-            if (!classData) {
+            if (error) throw error;
+
+            // Handle the custom JSON response from our SQL function
+            if (!data.success) {
                 toast({
-                    title: 'Invalid Code',
-                    description: 'We couldn\'t find a class with that code.',
+                    title: 'Could Not Join',
+                    description: data.message || 'Check your code and try again.',
                     variant: 'destructive'
                 });
-                setIsLoading(false);
                 return;
             }
 
-            // 2. Check if already enrolled
-            const { data: existingEnrollment } = await supabase
-                .from('class_enrollments')
-                .select('id')
-                .eq('class_id', classData.id)
-                .eq('student_id', userId)
-                .maybeSingle();
-
-            if (existingEnrollment) {
-                toast({
-                    title: 'Already Enrolled',
-                    description: `You are already a member of ${classData.name}.`,
-                    variant: 'destructive'
-                });
-                setIsLoading(false);
-                onOpenChange(false);
-                return;
-            }
-
-            // 3. Enroll the student
-            const { error: enrollError } = await supabase
-                .from('class_enrollments')
-                .insert({
-                    class_id: classData.id,
-                    student_id: userId
-                });
-
-            if (enrollError) throw enrollError;
-
+            // Success (Either newly joined or was already a member)
             toast({
-                title: 'Joined Class!',
-                description: `You've successfully joined ${classData.name}.`
+                title: data.message === 'Already enrolled' ? 'Welcome Back!' : 'Joined Class!',
+                description: `You are now a member of ${data.class_name}.`,
             });
 
             setJoinCode('');
-            onJoined();
-            onOpenChange(false);
+            onJoined(); // Refresh the parent list
+            onOpenChange(false); // Close dialog
+
         } catch (error: any) {
-            console.error('Error joining class:', error);
+            console.error('Join Error:', error);
             toast({
                 title: 'Error',
-                description: error.message || 'Failed to join class.',
+                description: 'An unexpected error occurred. Please try again.',
                 variant: 'destructive'
             });
         } finally {
@@ -102,7 +84,7 @@ export const JoinClassDialog = ({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md rounded-[2.5rem] border-white/10 bg-slate-950/90 backdrop-blur-3xl p-8 shadow-2xl overflow-hidden">
-                {/* Background Glow */}
+                {/* Visual Background Glow */}
                 <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-600/20 blur-[80px] pointer-events-none" />
 
                 <DialogHeader className="relative z-10">
@@ -113,7 +95,7 @@ export const JoinClassDialog = ({
                         Join a Class
                     </DialogTitle>
                     <p className="text-slate-300 font-medium">
-                        Enter the 6-character code from your teacher.
+                        Enter the code provided by your teacher.
                     </p>
                 </DialogHeader>
 
@@ -125,9 +107,12 @@ export const JoinClassDialog = ({
                         <Input
                             value={joinCode}
                             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                            placeholder="E.G., ABCXYZ"
-                            maxLength={6}
-                            className="h-16 rounded-2xl bg-white/5 border-white/10 px-6 text-2xl font-black text-center text-white placeholder:text-slate-700 focus:ring-blue-500/20 transition-all border-2 focus:border-blue-500/50 uppercase tracking-widest"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !isLoading) handleJoin();
+                            }}
+                            placeholder="ABCXYZ"
+                            maxLength={8}
+                            className="h-16 rounded-2xl bg-white/5 border-white/10 px-6 text-2xl font-mono font-black text-center text-white placeholder:text-slate-700 focus:ring-blue-500/20 transition-all border-2 focus:border-blue-500/50 uppercase tracking-widest"
                             autoFocus
                         />
                     </div>
@@ -141,7 +126,8 @@ export const JoinClassDialog = ({
                         variant="primary"
                         loading={isLoading}
                     >
-                        <Plus className="w-5 h-5 mr-2" /> Join Class
+                        {!isLoading && <Plus className="w-5 h-5 mr-2" />} 
+                        {isLoading ? 'Joining...' : 'Join Class'}
                     </GlowButton>
                 </DialogFooter>
             </DialogContent>
