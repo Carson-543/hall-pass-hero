@@ -4,76 +4,49 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, KeyRound } from 'lucide-react';
+import { Plus, KeyRound, Loader2 } from 'lucide-react';
 import { GlowButton } from '@/components/ui/glow-button';
 
-interface JoinClassDialogProps {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    onJoined: () => void;
-}
-
-export const JoinClassDialog = ({
-    open,
-    onOpenChange,
-    onJoined
-}: JoinClassDialogProps) => {
+export const JoinClassDialog = ({ open, onOpenChange, onJoined }: { open: boolean, onOpenChange: (o: boolean) => void, onJoined: () => void }) => {
     const { toast } = useToast();
     const [joinCode, setJoinCode] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
     const handleJoin = async () => {
-        const code = joinCode.trim().toUpperCase();
-        
-        // Basic client-side validation
-        if (code.length < 4) {
-            toast({
-                title: 'Invalid Code',
-                description: 'Please enter a valid join code.',
-                variant: 'destructive'
-            });
-            return;
-        }
+        const code = joinCode.trim(); // Send exactly what the computer generated
+        if (!code) return;
 
         setIsLoading(true);
 
         try {
-            /**
-             * We call the PostgreSQL function 'join_class_by_code'.
-             * The function handles checking for the class and existing enrollments 
-             * in a single atomic transaction on the server.
-             */
+            // Log for your eyes in F12 console to see exactly what is sent
+            console.log("Sending to DB:", code);
+
             const { data, error } = await supabase.rpc('join_class_by_code', {
                 p_join_code: code
             });
 
             if (error) throw error;
 
-            // Handle the custom JSON response from our SQL function
             if (!data.success) {
                 toast({
-                    title: 'Could Not Join',
-                    description: data.message || 'Check your code and try again.',
+                    title: 'Join Error',
+                    description: data.message, // This will now show the 'Deep Debug' messages
                     variant: 'destructive'
                 });
                 return;
             }
 
-            // Success (Either newly joined or was already a member)
-            toast({
-                title: data.message === 'Already enrolled' ? 'Welcome Back!' : 'Joined Class!',
-                description: `You are now a member of ${data.class_name}.`,
-            });
-
+            toast({ title: 'Success!', description: `Joined ${data.class_name}` });
             setJoinCode('');
-            onJoined(); // Refresh the parent list
-            onOpenChange(false); // Close dialog
+            onJoined();
+            onOpenChange(false);
 
         } catch (error: any) {
-            console.error('Join Error:', error);
+            console.error("Critical Failure:", error);
             toast({
-                title: 'Error',
-                description: 'An unexpected error occurred. Please try again.',
+                title: 'System Error',
+                description: error.message || 'Failed to connect to database.',
                 variant: 'destructive'
             });
         } finally {
@@ -83,51 +56,28 @@ export const JoinClassDialog = ({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md rounded-[2.5rem] border-white/10 bg-slate-950/90 backdrop-blur-3xl p-8 shadow-2xl overflow-hidden">
-                {/* Visual Background Glow */}
-                <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-600/20 blur-[80px] pointer-events-none" />
-
-                <DialogHeader className="relative z-10">
-                    <div className="w-16 h-16 rounded-[1.5rem] bg-blue-600/20 flex items-center justify-center mb-6 border border-blue-500/30">
-                        <KeyRound className="w-8 h-8 text-blue-400" />
+            <DialogContent className="max-w-md rounded-[2.5rem] bg-slate-950 p-8 border-white/10 shadow-2xl">
+                <DialogHeader>
+                    <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center mb-4">
+                        <KeyRound className="text-blue-400" />
                     </div>
-                    <DialogTitle className="text-3xl font-black tracking-tight text-white mb-1">
-                        Join a Class
-                    </DialogTitle>
-                    <p className="text-slate-300 font-medium">
-                        Enter the code provided by your teacher.
-                    </p>
+                    <DialogTitle className="text-2xl font-bold text-white">Enter Class Code</DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-6 py-8 relative z-10">
-                    <div className="space-y-3">
-                        <Label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">
-                            Join Code
-                        </Label>
-                        <Input
-                            value={joinCode}
-                            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !isLoading) handleJoin();
-                            }}
-                            placeholder="ABCXYZ"
-                            maxLength={8}
-                            className="h-16 rounded-2xl bg-white/5 border-white/10 px-6 text-2xl font-mono font-black text-center text-white placeholder:text-slate-700 focus:ring-blue-500/20 transition-all border-2 focus:border-blue-500/50 uppercase tracking-widest"
-                            autoFocus
-                        />
-                    </div>
+                <div className="py-6">
+                    <Label className="text-slate-400 text-xs uppercase tracking-widest font-bold">Class Code</Label>
+                    <Input
+                        value={joinCode}
+                        onChange={(e) => setJoinCode(e.target.value)}
+                        placeholder="ABC-123"
+                        className="mt-2 h-14 bg-white/5 border-white/10 text-xl text-center font-mono text-white"
+                        autoFocus
+                    />
                 </div>
 
-                <DialogFooter className="relative z-10">
-                    <GlowButton
-                        onClick={handleJoin}
-                        disabled={isLoading || joinCode.trim().length < 4}
-                        className="w-full h-16 rounded-2xl text-lg font-black"
-                        variant="primary"
-                        loading={isLoading}
-                    >
-                        {!isLoading && <Plus className="w-5 h-5 mr-2" />} 
-                        {isLoading ? 'Joining...' : 'Join Class'}
+                <DialogFooter>
+                    <GlowButton onClick={handleJoin} disabled={isLoading} className="w-full h-14">
+                        {isLoading ? <Loader2 className="animate-spin" /> : "Join Class"}
                     </GlowButton>
                 </DialogFooter>
             </DialogContent>
