@@ -128,18 +128,18 @@ export const SubModeToggle = ({ userId, onSubModeChange }: SubModeToggleProps) =
   }
 
   return (
-    <Card className="border-dashed bg-slate-600/50">
+    <Card className="border-white/10 bg-slate-900/60">
       <CardContent className="p-4">
         <div className="flex items-center gap-4">
-          <UserCheck className="h-5 w-5 text-muted-foreground" />
+          <UserCheck className="h-5 w-5 text-white" />
           <div className="flex-1">
-            <p className="font-medium">You have substitute assignments today</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="font-medium text-white">You have substitute assignments today</p>
+            <p className="text-sm text-white/2">
               Select a teacher to manage their classes
             </p>
           </div>
           <Select value={selectedTeacherId} onValueChange={setSelectedTeacherId}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-48 bg-slate-600/50">
               <SelectValue placeholder="Select teacher" />
             </SelectTrigger>
             <SelectContent>
