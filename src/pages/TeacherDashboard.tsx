@@ -424,15 +424,15 @@ export const TeacherDashboard = () => {
           studentName={selectedStudentForHistory?.name || null}
         />
 
-        {/* Embedded FloatingPassButton */}
-        <FloatingPassButton
-          userId={profile?.id || ''}
-          currentClassId={selectedClassId}
-          hasActivePass={false} // Teachers don't usually have their own active pass
-          isQuotaExceeded={isRestroomQuotaExceeded}
-          isSchoolDay={true}
-          onPassRequested={fetchPasses}
-        />
+
+
+<FloatingPassButton
+  userId={profile?.id || ''}
+  currentClassId={selectedClassId}
+  students={students} // Pass the roster state here
+  isQuotaExceeded={isRestroomQuotaExceeded}
+  onPassRequested={fetchPasses}
+/>
       </div>
     </PageTransition>
   );
