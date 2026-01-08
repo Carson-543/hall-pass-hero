@@ -176,6 +176,10 @@ export const TeacherDashboard = () => {
     // Only auto-select if nothing is selected yet
     if (!selectedClassId) {
       // 1. Try to find class matching the actual current period (time-based)
+
+console.log(c.period_order);
+console.log(currentPeriod?.period_order);
+      
       const matchesPeriod = data.find(c => 
   Number(c.period_order) === Number(currentPeriod?.period_order)
 );
