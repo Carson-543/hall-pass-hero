@@ -1,9 +1,16 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth'; // Ensure this path is correct
+
+interface TeacherHeaderProps {
+  signOut: () => void;
+}
 
 export const TeacherHeader = ({ signOut }: TeacherHeaderProps) => {
-   const { user, role, signOut, loading: authLoading } = useAuth();
+  // We remove 'signOut' from here because it's coming from props
+  const { user, role, loading: authLoading } = useAuth();
+
   return (
     <motion.header
       className="flex items-center justify-between mb-8 pt-4 relative z-10"
@@ -19,17 +26,23 @@ export const TeacherHeader = ({ signOut }: TeacherHeaderProps) => {
         >
           <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain drop-shadow-md" />
         </motion.div>
+        
         <div>
-          <h1 className="text-3xl font-black tracking-tighter text-white leading-none mb-1">ClassPass <span className="text-blue-500">Pro</span></h1>
-          <p className="text-sm text-slate-300 font-extrabold tracking-wide uppercase">Manage passes & students</p>
+          <h1 className="text-3xl font-black tracking-tighter text-white leading-none mb-1">
+            ClassPass <span className="text-blue-500">Pro</span>
+          </h1>
+          <p className="text-sm text-slate-300 font-extrabold tracking-wide uppercase">
+            Manage passes & students
+          </p>
         </div>
       </div>
+
       <Button
         variant="ghost"
         size="icon"
         onClick={() => {
-            console.log("🚪 Teacher signing out...");
-            signOut();
+          console.log("🚪 Teacher signing out...");
+          signOut();
         }}
         className="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/15 text-white shadow-sm"
       >
