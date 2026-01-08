@@ -305,16 +305,18 @@ export const TeacherDashboard = () => {
         {/* Floating Quick Pass Action */}
         {selectedClassId && (
           <motion.div 
-            initial={{ y: 100 }} animate={{ y: 0 }}
-            className="fixed bottom-8 w-full max-w px-4"
-          >
-            <Button 
-              onClick={() => setCreatePassDialogOpen(true)}
-              className="w-full h-16 rounded-2xl shadow-2xl text-lg font-bold bg-blue-600 hover:bg-blue-500 text-white border-none"
-            >
-              <Plus className="mr-2 h-6 w-6" /> ISSUE QUICK PASS
-            </Button>
-          </motion.div>
+  initial={{ y: 100 }} 
+  animate={{ y: 0 }}
+  /* Changed right-8 to left-8 */
+  className="fixed bottom-8 right-8 z-50" 
+>
+  <Button 
+    onClick={() => setCreatePassDialogOpen(true)}
+    className="px-8 h-16 rounded-2xl shadow-2xl text-lg font-bold bg-blue-600 hover:bg-blue-500 text-white border-none"
+  >
+    <Plus className="mr-2 h-6 w-6" /> ISSUE QUICK PASS
+  </Button>
+</motion.div>
         )}
 
         {/* Dialogs */}
