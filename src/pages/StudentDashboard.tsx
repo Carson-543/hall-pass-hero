@@ -592,7 +592,6 @@ const StudentDashboard = () => {
         <JoinClassDialog
           open={joinDialogOpen}
           onOpenChange={setJoinDialogOpen}
-          userId={user.id}
           onJoined={fetchEnrolledClasses}
         />
       </div>

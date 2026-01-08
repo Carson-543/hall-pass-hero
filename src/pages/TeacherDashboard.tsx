@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentPeriod } from '@/hooks/useCurrentPeriod';
+import { useAuth } from '@/contexts/AuthContext';
 import { ClassManagementDialog } from '@/components/teacher/ClassManagementDialog';
 import { StudentHistoryDialog } from '@/components/teacher/StudentHistoryDialog';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -76,6 +77,7 @@ interface Settings {
 export const TeacherDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signOut } = useAuth();
   const { organizationId } = useOrganization();
 
   // --- Core State ---
@@ -90,7 +92,7 @@ export const TeacherDashboard = () => {
 
   // --- UI & Controls State ---
   const [activeFreeze, setActiveFreeze] = useState<FreezeStatus | null>(null);
-  const [isFreezeLoading, setIsFreezeLoading] = useState(false);
+  const [editingClass, setEditingClass] = useState<ClassInfo | null>(null);
   const [freezeType, setFreezeType] = useState<'bathroom' | 'all'>('bathroom');
   const [timerMinutes, setTimerMinutes] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -154,7 +156,7 @@ export const TeacherDashboard = () => {
     // Only auto-select if nothing is selected yet
     if (!selectedClassId) {
       // 1. Try to find class matching the actual current period (time-based)
-      const matchesPeriod = data.find(c => c.period_order === currentPeriod);
+      const matchesPeriod = data.find(c => c.period_order === currentPeriod?.period_order);
       
       if (matchesPeriod) {
         setSelectedClassId(matchesPeriod.id);
@@ -263,7 +265,7 @@ export const TeacherDashboard = () => {
       </div>
 
       <div className="relative p-4 sm:p-6 max-w-7xl mx-auto z-10">
-        <TeacherHeader signOut={() => supabase.auth.signOut()} />
+        <TeacherHeader signOut={signOut} />
         <div className="mb-6"><PeriodDisplay /></div>
 
         <StaggerContainer className="space-y-6">
@@ -279,12 +281,13 @@ export const TeacherDashboard = () => {
                 onFreezeTypeChange={setFreezeType}
                 timerMinutes={timerMinutes}
                 onTimerChange={setTimerMinutes}
-                onFreeze={() => {}} // Implementation logic
-                onUnfreeze={() => {}} // Implementation logic
+                isFreezeLoading={false}
+                onFreeze={() => {}}
+                onUnfreeze={() => {}}
                 currentClass={currentClass}
                 maxConcurrent={settings?.max_concurrent_bathroom ?? 2}
-                onToggleAutoQueue={() => {}} // Implementation logic
-                onDeleteClass={() => {}} // Implementation logic
+                onToggleAutoQueue={() => {}}
+                onDeleteClass={() => {}}
               />
             </GlassCard>
           </StaggerItem>
@@ -343,8 +346,9 @@ export const TeacherDashboard = () => {
         {/* Dialogs */}
         <ClassManagementDialog
           open={dialogOpen} onOpenChange={setDialogOpen}
+          editingClass={editingClass}
           userId={profile?.id || ''} organizationId={organizationId}
-          onSaved={() => fetchClasses()}
+          onSaved={() => { fetchClasses(); setEditingClass(null); }}
         />
 
         <StudentHistoryDialog
