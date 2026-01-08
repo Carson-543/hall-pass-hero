@@ -220,14 +220,14 @@ const Auth = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Password</Label>
-                    <Button type="button" variant="link" className="text-xs font-bold text-red" onClick={() => setForgotPasswordOpen(true)}>Forgot?</Button>
+                    <Button type="button" variant="link" className="text-xs font-bold" onClick={() => setForgotPasswordOpen(true)}>Forgot?</Button>
                   </div>
                   <div className="relative">
                     <Input type={showPassword ? "text" : "password"} value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} placeholder="••••••••" className="h-14 rounded-2xl px-6 font-medium" required />
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button>
                   </div>
                 </div>
-                <GlowButton type="submit" className="w-full h-14 rounded-2xl text-lg font-black bg-red" loading={isLoading}>Sign In</GlowButton>
+                <GlowButton type="submit" className="w-full h-14 rounded-2xl text-lg font-black" loading={isLoading}>Sign In</GlowButton>
               </form>
             </TabsContent>
            <TabsContent value="signup" className="space-y-6">
