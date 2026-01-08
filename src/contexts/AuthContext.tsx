@@ -1,140 +1,67 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { LogOut } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth'; // Double-check this filename is exactly use-auth.tsx
+import { useNavigate } from 'react-router-dom';
 
-type AppRole = 'student' | 'teacher' | 'admin';
+export const TeacherHeader = () => {
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
 
-interface AuthContextType {
-  user: User | null;
-  session: Session | null;
-  role: AppRole | null;
-  isApproved: boolean;
-  loading: boolean;
-  signUp: (email: string, password: string, fullName: string, role: AppRole) => Promise<{ error: Error | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signOut: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [role, setRole] = useState<AppRole | null>(null);
-  const [isApproved, setIsApproved] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  const fetchUserData = async (userId: string) => {
+  const handleSignOut = async () => {
     try {
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .single();
-
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('is_approved')
-        .eq('id', userId)
-        .single();
-
-      if (roleData) {
-        setRole(roleData.role as AppRole);
-      }
-      if (profileData) {
-        setIsApproved(profileData.is_approved);
-      }
-    } catch {
-      // Authentication error - fail silently for security
+      console.log("🚪 Teacher signing out...");
+      
+      // 1. Trigger the actual logic (Firebase/Supabase/Custom)
+      await signOut();
+      
+      // 2. Force the UI to move to the login page
+      // This ensures they are "kicked out" even if the state takes a moment to update
+      navigate('/auth'); 
+      
+    } catch (error) {
+      console.error("Error signing out:", error);
     }
   };
 
-  useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          // Defer Supabase calls with setTimeout
-          setTimeout(() => {
-            fetchUserData(session.user.id);
-          }, 0);
-        } else {
-          setRole(null);
-          setIsApproved(false);
-        }
-        setLoading(false);
-      }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchUserData(session.user.id);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const signUp = async (email: string, password: string, fullName: string, role: AppRole) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName,
-          role: role
-        }
-      }
-    });
-    return { error };
-  };
-
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    return { error };
-  };
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
-    setRole(null);
-    setIsApproved(false);
-  };
-
   return (
-    <AuthContext.Provider value={{
-      user,
-      session,
-      role,
-      isApproved,
-      loading,
-      signUp,
-      signIn,
-      signOut
-    }}>
-      {children}
-    </AuthContext.Provider>
+    <motion.header
+      className="flex items-center justify-between mb-8 pt-4 relative z-10"
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
+      <div className="flex items-center gap-5">
+        <motion.div
+          className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-2xl shadow-blue-500/40 border-2 border-white/20 overflow-hidden p-2"
+          whileHover={{ scale: 1.05, rotate: 5 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <img 
+            src="/logo.png" 
+            alt="Logo" 
+            className="w-10 h-10 object-contain drop-shadow-md" 
+          />
+        </motion.div>
+        <div>
+          <h1 className="text-3xl font-black tracking-tighter text-white leading-none mb-1">
+            ClassPass <span className="text-blue-500">Pro</span>
+          </h1>
+          <p className="text-sm text-slate-300 font-extrabold tracking-wide uppercase">
+            Manage passes & students
+          </p>
+        </div>
+      </div>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={handleSignOut}
+        className="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/15 text-white shadow-sm transition-colors"
+        title="Sign Out"
+      >
+        <LogOut className="h-5 w-5" />
+      </Button>
+    </motion.header>
   );
 };
