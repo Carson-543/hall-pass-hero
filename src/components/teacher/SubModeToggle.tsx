@@ -103,7 +103,7 @@ export const SubModeToggle = ({ userId, onSubModeChange }: SubModeToggleProps) =
   if (isSubMode) {
     const teacherName = teachers.find(t => t.id === selectedTeacherId)?.name;
     return (
-      <Card className="rounded-2xl transition-all duration-300 backdrop-blur-xl border p-6 bg-slate-900/60 border-white/10">
+      <Card className="border-primary/50 bg-primary/5">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -111,13 +111,13 @@ export const SubModeToggle = ({ userId, onSubModeChange }: SubModeToggleProps) =
                 <UserCheck className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="font-semibold text-white">Substitute Mode Active</p>
-                <p className="text-sm text-white/10">
+                <p className="font-semibold text-primary">Substitute Mode Active</p>
+                <p className="text-sm text-muted-foreground">
                   Managing classes for {teacherName}
                 </p>
               </div>
             </div>
-            <Button class='flex w-full items-center justify-between py-2 ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 h-14 rounded-2xl bg-white/10 border-2 border-white/20 shadow-xl text-lg font-bold px-6 flex-1 text-white hover:bg-white/15 transition-all' onClick={handleExitSubMode}>
+            <Button variant="outline" size="sm" onClick={handleExitSubMode}>
               <X className="h-4 w-4 mr-1" />
               Exit Sub Mode
             </Button>
@@ -128,7 +128,7 @@ export const SubModeToggle = ({ userId, onSubModeChange }: SubModeToggleProps) =
   }
 
   return (
-    <Card className="border-dashed">
+    <Card className="border-dashed bg-slate-600/50">
       <CardContent className="p-4">
         <div className="flex items-center gap-4">
           <UserCheck className="h-5 w-5 text-muted-foreground" />
