@@ -13,6 +13,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { PeriodDisplay } from '@/components/PeriodDisplay';
 import { TeacherHeader } from '@/components/teacher/TeacherHeader';
 import { TeacherControls } from '@/components/teacher/TeacherControls';
+import { SubModeToggle } from '@/components/teacher/SubModeToggle'; // Added Import
 import { RequestQueue } from '@/components/teacher/RequestQueue';
 import { ActivePassList } from '@/components/teacher/ActivePassList';
 import { RosterGrid } from '@/components/teacher/RosterGrid';
@@ -90,9 +91,29 @@ export const TeacherDashboard = () => {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedStudentForHistory, setSelectedStudentForHistory] = useState<Student | null>(null);
 
-  const currentClass = classes.find(c => c.id === selectedClassId);
+  // --- Sub Mode State ---
+  const [isSubMode, setIsSubMode] = useState(false);
+  const [subClasses, setSubClasses] = useState<ClassInfo[]>([]);
+
+  // --- Derived Data ---
+  const displayClasses = isSubMode ? subClasses : classes;
+  const currentClass = displayClasses.find(c => c.id === selectedClassId);
 
   const { currentPeriod } = useCurrentPeriod();
+
+  // --- Sub Mode Handler ---
+  const handleSubModeChange = (enabled: boolean, teacherId: string | null, classList: any[]) => {
+    setIsSubMode(enabled);
+    if (enabled && classList.length > 0) {
+      setSubClasses(classList);
+      setSelectedClassId(classList[0].id);
+    } else {
+      setSubClasses([]);
+      if (classes.length > 0) {
+        setSelectedClassId(classes[0].id);
+      }
+    }
+  };
 
   useEffect(() => {
     checkUser();
@@ -169,7 +190,7 @@ export const TeacherDashboard = () => {
   }, [profile, organizationId]);
 
   useEffect(() => {
-    if (classes.length > 0 && !selectedClassId) {
+    if (classes.length > 0 && !selectedClassId && !isSubMode) {
       if (currentPeriod) {
         const matchingClass = classes.find(c => c.period_order === currentPeriod.period_order);
         if (matchingClass) {
@@ -179,7 +200,7 @@ export const TeacherDashboard = () => {
       }
       setSelectedClassId(classes[0].id);
     }
-  }, [classes, currentPeriod, selectedClassId]);
+  }, [classes, currentPeriod, selectedClassId, isSubMode]);
 
   const signOut = async () => { await supabase.auth.signOut(); navigate('/auth'); };
 
@@ -275,7 +296,11 @@ export const TeacherDashboard = () => {
     if (error) toast({ title: "Error", description: "Failed to update queue setting", variant: "destructive" });
     else {
       toast({ title: newValue ? "Auto-Queue Enabled" : "Auto-Queue Disabled" });
-      setClasses(prev => prev.map(c => c.id === selectedClassId ? { ...c, ...updates } : c));
+      if (isSubMode) {
+        setSubClasses(prev => prev.map(c => c.id === selectedClassId ? { ...c, ...updates } : c));
+      } else {
+        setClasses(prev => prev.map(c => c.id === selectedClassId ? { ...c, ...updates } : c));
+      }
     }
   };
 
@@ -319,14 +344,17 @@ export const TeacherDashboard = () => {
       const channel = supabase.channel(channelName)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'passes', filter: `class_id=eq.${selectedClassId}` }, () => fetchPasses())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'pass_freezes', filter: `class_id=eq.${selectedClassId}` }, () => fetchFreezeStatus(selectedClassId))
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'classes', filter: `id=eq.${selectedClassId}` }, payload => setClasses(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c)))
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'classes', filter: `id=eq.${selectedClassId}` }, payload => {
+          const updateFn = (prev: ClassInfo[]) => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c);
+          isSubMode ? setSubClasses(updateFn) : setClasses(updateFn);
+        })
         .subscribe();
       fetchStudents();
       fetchPasses();
       fetchFreezeStatus(selectedClassId);
       return () => { supabase.removeChannel(channel); };
     }
-  }, [selectedClassId, fetchFreezeStatus]);
+  }, [selectedClassId, fetchFreezeStatus, isSubMode]);
 
   const handleApprove = async (passId: string) => {
     const { error } = await supabase.from('passes').update({ status: 'approved', approved_at: new Date().toISOString() }).eq('id', passId);
@@ -407,15 +435,21 @@ export const TeacherDashboard = () => {
 
       <div className="relative p-4 sm:p-6 pb-24 max-w-7xl mx-auto z-10">
         <TeacherHeader signOut={signOut} />
-        <div className="mb-6">
+        
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <PeriodDisplay />
+          {/* Added SubModeToggle here */}
+          {profile?.id && (
+            <SubModeToggle userId={profile.id} onSubModeChange={handleSubModeChange} />
+          )}
         </div>
 
         <StaggerContainer className="space-y-6">
           <StaggerItem>
             <GlassCard className="p-6 bg-slate-900/60 border-2 border-white/10 shadow-xl">
               <TeacherControls
-                classes={classes}
+                classes={displayClasses} // Updated to use displayClasses
+                isSubMode={isSubMode}     // Added prop
                 selectedClassId={selectedClassId}
                 onClassChange={setSelectedClassId}
                 onAddClass={() => setDialogOpen(true)}
