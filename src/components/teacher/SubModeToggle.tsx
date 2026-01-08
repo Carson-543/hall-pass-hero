@@ -134,15 +134,15 @@ export const SubModeToggle = ({ userId, onSubModeChange }: SubModeToggleProps) =
           <UserCheck className="h-5 w-5 text-white" />
           <div className="flex-1">
             <p className="font-medium text-white">You have substitute assignments today</p>
-            <p className="text-sm text-white/2">
+            <p className="text-sm text-white/50">
               Select a teacher to manage their classes
             </p>
           </div>
           <Select value={selectedTeacherId} onValueChange={setSelectedTeacherId}>
-            <SelectTrigger className="w-48 bg-slate-600/50">
+            <SelectTrigger className="w-48 bg-slate-600/50 text-white">
               <SelectValue placeholder="Select teacher" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-slate-600/50 text-white">
               {teachers.map(t => (
                 <SelectItem key={t.id} value={t.id}>
                   {t.name}
@@ -150,7 +150,7 @@ export const SubModeToggle = ({ userId, onSubModeChange }: SubModeToggleProps) =
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={handleEnterSubMode} disabled={!selectedTeacherId}>
+          <Button className="bg-blue-500 text-white" onClick={handleEnterSubMode} disabled={!selectedTeacherId}>
             Enter Sub Mode
           </Button>
         </div>
