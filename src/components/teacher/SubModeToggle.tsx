@@ -142,7 +142,7 @@ export const SubModeToggle = ({ userId, onSubModeChange }: SubModeToggleProps) =
             <SelectTrigger className="w-48 bg-slate-600/50 text-white focus:outline-blue-500">
               <SelectValue placeholder="Select teacher" />
             </SelectTrigger>
-            <SelectContent className="bg-slate-600/50 text-white hover:bg-300/50 focus:outline-blue-500">
+            <SelectContent className="bg-slate-600/50 text-white hover:bg-blue-300/50 hover:text-blue-600 focus:outline-blue-500">
               {teachers.map(t => (
                 <SelectItem key={t.id} value={t.id}>
                   {t.name}
