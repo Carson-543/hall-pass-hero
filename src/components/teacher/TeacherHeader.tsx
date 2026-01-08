@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
-import { useAuth } from '@/hooks/use-auth'; // Ensure this path is correct
+import { useAuth } from '@/contexts/AuthContext'; // Ensure this path is correct
 
 interface TeacherHeaderProps {
   signOut: () => void;
