@@ -306,7 +306,7 @@ export const TeacherDashboard = () => {
         {selectedClassId && (
           <motion.div 
             initial={{ y: 100 }} animate={{ y: 0 }}
-            className="fixed bottom-8 left-1/2 w-full max-w px-4"
+            className="fixed bottom-8 w-full max-w px-4"
           >
             <Button 
               onClick={() => setCreatePassDialogOpen(true)}
