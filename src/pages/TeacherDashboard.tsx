@@ -344,7 +344,7 @@ export const TeacherDashboard = () => {
                     <Button 
                       key={s.id} size="sm" 
                       variant={selectedStudentForPass === s.id ? 'default' : 'outline'}
-                      className={`rounded-xl font-bold ${selectedStudentForPass === s.id ? 'bg-blue-600' : 'border-white/10'}`}
+                      className={`rounded-xl font-bold ${selectedStudentForPass === s.id ? 'bg-blue-600' : 'border-white/10 text-blue-600'}`}
                       onClick={() => setSelectedStudentForPass(s.id)}
                     >
                       {s.name.split(' ')[0]}
@@ -358,7 +358,7 @@ export const TeacherDashboard = () => {
                   {DESTINATIONS.map(d => (
                     <Button 
                       key={d} variant={selectedDestination === d ? 'default' : 'outline'}
-                      className={`rounded-xl font-bold ${selectedDestination === d ? 'bg-blue-600' : 'border-white/10'}`}
+                      className={`rounded-xl font-bold ${selectedDestination === d ? 'bg-blue-600' : 'border-white/10 text-blue-600'}`}
                       onClick={() => setSelectedDestination(d)}
                     >
                       {d}
