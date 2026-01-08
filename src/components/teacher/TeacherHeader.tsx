@@ -1,15 +1,28 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext'; // Ensure this path is correct
+import { useAuth } from '@/hooks/use-auth'; // Double-check this filename is exactly use-auth.tsx
+import { useNavigate } from 'react-router-dom';
 
-interface TeacherHeaderProps {
-  signOut: () => void;
-}
+export const TeacherHeader = () => {
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
 
-export const TeacherHeader = ({ signOut }: TeacherHeaderProps) => {
-  // We remove 'signOut' from here because it's coming from props
-  const { user, role, loading: authLoading } = useAuth();
+  const handleSignOut = async () => {
+    try {
+      console.log("🚪 Teacher signing out...");
+      
+      // 1. Trigger the actual logic (Firebase/Supabase/Custom)
+      await signOut();
+      
+      // 2. Force the UI to move to the login page
+      // This ensures they are "kicked out" even if the state takes a moment to update
+      navigate('/auth'); 
+      
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
 
   return (
     <motion.header
@@ -24,9 +37,12 @@ export const TeacherHeader = ({ signOut }: TeacherHeaderProps) => {
           whileHover={{ scale: 1.05, rotate: 5 }}
           whileTap={{ scale: 0.95 }}
         >
-          <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain drop-shadow-md" />
+          <img 
+            src="/logo.png" 
+            alt="Logo" 
+            className="w-10 h-10 object-contain drop-shadow-md" 
+          />
         </motion.div>
-        
         <div>
           <h1 className="text-3xl font-black tracking-tighter text-white leading-none mb-1">
             ClassPass <span className="text-blue-500">Pro</span>
@@ -40,11 +56,9 @@ export const TeacherHeader = ({ signOut }: TeacherHeaderProps) => {
       <Button
         variant="ghost"
         size="icon"
-        onClick={() => {
-          console.log("🚪 Teacher signing out...");
-          signOut();
-        }}
-        className="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/15 text-white shadow-sm"
+        onClick={handleSignOut}
+        className="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/15 text-white shadow-sm transition-colors"
+        title="Sign Out"
       >
         <LogOut className="h-5 w-5" />
       </Button>
