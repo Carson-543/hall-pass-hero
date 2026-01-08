@@ -2,11 +2,8 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
 
-interface TeacherHeaderProps {
-  signOut: () => void;
-}
-
 export const TeacherHeader = ({ signOut }: TeacherHeaderProps) => {
+   const { user, role, signOut, loading: authLoading } = useAuth();
   return (
     <motion.header
       className="flex items-center justify-between mb-8 pt-4 relative z-10"
