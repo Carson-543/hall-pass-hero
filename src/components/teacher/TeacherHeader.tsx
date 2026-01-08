@@ -30,7 +30,10 @@ export const TeacherHeader = ({ signOut }: TeacherHeaderProps) => {
       <Button
         variant="ghost"
         size="icon"
-        onClick={signOut}
+        onClick={() => {
+            console.log("🚪 Teacher signing out...");
+            signOut();
+        }}
         className="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/15 text-white shadow-sm"
       >
         <LogOut className="h-5 w-5" />
