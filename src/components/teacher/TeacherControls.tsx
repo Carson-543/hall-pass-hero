@@ -32,7 +32,6 @@ interface TeacherControlsProps {
     onToggleAutoQueue?: (newMaxConcurrent?: number) => void;
     maxConcurrent: number;
     onDeleteClass: (id: string) => void;
-    isSubMode?: boolean;
 }
 
 export const TeacherControls = ({
@@ -51,8 +50,7 @@ export const TeacherControls = ({
     currentClass,
     onToggleAutoQueue,
     maxConcurrent,
-    onDeleteClass,
-    isSubMode = false
+    onDeleteClass
 }: TeacherControlsProps) => {
     const [tempMaxConcurrent, setTempMaxConcurrent] = useState<string>('2');
 
@@ -90,48 +88,44 @@ export const TeacherControls = ({
                         ))}
                     </SelectContent>
                 </Select>
-                {!isSubMode && (
-                    <>
-                        <Button
-                            size="icon"
-                            variant="outline"
-                            className="h-14 w-14 rounded-2xl border-2 border-dashed border-white/20 bg-white/5 hover:bg-white/10 hover:border-blue-500/50 text-white transition-all shrink-0"
-                            onClick={onAddClass}
-                        >
-                            <Plus className="h-6 w-6" />
-                        </Button>
+                <Button
+                    size="icon"
+                    variant="outline"
+                    className="h-14 w-14 rounded-2xl border-2 border-dashed border-white/20 bg-white/5 hover:bg-white/10 hover:border-blue-500/50 text-white transition-all shrink-0"
+                    onClick={onAddClass}
+                >
+                    <Plus className="h-6 w-6" />
+                </Button>
 
-                        {selectedClassId && (
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        className="h-14 w-14 rounded-2xl bg-red-500/10 border-2 border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all shrink-0"
-                                    >
-                                        <Trash2 className="h-6 w-6" />
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent className="rounded-[2rem] bg-slate-900 border-white/10 text-white shadow-2xl">
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle className="text-2xl font-black">Delete Class?</AlertDialogTitle>
-                                        <AlertDialogDescription className="text-slate-300 font-medium pt-2">
-                                            This will permanently remove <span className="text-white font-bold">{currentClass?.name}</span> and all associated hall pass history. This action cannot be undone.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter className="pt-4">
-                                        <AlertDialogCancel className="rounded-xl bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
-                                        <AlertDialogAction
-                                            onClick={() => onDeleteClass(selectedClassId)}
-                                            className="rounded-xl bg-red-600 hover:bg-red-700 text-white font-black px-6"
-                                        >
-                                            Delete Permanently
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        )}
-                    </>
+                {selectedClassId && (
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-14 w-14 rounded-2xl bg-red-500/10 border-2 border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all shrink-0"
+                            >
+                                <Trash2 className="h-6 w-6" />
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="rounded-[2rem] bg-slate-900 border-white/10 text-white shadow-2xl">
+                            <AlertDialogHeader>
+                                <AlertDialogTitle className="text-2xl font-black">Delete Class?</AlertDialogTitle>
+                                <AlertDialogDescription className="text-slate-300 font-medium pt-2">
+                                    This will permanently remove <span className="text-white font-bold">{currentClass?.name}</span> and all associated hall pass history. This action cannot be undone.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter className="pt-4">
+                                <AlertDialogCancel className="rounded-xl bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={() => onDeleteClass(selectedClassId)}
+                                    className="rounded-xl bg-red-600 hover:bg-red-700 text-white font-black px-6"
+                                >
+                                    Delete Permanently
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 )}
             </div>
 
@@ -148,7 +142,7 @@ export const TeacherControls = ({
                             <PopoverTrigger asChild>
                                 <Button
                                     variant={!!activeFreeze ? "destructive" : "outline"}
-                                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-44 rounded-full border-2 shadow-lg p-0 ${!!activeFreeze ? 'bg-red-600 border-red-500 text-white shadow-red-500/20' : 'bg-white/10 border-white/20 text-blue-400 hover:border-blue-400/50 hover:bg-white/45 hover:text-blue-900'}`}
+                                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-44 rounded-full border-2 shadow-lg p-0 ${!!activeFreeze ? 'bg-red-600 border-red-500 text-white shadow-red-500/20' : 'bg-white/10 border-white/20 text-blue-400 hover:border-blue-400/50 hover:bg-white/15'}`}
                                     disabled={isFreezeLoading}
                                 >
                                     <div className="absolute left-[-2px] top-[-2px] w-10 h-10 flex items-center justify-center pointer-events-none">
@@ -204,7 +198,7 @@ export const TeacherControls = ({
                             <AlertDialogTrigger asChild>
                                 <Button
                                     variant="outline"
-                                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-48 rounded-full border-2 shadow-lg p-0 ${currentClass?.is_queue_autonomous ? 'bg-blue-600 border-blue-500 text-white hover:bg-blue-700' : 'bg-white/10 border-white/20 text-slate-400 hover:border-blue-400/50 hover:bg-white/45 hover:text-blue-900'}`}
+                                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-48 rounded-full border-2 shadow-lg p-0 ${currentClass?.is_queue_autonomous ? 'bg-blue-600 border-blue-500 text-white hover:bg-blue-700' : 'bg-white/10 border-white/20 text-slate-400 hover:border-blue-400/50 hover:bg-white/15'}`}
                                 >
                                     <div className="absolute left-[-2px] top-[-2px] w-10 h-10 flex items-center justify-center pointer-events-none">
                                         <Bot className={`h-4 w-4 ${currentClass?.is_queue_autonomous ? 'text-white' : ''}`} />

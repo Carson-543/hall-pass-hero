@@ -128,29 +128,29 @@ export const SubModeToggle = ({ userId, onSubModeChange }: SubModeToggleProps) =
   }
 
   return (
-    <Card className="border-white/10 bg-slate-900/60">
+    <Card className="border-dashed">
       <CardContent className="p-4">
         <div className="flex items-center gap-4">
-          <UserCheck className="h-5 w-5 text-white" />
+          <UserCheck className="h-5 w-5 text-muted-foreground" />
           <div className="flex-1">
-            <p className="font-medium text-white">You have substitute assignments today</p>
-            <p className="text-sm text-white/50">
+            <p className="font-medium">You have substitute assignments today</p>
+            <p className="text-sm text-muted-foreground">
               Select a teacher to manage their classes
             </p>
           </div>
           <Select value={selectedTeacherId} onValueChange={setSelectedTeacherId}>
-            <SelectTrigger className="w-48 bg-slate-600/50 text-white focus:outline-blue-500">
+            <SelectTrigger className="w-48">
               <SelectValue placeholder="Select teacher" />
             </SelectTrigger>
-            <SelectContent className="bg-slate-600/50 text-white hover:bg-blue-300/50 focus:outline-blue-500">
+            <SelectContent>
               {teachers.map(t => (
-                <SelectItem className="focus:bg-blue-300 focus:text-blue-600" key={t.id} value={t.id}>
+                <SelectItem key={t.id} value={t.id}>
                   {t.name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Button className="bg-blue-500 text-white focus:bg-blue-800" onClick={handleEnterSubMode} disabled={!selectedTeacherId}>
+          <Button onClick={handleEnterSubMode} disabled={!selectedTeacherId}>
             Enter Sub Mode
           </Button>
         </div>
