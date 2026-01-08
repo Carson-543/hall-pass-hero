@@ -32,6 +32,7 @@ interface TeacherControlsProps {
     onToggleAutoQueue?: (newMaxConcurrent?: number) => void;
     maxConcurrent: number;
     onDeleteClass: (id: string) => void;
+    isSubMode?: boolean;
 }
 
 export const TeacherControls = ({
@@ -50,7 +51,8 @@ export const TeacherControls = ({
     currentClass,
     onToggleAutoQueue,
     maxConcurrent,
-    onDeleteClass
+    onDeleteClass,
+    isSubMode = false
 }: TeacherControlsProps) => {
     const [tempMaxConcurrent, setTempMaxConcurrent] = useState<string>('2');
 
@@ -88,44 +90,48 @@ export const TeacherControls = ({
                         ))}
                     </SelectContent>
                 </Select>
-                <Button
-                    size="icon"
-                    variant="outline"
-                    className="h-14 w-14 rounded-2xl border-2 border-dashed border-white/20 bg-white/5 hover:bg-white/10 hover:border-blue-500/50 text-white transition-all shrink-0"
-                    onClick={onAddClass}
-                >
-                    <Plus className="h-6 w-6" />
-                </Button>
+                {!isSubMode && (
+                    <>
+                        <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-14 w-14 rounded-2xl border-2 border-dashed border-white/20 bg-white/5 hover:bg-white/10 hover:border-blue-500/50 text-white transition-all shrink-0"
+                            onClick={onAddClass}
+                        >
+                            <Plus className="h-6 w-6" />
+                        </Button>
 
-                {selectedClassId && (
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-14 w-14 rounded-2xl bg-red-500/10 border-2 border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all shrink-0"
-                            >
-                                <Trash2 className="h-6 w-6" />
-                            </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent className="rounded-[2rem] bg-slate-900 border-white/10 text-white shadow-2xl">
-                            <AlertDialogHeader>
-                                <AlertDialogTitle className="text-2xl font-black">Delete Class?</AlertDialogTitle>
-                                <AlertDialogDescription className="text-slate-300 font-medium pt-2">
-                                    This will permanently remove <span className="text-white font-bold">{currentClass?.name}</span> and all associated hall pass history. This action cannot be undone.
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter className="pt-4">
-                                <AlertDialogCancel className="rounded-xl bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                    onClick={() => onDeleteClass(selectedClassId)}
-                                    className="rounded-xl bg-red-600 hover:bg-red-700 text-white font-black px-6"
-                                >
-                                    Delete Permanently
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
+                        {selectedClassId && (
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-14 w-14 rounded-2xl bg-red-500/10 border-2 border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all shrink-0"
+                                    >
+                                        <Trash2 className="h-6 w-6" />
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent className="rounded-[2rem] bg-slate-900 border-white/10 text-white shadow-2xl">
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle className="text-2xl font-black">Delete Class?</AlertDialogTitle>
+                                        <AlertDialogDescription className="text-slate-300 font-medium pt-2">
+                                            This will permanently remove <span className="text-white font-bold">{currentClass?.name}</span> and all associated hall pass history. This action cannot be undone.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter className="pt-4">
+                                        <AlertDialogCancel className="rounded-xl bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
+                                        <AlertDialogAction
+                                            onClick={() => onDeleteClass(selectedClassId)}
+                                            className="rounded-xl bg-red-600 hover:bg-red-700 text-white font-black px-6"
+                                        >
+                                            Delete Permanently
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        )}
+                    </>
                 )}
             </div>
 

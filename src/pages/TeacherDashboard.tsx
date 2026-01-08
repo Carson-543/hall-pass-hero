@@ -13,6 +13,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { PeriodDisplay } from '@/components/PeriodDisplay';
 import { TeacherHeader } from '@/components/teacher/TeacherHeader';
 import { TeacherControls } from '@/components/teacher/TeacherControls';
+import { SubModeToggle } from '@/components/teacher/SubModeToggle';
 import { RequestQueue } from '@/components/teacher/RequestQueue';
 import { ActivePassList } from '@/components/teacher/ActivePassList';
 import { RosterGrid } from '@/components/teacher/RosterGrid';
@@ -103,6 +104,10 @@ export const TeacherDashboard = () => {
   const [createPassDialogOpen, setCreatePassDialogOpen] = useState(false);
   const [selectedStudentForHistory, setSelectedStudentForHistory] = useState<Student | null>(null);
 
+  // --- Sub Mode State ---
+  const [isSubMode, setIsSubMode] = useState(false);
+  const [subClasses, setSubClasses] = useState<ClassInfo[]>([]);
+
   // --- Quick Pass State ---
   const [selectedStudentForPass, setSelectedStudentForPass] = useState('');
   const [selectedDestination, setSelectedDestination] = useState('');
@@ -110,8 +115,23 @@ export const TeacherDashboard = () => {
   const [isActionLoading, setIsActionLoading] = useState(false);
 
   const DESTINATIONS = ['Restroom', 'Locker', 'Office', 'Other'];
-  const currentClass = classes.find(c => c.id === selectedClassId);
+  const displayClasses = isSubMode ? subClasses : classes;
+  const currentClass = displayClasses.find(c => c.id === selectedClassId);
   const { currentPeriod } = useCurrentPeriod();
+
+  // --- Sub Mode Handler ---
+  const handleSubModeChange = (enabled: boolean, teacherId: string | null, classList: any[]) => {
+    setIsSubMode(enabled);
+    if (enabled && classList.length > 0) {
+      setSubClasses(classList);
+      setSelectedClassId(classList[0].id);
+    } else {
+      setSubClasses([]);
+      if (classes.length > 0) {
+        setSelectedClassId(classes[0].id);
+      }
+    }
+  };
 
   // --- Auth & Initial Data ---
   useEffect(() => {
@@ -265,14 +285,22 @@ export const TeacherDashboard = () => {
       </div>
 
       <div className="relative p-4 sm:p-6 max-w-7xl mx-auto z-10">
-        <TeacherHeader signOut={signOut} />
+        <TeacherHeader />
         <div className="mb-6"><PeriodDisplay /></div>
+
+        {/* Sub Mode Toggle */}
+        {profile?.id && (
+          <div className="mb-6">
+            <SubModeToggle userId={profile.id} onSubModeChange={handleSubModeChange} />
+          </div>
+        )}
 
         <StaggerContainer className="space-y-6">
           <StaggerItem>
             <GlassCard className="p-6 bg-slate-900/60 border-white/10">
               <TeacherControls
-                classes={classes}
+                classes={displayClasses}
+                isSubMode={isSubMode}
                 selectedClassId={selectedClassId}
                 onClassChange={setSelectedClassId}
                 onAddClass={() => setDialogOpen(true)}
