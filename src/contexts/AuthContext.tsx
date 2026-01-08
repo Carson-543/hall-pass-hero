@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
-import { useAuth } from '@/hooks/use-auth'; // Double-check this filename is exactly use-auth.tsx
+import { useAuth } from '@/contexts/AuthContext'; // Double-check this filename is exactly use-auth.tsx
 import { useNavigate } from 'react-router-dom';
 
 export const TeacherHeader = () => {
