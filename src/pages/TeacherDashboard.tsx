@@ -18,7 +18,7 @@ import { ActivePassList } from '@/components/teacher/ActivePassList';
 import { RosterGrid } from '@/components/teacher/RosterGrid';
 import { GlassCard } from '@/components/ui/glass-card';
 import { PageTransition, StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
-import { FloatingPassButton } from '@/components/teacher/FloatingPassButton';
+import { FloatingPassButton } from '@/components/FloatingPassButton';
 
 // --- Interfaces ---
 interface Student {
