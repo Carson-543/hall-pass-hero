@@ -1,297 +1,380 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { useCurrentPeriod } from '@/hooks/useCurrentPeriod';
+import { ClassManagementDialog } from '@/components/teacher/ClassManagementDialog';
+import { StudentHistoryDialog } from '@/components/teacher/StudentHistoryDialog';
+import { useOrganization } from '@/contexts/OrganizationContext';
+
+// Components
+import { PeriodDisplay } from '@/components/PeriodDisplay';
+import { TeacherHeader } from '@/components/teacher/TeacherHeader';
+import { TeacherControls } from '@/components/teacher/TeacherControls';
+import { RequestQueue } from '@/components/teacher/RequestQueue';
+import { ActivePassList } from '@/components/teacher/ActivePassList';
+import { RosterGrid } from '@/components/teacher/RosterGrid';
+import { GlassCard } from '@/components/ui/glass-card';
+import { PageTransition, StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
-import { PeriodDisplay } from '@/components/PeriodDisplay';
-import { ElapsedTimer } from '@/components/ElapsedTimer';
-import { ClassManagementDialog } from '@/components/teacher/ClassManagementDialog';
-import { StudentManagementDialog } from '@/components/teacher/StudentManagementDialog';
-import { 
-  LogOut, Plus, Check, X, 
-  Search, Loader2, History, UserMinus, Timer
-} from 'lucide-react';
-import { startOfWeek } from 'date-fns';
+import { Plus, Loader2, Search } from 'lucide-react';
 
-// Helper for status colors (Restored from your original)
-const getDestinationColor = (destination: string) => {
-  switch (destination?.toLowerCase()) {
-    case 'restroom': return 'bg-success/10 text-success border-success/20';
-    case 'locker': return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
-    case 'office': return 'bg-purple-500/10 text-purple-600 border-purple-500/20';
-    default: return 'bg-muted text-muted-foreground border-border';
-  }
-};
+// --- Interfaces ---
+interface Student {
+  id: string;
+  name: string;
+  email: string;
+}
 
-const getPassCardColor = (pass: any) => {
-  if (pass.status === 'pending') {
-    return pass.is_quota_exceeded ? 'border-l-destructive' : 'border-l-warning';
-  }
-  return 'border-l-success';
-};
+interface ClassInfo {
+  id: string;
+  name: string;
+  period_order: number;
+  join_code: string;
+  is_queue_autonomous?: boolean;
+  max_concurrent_bathroom?: number;
+}
 
-const TeacherDashboard = () => {
-  const { user, role, signOut, loading: authLoading } = useAuth();
+interface PendingPass {
+  id: string;
+  student_id: string;
+  class_id: string;
+  destination: string;
+  status: 'pending' | 'approved' | 'denied' | 'pending_return' | 'returned';
+  requested_at: string;
+  approved_at?: string;
+  student_name: string;
+  is_quota_exceeded?: boolean;
+}
+
+interface ActivePass {
+  id: string;
+  student_id: string;
+  class_id: string;
+  destination: string;
+  status: 'pending' | 'approved' | 'denied' | 'pending_return' | 'returned';
+  requested_at: string;
+  approved_at?: string;
+  student_name: string;
+}
+
+interface FreezeStatus {
+  id: string;
+  freeze_type: string;
+  ends_at: string | null;
+  is_active: boolean;
+}
+
+interface Settings {
+  max_concurrent_bathroom: number;
+}
+
+export const TeacherDashboard = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
+  const { organizationId } = useOrganization();
 
-  // Core Data States
-  const [classes, setClasses] = useState<any[]>([]);
+  // --- Core State ---
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<{ id: string; full_name: string; email?: string } | null>(null);
+  const [classes, setClasses] = useState<ClassInfo[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
-  const [pendingPasses, setPendingPasses] = useState<any[]>([]);
-  const [activePasses, setActivePasses] = useState<any[]>([]);
-  const [students, setStudents] = useState<any[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [pendingPasses, setPendingPasses] = useState<PendingPass[]>([]);
+  const [activePasses, setActivePasses] = useState<ActivePass[]>([]);
+  const [settings, setSettings] = useState<Settings | null>(null);
+
+  // --- UI & Controls State ---
+  const [activeFreeze, setActiveFreeze] = useState<FreezeStatus | null>(null);
+  const [isFreezeLoading, setIsFreezeLoading] = useState(false);
+  const [freezeType, setFreezeType] = useState<'bathroom' | 'all'>('bathroom');
+  const [timerMinutes, setTimerMinutes] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isActionLoading, setIsActionLoading] = useState(false);
-
-  // Dialog States
-  const [createPassDialogOpen, setCreatePassDialogOpen] = useState(false);
-  const [classDialogOpen, setClassDialogOpen] = useState(false);
-  const [editingClass, setEditingClass] = useState<any | null>(null);
-  const [studentDialogOpen, setStudentDialogOpen] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
+  
+  // --- Dialog States ---
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [createPassDialogOpen, setCreatePassDialogOpen] = useState(false);
+  const [selectedStudentForHistory, setSelectedStudentForHistory] = useState<Student | null>(null);
 
-  // Quick Pass Selection State
+  // --- Quick Pass State ---
   const [selectedStudentForPass, setSelectedStudentForPass] = useState('');
   const [selectedDestination, setSelectedDestination] = useState('');
   const [customDestination, setCustomDestination] = useState('');
+  const [isActionLoading, setIsActionLoading] = useState(false);
 
   const DESTINATIONS = ['Restroom', 'Locker', 'Office', 'Other'];
+  const currentClass = classes.find(c => c.id === selectedClassId);
+  const { currentPeriod } = useCurrentPeriod();
 
-  // --- Logic Functions (Restored) ---
-  const fetchClasses = useCallback(async () => {
-    if (!user) return;
-    const { data } = await supabase.from('classes').select('*').eq('teacher_id', user.id).order('period_order');
-    if (data && data.length > 0) {
-      setClasses(data);
-      if (!selectedClassId) setSelectedClassId(data[0].id);
-    }
-  }, [user, selectedClassId]);
-
-  const fetchPasses = useCallback(async (classId: string) => {
-    const { data: passes } = await supabase.from('passes').select('*, profiles(full_name)').eq('class_id', classId).in('status', ['pending', 'approved', 'pending_return']);
-    if (passes) {
-      const processed = passes.map(p => ({
-        ...p,
-        student_name: p.profiles?.full_name || 'Unknown',
-        is_quota_exceeded: false // Simplified for this restore
-      }));
-      setPendingPasses(processed.filter(p => p.status === 'pending'));
-      setActivePasses(processed.filter(p => p.status !== 'pending'));
-    }
-  }, []);
-
-  const fetchRoster = useCallback(async (classId: string) => {
-    const { data } = await supabase.from('class_enrollments').select('profiles(id, full_name, email)').eq('class_id', classId);
-    if (data) setStudents(data.map((d: any) => ({ id: d.profiles.id, name: d.profiles.full_name, email: d.profiles.email })));
-  }, []);
-
-  useEffect(() => { fetchClasses(); }, [fetchClasses]);
+  // --- Auth & Initial Data ---
   useEffect(() => {
-    if (selectedClassId) {
-      fetchPasses(selectedClassId);
-      fetchRoster(selectedClassId);
-    }
-  }, [selectedClassId, fetchPasses, fetchRoster]);
+    checkUser();
+  }, []);
 
+  const checkUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { navigate('/auth'); return; }
+
+      const { data: profileData } = await supabase.from('profiles').select('id, full_name').eq('id', user.id).single();
+      const { data: roleData } = await supabase.from('user_roles').select('role').eq('user_id', user.id).single();
+
+      if (!profileData || roleData?.role !== 'teacher') {
+        navigate('/'); return;
+      }
+
+      setProfile({ ...profileData, email: user.email });
+      await fetchClasses(user.id);
+    } catch (error) {
+      console.error("Dashboard Load Error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- Data Fetching ---
+  const fetchClasses = useCallback(async (userId?: string) => {
+    const uid = userId || profile?.id;
+    if (!uid) return;
+    const { data } = await supabase.from('classes').select('*').eq('teacher_id', uid).order('period_order');
+    if (data) setClasses(data);
+  }, [profile]);
+
+  const fetchPasses = useCallback(async () => {
+    if (!selectedClassId) return;
+    const { data: passes } = await supabase
+      .from('passes')
+      .select('id, student_id, class_id, destination, status, requested_at, approved_at')
+      .eq('class_id', selectedClassId)
+      .in('status', ['pending', 'approved', 'pending_return'])
+      .order('requested_at', { ascending: true });
+
+    if (passes) {
+      const studentIds = [...new Set(passes.map(p => p.student_id))];
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', studentIds);
+      const profileMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
+      
+      setPendingPasses(passes.filter(p => p.status === 'pending').map(p => ({ 
+        ...p, 
+        student_name: profileMap.get(p.student_id) || 'Unknown' 
+      })) as PendingPass[]);
+      
+      setActivePasses(passes.filter(p => ['approved', 'pending_return'].includes(p.status)).map(p => ({ 
+        ...p, 
+        student_name: profileMap.get(p.student_id) || 'Unknown' 
+      })) as ActivePass[]);
+    }
+  }, [selectedClassId]);
+
+  const fetchStudents = useCallback(async () => {
+    if (!selectedClassId) return;
+    const { data: enrollments } = await supabase.from('class_enrollments').select('student_id').eq('class_id', selectedClassId);
+    if (!enrollments?.length) { setStudents([]); return; }
+    
+    const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', enrollments.map(e => e.student_id));
+    if (profiles) setStudents(profiles.map(p => ({ id: p.id, name: p.full_name, email: '' })));
+  }, [selectedClassId]);
+
+  // --- Handlers ---
   const handleQuickPass = async () => {
     if (!selectedStudentForPass || !selectedDestination || isActionLoading) return;
     setIsActionLoading(true);
     const dest = selectedDestination === 'Other' ? customDestination : selectedDestination;
+    
     const { error } = await supabase.from('passes').insert({
       student_id: selectedStudentForPass,
       class_id: selectedClassId,
       destination: dest,
       status: 'approved',
       approved_at: new Date().toISOString(),
-      approved_by: user!.id
+      approved_by: profile?.id
     });
-    setIsActionLoading(false);
+
     if (!error) {
+      toast({ title: "Pass Issued" });
       setCreatePassDialogOpen(false);
       setSelectedStudentForPass('');
       setSelectedDestination('');
-      fetchPasses(selectedClassId);
-      toast({ title: 'Pass Issued' });
+      fetchPasses();
     }
+    setIsActionLoading(false);
   };
 
-  const handleDeny = async (id: string) => {
-    await supabase.from('passes').update({ status: 'denied' }).eq('id', id);
-    fetchPasses(selectedClassId);
+  const handleApprove = async (passId: string) => {
+    await supabase.from('passes').update({ status: 'approved', approved_at: new Date().toISOString() }).eq('id', passId);
+    fetchPasses();
   };
 
-  const handleApprove = async (id: string) => {
-    await supabase.from('passes').update({ status: 'approved', approved_at: new Date().toISOString() }).eq('id', id);
-    fetchPasses(selectedClassId);
+  const handleDeny = async (passId: string) => {
+    await supabase.from('passes').update({ status: 'denied', denied_at: new Date().toISOString() }).eq('id', passId);
+    fetchPasses();
   };
 
-  const handleCheckIn = async (id: string) => {
-    await supabase.from('passes').update({ status: 'returned', returned_at: new Date().toISOString() }).eq('id', id);
-    fetchPasses(selectedClassId);
+  const handleCheckIn = async (passId: string) => {
+    await supabase.from('passes').update({ status: 'returned', returned_at: new Date().toISOString() }).eq('id', passId);
+    fetchPasses();
   };
 
-  if (authLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
-  if (!user || role !== 'teacher') return <Navigate to="/auth" replace />;
+  // --- Realtime Subscriptions ---
+  useEffect(() => {
+    if (selectedClassId) {
+      fetchStudents(); fetchPasses();
+      const channel = supabase.channel(`teacher-db-${selectedClassId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'passes', filter: `class_id=eq.${selectedClassId}` }, () => fetchPasses())
+        .subscribe();
+      return () => { supabase.removeChannel(channel); };
+    }
+  }, [selectedClassId, fetchPasses, fetchStudents]);
 
-  const filteredStudents = students.filter(s => s.name?.toLowerCase().includes(searchQuery.toLowerCase()));
+  if (loading) return <div className="h-screen flex items-center justify-center bg-slate-950"><Loader2 className="animate-spin text-blue-500 w-12 h-12" /></div>;
 
   return (
-    <div className="min-h-screen bg-background p-4 max-w-6xl mx-auto pb-32">
-      {/* Header */}
-      <header className="flex items-center justify-between mb-6 pt-4">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-            <span className="text-primary-foreground font-bold text-xl">T</span>
-          </div>
-          <div>
-            <h1 className="text-xl font-bold">Teacher Central</h1>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Pass Management</p>
-          </div>
-        </div>
-        <Button variant="ghost" size="icon" onClick={() => signOut()} className="rounded-full bg-card shadow-sm border">
-          <LogOut className="h-5 w-5 text-muted-foreground" />
-        </Button>
-      </header>
-
-      <div className="space-y-6">
-        <PeriodDisplay />
-
-        <div className="flex gap-2">
-          <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-            <SelectTrigger className="h-14 rounded-2xl bg-card border-none shadow-sm text-lg font-bold px-6 flex-1">
-              <SelectValue placeholder="Select Class" />
-            </SelectTrigger>
-            <SelectContent className="rounded-2xl">
-              {classes.map(c => (
-                <SelectItem key={c.id} value={c.id}>Period {c.period_order}: {c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button size="icon" className="h-14 w-14 rounded-2xl shadow-lg" onClick={() => setClassDialogOpen(true)}>
-            <Plus className="h-5 w-5" />
-          </Button>
-        </div>
-
-        {selectedClassId && (
-          <>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Request Queue */}
-              <div className="space-y-3">
-                <h2 className="text-sm font-bold uppercase tracking-wider text-warning">Requests ({pendingPasses.length})</h2>
-                {pendingPasses.map(pass => (
-                  <Card key={pass.id} className={`rounded-2xl border-l-4 ${getPassCardColor(pass)}`}>
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-bold">{pass.student_name}</h3>
-                        <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-bold rounded-full border ${getDestinationColor(pass.destination)}`}>{pass.destination}</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button size="icon" variant="ghost" className="h-10 w-10 rounded-xl bg-muted" onClick={() => handleDeny(pass.id)}><X className="h-4 w-4" /></Button>
-                        <Button size="icon" className="h-10 w-10 rounded-xl shadow-lg" onClick={() => handleApprove(pass.id)}><Check className="h-4 w-4" /></Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              {/* Active List */}
-              <div className="space-y-3">
-                <h2 className="text-sm font-bold uppercase tracking-wider text-success">Active ({activePasses.length})</h2>
-                {activePasses.map(pass => (
-                  <Card key={pass.id} className="rounded-2xl border-l-4 border-l-success">
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div>
-                        <h3 className="font-bold">{pass.student_name}</h3>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className={`inline-block px-2 py-0.5 text-xs font-bold rounded-full border ${getDestinationColor(pass.destination)}`}>{pass.destination}</span>
-                          {pass.approved_at && <ElapsedTimer startTime={pass.approved_at} destination={pass.destination} />}
-                        </div>
-                      </div>
-                      <Button onClick={() => handleCheckIn(pass.id)} className="rounded-xl h-10 px-4 shadow-lg font-bold">Check In</Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-
-            {/* Roster Search */}
-            <div className="space-y-4 pt-4 border-t">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input placeholder="Search students..." className="h-12 pl-12 rounded-2xl border-none shadow-sm font-medium bg-card" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-              </div>
-              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredStudents.map(student => (
-                  <div key={student.id} className="bg-card p-3 rounded-xl shadow-sm border flex items-center justify-between hover:bg-muted/30 transition-colors">
-                    <div className="min-w-0"><p className="font-bold truncate">{student.name}</p></div>
-                    <div className="flex gap-1">
-                      <Button size="icon" variant="ghost" className="rounded-lg h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={() => { setSelectedStudent(student); setHistoryDialogOpen(true); }}>
-                        <History className="h-4 w-4" />
-                      </Button>
-                      <Button size="icon" variant="ghost" className="rounded-lg h-8 w-8" onClick={() => { setSelectedStudent(student); setStudentDialogOpen(true); }}>
-                        <UserMinus className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
+    <PageTransition className="min-h-screen bg-slate-950 text-slate-100 pb-32">
+      {/* Background Glow */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none opacity-20">
+        <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-600 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-600 blur-[120px] rounded-full" />
       </div>
 
-      {/* FIXED FOOTER BUTTON */}
-      {selectedClassId && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-md px-4">
-          <Button onClick={() => setCreatePassDialogOpen(true)} className="w-full h-14 rounded-2xl shadow-2xl text-lg font-bold flex items-center justify-center gap-3">
-            <Plus className="h-5 w-5" /> ISSUE QUICK PASS
-          </Button>
-        </div>
-      )}
+      <div className="relative p-4 sm:p-6 max-w-7xl mx-auto z-10">
+        <TeacherHeader signOut={() => supabase.auth.signOut()} />
+        <div className="mb-6"><PeriodDisplay /></div>
 
-      {/* QUICK PASS DIALOG */}
-      <Dialog open={createPassDialogOpen} onOpenChange={setCreatePassDialogOpen}>
-        <DialogContent className="rounded-3xl max-w-sm">
-          <DialogHeader><DialogTitle className="font-bold">Quick Pass</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase text-muted-foreground">Student</Label>
-              <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto pr-1">
-                {students.map(s => (
-                  <Button 
-                    key={s.id} size="sm" 
-                    variant={selectedStudentForPass === s.id ? 'default' : 'outline'} 
-                    className="rounded-xl font-bold truncate" 
-                    onClick={() => setSelectedStudentForPass(s.id)}
-                  >
-                    {(s.name || '').split(' ')[0]}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase text-muted-foreground">Location</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {DESTINATIONS.map(d => (
-                  <Button key={d} variant={selectedDestination === d ? 'default' : 'outline'} className="rounded-xl font-bold" onClick={() => setSelectedDestination(d)}>{d}</Button>
-                ))}
-              </div>
-            </div>
-            <Button onClick={handleQuickPass} className="w-full h-12 rounded-xl font-bold" disabled={isActionLoading || !selectedStudentForPass || !selectedDestination}>Issue Pass</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        <StaggerContainer className="space-y-6">
+          <StaggerItem>
+            <GlassCard className="p-6 bg-slate-900/60 border-white/10">
+              <TeacherControls
+                classes={classes}
+                selectedClassId={selectedClassId}
+                onClassChange={setSelectedClassId}
+                onAddClass={() => setDialogOpen(true)}
+                activeFreeze={activeFreeze}
+                freezeType={freezeType}
+                onFreezeTypeChange={setFreezeType}
+                timerMinutes={timerMinutes}
+                onTimerChange={setTimerMinutes}
+                onFreeze={() => {}} // Implementation logic
+                onUnfreeze={() => {}} // Implementation logic
+                currentClass={currentClass}
+                maxConcurrent={settings?.max_concurrent_bathroom ?? 2}
+                onToggleAutoQueue={() => {}} // Implementation logic
+                onDeleteClass={() => {}} // Implementation logic
+              />
+            </GlassCard>
+          </StaggerItem>
 
-      <ClassManagementDialog open={classDialogOpen} onOpenChange={setClassDialogOpen} editingClass={editingClass} userId={user?.id || ''} onSaved={fetchClasses} />
-      <StudentManagementDialog open={studentDialogOpen} onOpenChange={setStudentDialogOpen} student={selectedStudent} currentClassId={selectedClassId} teacherClasses={classes} onUpdated={() => fetchRoster(selectedClassId)} />
-    </div>
+          <StaggerItem>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <GlassCard className="p-6 bg-slate-900/60 border-white/10">
+                <RequestQueue
+                  pendingPasses={pendingPasses}
+                  onApprove={handleApprove}
+                  onDeny={handleDeny}
+                />
+              </GlassCard>
+              <GlassCard className="p-6 bg-slate-900/60 border-white/10">
+                <ActivePassList
+                  activePasses={activePasses}
+                  onCheckIn={handleCheckIn}
+                />
+              </GlassCard>
+            </div>
+          </StaggerItem>
+
+          {selectedClassId && (
+            <StaggerItem>
+              <GlassCard className="p-6 bg-slate-900/60 border-white/10">
+                <RosterGrid
+                  students={students}
+                  currentClass={currentClass}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                  onViewHistory={(s) => { setSelectedStudentForHistory(s); setHistoryDialogOpen(true); }}
+                  onRemoveStudent={() => {}}
+                />
+              </GlassCard>
+            </StaggerItem>
+          )}
+        </StaggerContainer>
+
+        {/* Floating Quick Pass Action */}
+        {selectedClassId && (
+          <motion.div 
+            initial={{ y: 100 }} animate={{ y: 0 }}
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w px-4"
+          >
+            <Button 
+              onClick={() => setCreatePassDialogOpen(true)}
+              className="w-full h-16 rounded-2xl shadow-2xl text-lg font-bold bg-blue-600 hover:bg-blue-500 text-white border-none"
+            >
+              <Plus className="mr-2 h-6 w-6" /> ISSUE QUICK PASS
+            </Button>
+          </motion.div>
+        )}
+
+        {/* Dialogs */}
+        <ClassManagementDialog
+          open={dialogOpen} onOpenChange={setDialogOpen}
+          userId={profile?.id || ''} organizationId={organizationId}
+          onSaved={() => fetchClasses()}
+        />
+
+        <StudentHistoryDialog
+          open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}
+          studentId={selectedStudentForHistory?.id || null}
+          studentName={selectedStudentForHistory?.name || null}
+        />
+
+        {/* Quick Pass Dialog */}
+        <Dialog open={createPassDialogOpen} onOpenChange={setCreatePassDialogOpen}>
+          <DialogContent className="rounded-3xl max-w-sm bg-slate-900 border-white/10 text-slate-100">
+            <DialogHeader><DialogTitle className="font-bold text-xl">Quick Pass</DialogTitle></DialogHeader>
+            <div className="space-y-6 py-4">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase text-slate-400">Student</Label>
+                <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                  {students.map(s => (
+                    <Button 
+                      key={s.id} size="sm" 
+                      variant={selectedStudentForPass === s.id ? 'default' : 'outline'}
+                      className={`rounded-xl font-bold ${selectedStudentForPass === s.id ? 'bg-blue-600' : 'border-white/10'}`}
+                      onClick={() => setSelectedStudentForPass(s.id)}
+                    >
+                      {s.name.split(' ')[0]}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase text-slate-400">Location</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {DESTINATIONS.map(d => (
+                    <Button 
+                      key={d} variant={selectedDestination === d ? 'default' : 'outline'}
+                      className={`rounded-xl font-bold ${selectedDestination === d ? 'bg-blue-600' : 'border-white/10'}`}
+                      onClick={() => setSelectedDestination(d)}
+                    >
+                      {d}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <Button 
+                onClick={handleQuickPass} disabled={isActionLoading || !selectedStudentForPass || !selectedDestination}
+                className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-700"
+              >
+                {isActionLoading ? <Loader2 className="animate-spin" /> : 'Confirm Pass'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </PageTransition>
   );
 };
 
