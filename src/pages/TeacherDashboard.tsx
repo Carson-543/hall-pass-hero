@@ -139,11 +139,32 @@ export const TeacherDashboard = () => {
 
   // --- Data Fetching ---
   const fetchClasses = useCallback(async (userId?: string) => {
-    const uid = userId || profile?.id;
-    if (!uid) return;
-    const { data } = await supabase.from('classes').select('*').eq('teacher_id', uid).order('period_order');
-    if (data) setClasses(data);
-  }, [profile]);
+  const uid = userId || profile?.id;
+  if (!uid) return;
+
+  const { data } = await supabase
+    .from('classes')
+    .select('*')
+    .eq('teacher_id', uid)
+    .order('period_order');
+
+  if (data && data.length > 0) {
+    setClasses(data);
+
+    // Only auto-select if nothing is selected yet
+    if (!selectedClassId) {
+      // 1. Try to find class matching the actual current period (time-based)
+      const matchesPeriod = data.find(c => c.period_order === currentPeriod);
+      
+      if (matchesPeriod) {
+        setSelectedClassId(matchesPeriod.id);
+      } else {
+        // 2. Fallback to the first class of the day if no period match
+        setSelectedClassId(data[0].id);
+      }
+    }
+  }
+}, [profile, selectedClassId, currentPeriod]); // Added currentPeriod to dependencies
 
   const fetchPasses = useCallback(async () => {
     if (!selectedClassId) return;
