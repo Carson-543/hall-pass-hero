@@ -150,7 +150,7 @@ export const SubModeToggle = ({ userId, onSubModeChange }: SubModeToggleProps) =
               ))}
             </SelectContent>
           </Select>
-          <Button className="bg-blue-500 text-white" onClick={handleEnterSubMode} disabled={!selectedTeacherId}>
+          <Button className="bg-blue-500 text-white focus:bg-blue-800" onClick={handleEnterSubMode} disabled={!selectedTeacherId}>
             Enter Sub Mode
           </Button>
         </div>
