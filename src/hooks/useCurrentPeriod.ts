@@ -34,6 +34,7 @@ interface CachedScheduleData {
 }
 
 export const useCurrentPeriod = () => {
+  console.log("Running useCurrentPeriod");
   const { organizationId } = useOrganization();
   const [periodInfo, setPeriodInfo] = useState<CurrentPeriodInfo>({
     currentPeriod: null,
