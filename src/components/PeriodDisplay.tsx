@@ -66,10 +66,10 @@ export const PeriodDisplay = () => {
             </p>
             <h3 className="text-lg font-black text-white">{currentPeriod.name}</h3>
           </div>
-          <div className="flex items-right gap-3 text-3xl font-black text-blue-500 drop-shadow-[0_0_15px_rgba(37,99,235,0.3)]">
-            <Clock className="h-6 w-6" />
-            {formatTime(timeRemaining)}
-          </div>
+          <<div className="flex items-center gap-3 text-3xl font-black text-blue-500 drop-shadow-[0_0_15px_rgba(37,99,235,0.3)] ml-auto">
+    <Clock className="h-7 w-7 mb-1" /> {/* Slight margin-bottom often helps icons look centered with large numbers */}
+    {formatTime(timeRemaining)}
+  </div>
         </div>
         {nextPeriod && (
           <p className="text-xs font-black text-slate-400 flex items-center gap-1.5 uppercase tracking-widest">
