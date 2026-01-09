@@ -38,32 +38,45 @@ export const JoinClassDialog = ({
         setIsLoading(true);
 
         try {
-            /**
-             * We call the PostgreSQL function 'join_class_by_code'.
-             * The function handles checking for the class and existing enrollments 
-             * in a single atomic transaction on the server.
-             */
-            const { data, error } = await supabase.rpc('join_class_by_code', {
-                p_join_code: code
+            // First lookup the class by join code
+            const { data: classData, error: lookupError } = await supabase.rpc('lookup_class_by_join_code', {
+                _join_code: code
             });
 
-            if (error) throw error;
+            if (lookupError) throw lookupError;
 
-            // Handle the custom JSON response from our SQL function
-            if (!data.success) {
+            if (!classData || classData.length === 0) {
                 toast({
-                    title: 'Could Not Join',
-                    description: data.message || 'Check your code and try again.',
+                    title: 'Class Not Found',
+                    description: 'No class found with that join code. Please check and try again.',
                     variant: 'destructive'
                 });
                 return;
             }
 
-            // Success (Either newly joined or was already a member)
-            toast({
-                title: data.message === 'Already enrolled' ? 'Welcome Back!' : 'Joined Class!',
-                description: `You are now a member of ${data.class_name}.`,
-            });
+            const classInfo = classData[0];
+
+            // Try to enroll in the class
+            const { error: enrollError } = await supabase
+                .from('class_enrollments')
+                .insert({ class_id: classInfo.id, student_id: (await supabase.auth.getUser()).data.user?.id });
+
+            if (enrollError) {
+                // Check if already enrolled (duplicate key)
+                if (enrollError.code === '23505') {
+                    toast({
+                        title: 'Welcome Back!',
+                        description: `You are already enrolled in ${classInfo.name}.`,
+                    });
+                } else {
+                    throw enrollError;
+                }
+            } else {
+                toast({
+                    title: 'Joined Class!',
+                    description: `You are now a member of ${classInfo.name}.`,
+                });
+            }
 
             setJoinCode('');
             onJoined(); // Refresh the parent list
