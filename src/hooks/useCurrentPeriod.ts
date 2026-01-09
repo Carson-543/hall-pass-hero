@@ -28,6 +28,7 @@ interface CurrentPeriodInfo {
 }
 
 export const useCurrentPeriod = () => {
+  console.log("running useCurrentPeriod");
   const { organizationId } = useOrganization();
   const [periodInfo, setPeriodInfo] = useState<CurrentPeriodInfo>({
     currentPeriod: null,
