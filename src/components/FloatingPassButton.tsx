@@ -28,7 +28,7 @@ interface FloatingPassButtonProps {
   onPassRequested: () => void;
 }
 
-const LOCATIONS = ["Restroom", "Office", "Nurse", "Library", "Counselor"];
+const LOCATIONS = ["Restroom", "Locker", "Office", "Other"];
 
 export const FloatingPassButton = ({
   userId,
