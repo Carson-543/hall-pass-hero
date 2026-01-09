@@ -58,7 +58,7 @@ export const PeriodDisplay = () => {
 
   if (currentPeriod) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-3 flex-1 w-full">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
