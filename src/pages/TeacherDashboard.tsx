@@ -349,7 +349,6 @@ export const TeacherDashboard = () => {
             <GlassCard className="p-6 bg-slate-900/60 border-2 border-white/10 shadow-xl">
               <TeacherControls
                 classes={displayClasses}
-                isSubMode={isSubMode}
                 selectedClassId={selectedClassId}
                 onClassChange={setSelectedClassId}
                 onAddClass={() => setDialogOpen(true)}
