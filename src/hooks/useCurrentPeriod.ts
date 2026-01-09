@@ -34,7 +34,7 @@ interface CachedScheduleData {
 }
 
 export const useCurrentPeriod = () => {
-  console.log("Running useCurrentPeriod");
+
   const { organizationId } = useOrganization();
   const [periodInfo, setPeriodInfo] = useState<CurrentPeriodInfo>({
     currentPeriod: null,
@@ -57,7 +57,7 @@ export const useCurrentPeriod = () => {
     if (cachedDataRef.current && cachedDataRef.current.fetchedDate === today) {
       return cachedDataRef.current;
     }
-    
+      console.log("Running useCurrentPeriod");
     // Get today's schedule assignment - filter by organization's schedules
     let scheduleId: string | null = null;
     
