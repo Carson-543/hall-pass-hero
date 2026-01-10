@@ -362,8 +362,55 @@ export const TeacherDashboard = () => {
                 onUnfreeze={handleUnfreeze}
                 currentClass={currentClass}
                 maxConcurrent={maxConcurrent}
-                onToggleAutoQueue={async () => {}} // Implementation omitted for brevity
-                onDeleteClass={async () => {}} 
+                onToggleAutoQueue={async (newMaxConcurrent?: number) => {
+                  if (!selectedClassId) return;
+                  const newValue = !currentClass?.is_queue_autonomous;
+                  const updateData: { is_queue_autonomous: boolean; max_concurrent_bathroom?: number } = {
+                    is_queue_autonomous: newValue,
+                  };
+                  if (newValue && newMaxConcurrent) {
+                    updateData.max_concurrent_bathroom = newMaxConcurrent;
+                  }
+                  const { error } = await supabase
+                    .from('classes')
+                    .update(updateData)
+                    .eq('id', selectedClassId);
+                  if (error) {
+                    toast({ title: "Error", description: "Failed to update auto-queue setting", variant: "destructive" });
+                  } else {
+                    toast({ title: newValue ? "Auto-Queue Enabled" : "Auto-Queue Disabled" });
+                    setClasses(prev => prev.map(c => 
+                      c.id === selectedClassId 
+                        ? { ...c, is_queue_autonomous: newValue, max_concurrent_bathroom: newMaxConcurrent ?? c.max_concurrent_bathroom }
+                        : c
+                    ));
+                    if (isSubMode) {
+                      setSubClasses(prev => prev.map(c => 
+                        c.id === selectedClassId 
+                          ? { ...c, is_queue_autonomous: newValue, max_concurrent_bathroom: newMaxConcurrent ?? c.max_concurrent_bathroom }
+                          : c
+                      ));
+                    }
+                  }
+                }}
+                onDeleteClass={async (classId: string) => {
+                  const { error } = await supabase
+                    .from('classes')
+                    .delete()
+                    .eq('id', classId);
+                  if (error) {
+                    toast({ title: "Error", description: "Failed to delete class", variant: "destructive" });
+                  } else {
+                    toast({ title: "Class Deleted" });
+                    const remaining = classes.filter(c => c.id !== classId);
+                    setClasses(remaining);
+                    if (remaining.length > 0) {
+                      setSelectedClassId(remaining[0].id);
+                    } else {
+                      setSelectedClassId('');
+                    }
+                  }
+                }}
               />
             </GlassCard>
           </StaggerItem>
