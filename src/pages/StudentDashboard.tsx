@@ -169,13 +169,24 @@ const StudentDashboard = () => {
 
     const channel = supabase
       .channel(channelName)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'passes', filter: `student_id=eq.${user.id}` },
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'passes', filter: `student_id=eq.${user.id}` },
         (payload) => {
           console.log('[StudentDashboard] Pass update:', payload);
-          // Refresh active pass logic
-          fetchActivePass();
-          if (payload.eventType === 'UPDATE' && ['returned', 'completed', 'denied'].includes((payload.new as any).status)) {
+          const newPass = payload.new as any;
+          
+          // Use payload data directly instead of refetching
+          if (['returned', 'completed', 'denied', 'cancelled'].includes(newPass.status)) {
+            // Pass ended - clear and refresh quota
+            setActivePass(null);
             refreshQuota();
+          } else if (newPass.id === activePass?.id) {
+            // Update existing pass with new data from payload
+            setActivePass((prev: any) => prev ? {
+              ...prev,
+              status: newPass.status,
+              approved_at: newPass.approved_at,
+              expected_return_at: newPass.expected_return_at
+            } : null);
           }
         })
       .subscribe((status) => {
@@ -243,31 +254,50 @@ const StudentDashboard = () => {
 
   const handleCheckIn = async () => {
     if (!activePass) return;
+    
+    // Optimistic update - clear UI immediately
+    const previousPass = activePass;
+    setActivePass(null);
 
-    const { error } = await supabase.rpc('student_check_in', { p_pass_id: activePass.id });
+    const { error } = await supabase.rpc('student_check_in', { p_pass_id: previousPass.id });
 
     if (error) {
+      // Rollback on error
+      setActivePass(previousPass);
       console.error("[StudentDashboard] Error checking in:", error);
       toast({ title: "Error checking in", description: error.message, variant: "destructive" });
     } else {
-      console.log(`[StudentDashboard] Student checked in pass ${activePass.id}`);
+      console.log(`[StudentDashboard] Student checked in pass ${previousPass.id}`);
+      toast({ title: "Checked in successfully!" });
+      refreshQuota();
     }
   };
 
   const handleCancelRequest = async () => {
-    if (!activePass) return;
+    if (!activePass || !user?.id) return;
+    
+    // Optimistic update - clear UI immediately
+    const previousPass = activePass;
+    setActivePass(null);
+    
     const { error } = await supabase
       .from('passes')
-      .update({ status: 'denied', denied_at: new Date().toISOString() })
-      .eq('id', activePass.id)
+      .update({ 
+        status: 'denied', 
+        denied_at: new Date().toISOString(),
+        denied_by: user.id 
+      })
+      .eq('id', previousPass.id)
       .eq('status', 'pending');
 
-    if (!error) {
-      console.log(`[StudentDashboard] Pending request ${activePass.id} cancelled`);
-      toast({ title: 'Request Cancelled' });
-      setActivePass(null);
-    } else {
+    if (error) {
+      // Rollback on error
+      setActivePass(previousPass);
       console.error("[StudentDashboard] Error cancelling request:", error);
+      toast({ title: 'Error cancelling request', variant: 'destructive' });
+    } else {
+      console.log(`[StudentDashboard] Pending request ${previousPass.id} cancelled`);
+      toast({ title: 'Request Cancelled' });
     }
   };
 
