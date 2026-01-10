@@ -2,8 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
+import { useOrganization } from '@/contexts/OrganizationContext';
+
 export const useWeeklyQuota = () => {
   const { user } = useAuth();
+  const { settings } = useOrganization();
   const [weeklyLimit, setWeeklyLimit] = useState(4);
   const [usedPasses, setUsedPasses] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -11,15 +14,8 @@ export const useWeeklyQuota = () => {
   const fetchQuotaData = useCallback(async () => {
     if (!user) return;
 
-    // Get weekly limit setting
-    const { data: settings } = await supabase
-      .from('weekly_quota_settings')
-      .select('weekly_limit')
-      .limit(1)
-      .single();
-
     if (settings) {
-      setWeeklyLimit(settings.weekly_limit);
+      setWeeklyLimit(settings.weekly_bathroom_limit);
     }
 
     // Get start of current week (Monday)
@@ -41,7 +37,7 @@ export const useWeeklyQuota = () => {
 
     setUsedPasses(count ?? 0);
     setLoading(false);
-  }, [user]);
+  }, [user, settings]);
 
   useEffect(() => {
     fetchQuotaData();
