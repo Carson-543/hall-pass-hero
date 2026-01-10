@@ -319,10 +319,33 @@ export const TeacherDashboard = () => {
     fetchPasses();
   };
 
-  const handleCheckIn = async (passId: string) => {
-    await supabase.from('passes').update({ status: 'returned', returned_at: new Date().toISOString() }).eq('id', passId);
+ const handleCheckIn = async (passId: string) => {
+  // 1. Fetch the current state of this pass
+  const { data: pass } = await supabase
+    .from('passes')
+    .select('returned_at')
+    .eq('id', passId)
+    .single();
+
+  // 2. Prepare the update object
+  const updateData: any = { status: 'returned' };
+  
+  // 3. Only add returned_at if it's currently null/missing
+  if (!pass?.returned_at) {
+    updateData.returned_at = new Date().toISOString();
+  }
+
+  const { error } = await supabase
+    .from('passes')
+    .update(updateData)
+    .eq('id', passId);
+
+  if (error) {
+    console.error("Error checking in:", error.message);
+  } else {
     fetchPasses();
-  };
+  }
+};
 
   if (loading) {
     return (
