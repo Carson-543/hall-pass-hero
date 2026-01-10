@@ -83,7 +83,7 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           // Fetch organization settings
           const { data: orgSettings } = await supabase
             .from('organization_settings')
-            .select('*')
+            .select('weekly_bathroom_limit, default_period_count, max_concurrent_bathroom, require_deletion_approval, bathroom_expected_minutes, locker_expected_minutes, office_expected_minutes')
             .eq('organization_id', org.id)
             .maybeSingle();
 
@@ -117,7 +117,7 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     const { data: orgSettings } = await supabase
       .from('organization_settings')
-      .select('*')
+      .select('weekly_bathroom_limit, default_period_count, max_concurrent_bathroom, require_deletion_approval, bathroom_expected_minutes, locker_expected_minutes, office_expected_minutes')
       .eq('organization_id', organization.id)
       .maybeSingle();
 

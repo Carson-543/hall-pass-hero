@@ -99,7 +99,7 @@ export const TeacherDashboard = () => {
   const displayClasses = isSubMode ? subClasses : classes;
   const currentClass = displayClasses.find(c => c.id === selectedClassId);
   const maxConcurrent = currentClass?.max_concurrent_bathroom ?? settings?.max_concurrent_bathroom ?? 2;
-  
+
   // Logic for FloatingPassButton
   const isRestroomQuotaExceeded = activePasses.filter(p => p.destination === 'Restroom').length >= maxConcurrent;
 
@@ -299,8 +299,11 @@ export const TeacherDashboard = () => {
   useEffect(() => {
     if (selectedClassId) {
       const channel = supabase.channel(`teacher-dashboard-${selectedClassId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'passes', filter: `class_id=eq.${selectedClassId}` }, () => fetchPasses())
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'pass_freezes', filter: `class_id=eq.${selectedClassId}` }, () => fetchFreezeStatus(selectedClassId))
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'passes', filter: `class_id=eq.${selectedClassId}` }, () => fetchPasses())
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'passes', filter: `class_id=eq.${selectedClassId}` }, () => fetchPasses())
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pass_freezes', filter: `class_id=eq.${selectedClassId}` }, () => fetchFreezeStatus(selectedClassId))
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pass_freezes', filter: `class_id=eq.${selectedClassId}` }, () => fetchFreezeStatus(selectedClassId))
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'pass_freezes', filter: `class_id=eq.${selectedClassId}` }, () => fetchFreezeStatus(selectedClassId))
         .subscribe();
       fetchStudents();
       fetchPasses();
@@ -319,33 +322,33 @@ export const TeacherDashboard = () => {
     fetchPasses();
   };
 
- const handleCheckIn = async (passId: string) => {
-  // 1. Fetch the current state of this pass
-  const { data: pass } = await supabase
-    .from('passes')
-    .select('returned_at')
-    .eq('id', passId)
-    .single();
+  const handleCheckIn = async (passId: string) => {
+    // 1. Fetch the current state of this pass
+    const { data: pass } = await supabase
+      .from('passes')
+      .select('returned_at')
+      .eq('id', passId)
+      .single();
 
-  // 2. Prepare the update object
-  const updateData: any = { status: 'returned' };
-  
-  // 3. Only add returned_at if it's currently null/missing
-  if (!pass?.returned_at) {
-    updateData.returned_at = new Date().toISOString();
-  }
+    // 2. Prepare the update object
+    const updateData: any = { status: 'returned' };
 
-  const { error } = await supabase
-    .from('passes')
-    .update(updateData)
-    .eq('id', passId);
+    // 3. Only add returned_at if it's currently null/missing
+    if (!pass?.returned_at) {
+      updateData.returned_at = new Date().toISOString();
+    }
 
-  if (error) {
-    console.error("Error checking in:", error.message);
-  } else {
-    fetchPasses();
-  }
-};
+    const { error } = await supabase
+      .from('passes')
+      .update(updateData)
+      .eq('id', passId);
+
+    if (error) {
+      console.error("Error checking in:", error.message);
+    } else {
+      fetchPasses();
+    }
+  };
 
   if (loading) {
     return (
@@ -359,7 +362,7 @@ export const TeacherDashboard = () => {
     <PageTransition className="min-h-screen bg-slate-950 text-slate-100">
       <div className="relative p-4 sm:p-6 pb-24 max-w-7xl mx-auto z-10">
         <TeacherHeader signOut={signOut} />
-        
+
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <PeriodDisplay />
           {profile?.id && (
@@ -402,14 +405,14 @@ export const TeacherDashboard = () => {
                     toast({ title: "Error", description: "Failed to update auto-queue setting", variant: "destructive" });
                   } else {
                     toast({ title: newValue ? "Auto-Queue Enabled" : "Auto-Queue Disabled" });
-                    setClasses(prev => prev.map(c => 
-                      c.id === selectedClassId 
+                    setClasses(prev => prev.map(c =>
+                      c.id === selectedClassId
                         ? { ...c, is_queue_autonomous: newValue, max_concurrent_bathroom: newMaxConcurrent ?? c.max_concurrent_bathroom }
                         : c
                     ));
                     if (isSubMode) {
-                      setSubClasses(prev => prev.map(c => 
-                        c.id === selectedClassId 
+                      setSubClasses(prev => prev.map(c =>
+                        c.id === selectedClassId
                           ? { ...c, is_queue_autonomous: newValue, max_concurrent_bathroom: newMaxConcurrent ?? c.max_concurrent_bathroom }
                           : c
                       ));
@@ -469,7 +472,7 @@ export const TeacherDashboard = () => {
                   searchQuery={searchQuery}
                   setSearchQuery={setSearchQuery}
                   onViewHistory={(s) => { setSelectedStudentForHistory(s); setHistoryDialogOpen(true); }}
-                  onRemoveStudent={() => {}}
+                  onRemoveStudent={() => { }}
                 />
               </GlassCard>
             </StaggerItem>
@@ -495,13 +498,13 @@ export const TeacherDashboard = () => {
 
 
 
-<FloatingPassButton
-  userId={profile?.id || ''}
-  currentClassId={selectedClassId}
-  students={students} // Pass the roster state here
-  isQuotaExceeded={isRestroomQuotaExceeded}
-  onPassRequested={fetchPasses}
-/>
+        <FloatingPassButton
+          userId={profile?.id || ''}
+          currentClassId={selectedClassId}
+          students={students} // Pass the roster state here
+          isQuotaExceeded={isRestroomQuotaExceeded}
+          onPassRequested={fetchPasses}
+        />
       </div>
     </PageTransition>
   );

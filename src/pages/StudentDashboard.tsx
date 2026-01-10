@@ -173,7 +173,7 @@ const StudentDashboard = () => {
         (payload) => {
           console.log('[StudentDashboard] Pass update:', payload);
           const newPass = payload.new as any;
-          
+
           // Use payload data directly instead of refetching
           if (['returned', 'completed', 'denied', 'cancelled'].includes(newPass.status)) {
             // Pass ended - clear and refresh quota
@@ -208,9 +208,19 @@ const StudentDashboard = () => {
 
     const channel = supabase
       .channel(channelName)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pass_freezes', filter: `class_id=eq.${selectedClassId}` },
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pass_freezes', filter: `class_id=eq.${selectedClassId}` },
         (payload) => {
-          console.log('[StudentDashboard] Freeze update:', payload);
+          console.log('[StudentDashboard] Freeze INSERT:', payload);
+          fetchActiveFreeze(selectedClassId);
+        })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pass_freezes', filter: `class_id=eq.${selectedClassId}` },
+        (payload) => {
+          console.log('[StudentDashboard] Freeze UPDATE:', payload);
+          fetchActiveFreeze(selectedClassId);
+        })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'pass_freezes', filter: `class_id=eq.${selectedClassId}` },
+        (payload) => {
+          console.log('[StudentDashboard] Freeze DELETE:', payload);
           fetchActiveFreeze(selectedClassId);
         })
       .subscribe((status) => {
@@ -254,7 +264,7 @@ const StudentDashboard = () => {
 
   const handleCheckIn = async () => {
     if (!activePass) return;
-    
+
     // Optimistic update - clear UI immediately
     const previousPass = activePass;
     setActivePass(null);
@@ -275,17 +285,17 @@ const StudentDashboard = () => {
 
   const handleCancelRequest = async () => {
     if (!activePass || !user?.id) return;
-    
+
     // Optimistic update - clear UI immediately
     const previousPass = activePass;
     setActivePass(null);
-    
+
     const { error } = await supabase
       .from('passes')
-      .update({ 
-        status: 'cancelled', 
+      .update({
+        status: 'cancelled',
         denied_at: new Date().toISOString(),
-        denied_by: user.id 
+        denied_by: user.id
       })
       .eq('id', previousPass.id)
       .eq('status', 'pending');
