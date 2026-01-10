@@ -283,7 +283,7 @@ const StudentDashboard = () => {
     const { error } = await supabase
       .from('passes')
       .update({ 
-        status: 'denied', 
+        status: 'cancelled', 
         denied_at: new Date().toISOString(),
         denied_by: user.id 
       })
