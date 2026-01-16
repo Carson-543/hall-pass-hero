@@ -260,13 +260,18 @@ const AdminDashboard = () => {
   };
 
   const handleDenyUser = async (userId: string) => {
-    console.log(`🔄 Denying (deleting) user: ${userId}`);
-    const { error } = await supabase.from('profiles').delete().eq('id', userId);
+    console.log(`🔄 Denying user: ${userId}`);
+    // UPDATE: We now mark as FALSE (Denied) instead of deleting
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_approved: false })
+      .eq('id', userId);
+
     if (error) {
       console.error("❌ Denial error:", error);
       toast({ title: 'Error', description: 'Failed to deny user.', variant: 'destructive' });
     } else {
-      console.log("✅ User denied and record removed.");
+      console.log("✅ User denied.");
       toast({ title: 'User Denied' });
       fetchPendingUsers();
     }
@@ -505,9 +510,10 @@ const AdminDashboard = () => {
           fetchActivePasses();
         })
         .subscribe((status) => {
-        const timestamp = new Date().toLocaleTimeString();
-        console.log(`[${timestamp}] [AdminDashboard] Admin channel status: ${status}`);
-      });}
+          const timestamp = new Date().toLocaleTimeString();
+          console.log(`[${timestamp}] [AdminDashboard] Admin channel status: ${status}`);
+        });
+    }
 
     return () => {
       if (channelRef.current) {

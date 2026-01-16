@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { GlassCard } from '@/components/ui/glass-card';
 import { GlowButton } from '@/components/ui/glow-button';
@@ -64,7 +64,7 @@ const Auth = () => {
           <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-20">
             <div className="absolute -top-1/4 -right-1/4 w-[80%] h-[80%] rounded-full bg-primary/30 blur-[100px]" />
           </div>
-          
+
           <motion.div
             className="w-full max-w-md space-y-4 relative z-10"
             initial={{ opacity: 0, y: 20 }}
@@ -95,21 +95,84 @@ const Auth = () => {
               </div>
               <CardTitle className="text-3xl font-black text-white">Pending Approval</CardTitle>
               <CardDescription className="text-lg text-slate-400 pt-2 leading-relaxed">
-                You've joined <span className="text-white font-bold">{organization?.name}</span>. 
+                You've joined <span className="text-white font-bold">{organization?.name}</span>.
                 Your account is currently being reviewed by an administrator.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6 pt-4">
+            <CardContent className="space-y-4 pt-4">
               <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-sm text-slate-400 font-medium text-center">
                 Access will be granted automatically once your role is verified.
               </div>
-              <Button 
-                onClick={signOut} 
-                variant="outline" 
-                className="w-full h-14 rounded-2xl font-bold border-white/10 hover:bg-white/5"
-              >
-                Sign Out / Switch Account
-              </Button>
+              <div className="flex gap-3">
+                <Button
+                  onClick={signOut}
+                  variant="outline"
+                  className="flex-1 h-12 rounded-xl font-bold border-white/10 hover:bg-white/5"
+                >
+                  Sign Out
+                </Button>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button className="flex-1 h-12 rounded-xl font-bold bg-white/10 hover:bg-white/20 text-white border border-white/10">
+                      Change Role
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="rounded-3xl p-8 border-0 shadow-2xl bg-slate-900 text-white">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl font-black">Change Role & Re-apply</DialogTitle>
+                      <DialogDescription className="text-slate-400">
+                        If you applied with the wrong role or were denied, you can update your details here to re-submit your application.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      const formData = new FormData(e.currentTarget);
+                      const newName = formData.get('name') as string;
+                      const newRole = formData.get('role') as AppRole;
+
+                      if (!newName || !newRole) return;
+
+                      setIsLoading(true);
+
+                      // 1. Update Role
+                      await supabase.from('user_roles').update({ role: newRole }).eq('user_id', user.id);
+
+                      // 2. Upsert Profile (Restore it if deleted, update name)
+                      // If new role is student, auto-approve.
+                      await supabase.from('profiles').upsert({
+                        id: user.id,
+                        email: user.email,
+                        full_name: newName,
+                        is_approved: newRole === 'student'
+                      });
+
+                      toast({ title: "Application Updated", description: "Your role and details have been updated." });
+                      window.location.reload();
+                    }} className="space-y-5 pt-4">
+                      <div className="space-y-2">
+                        <Label className="uppercase text-xs font-black tracking-widest text-slate-500">Full Name</Label>
+                        <Input name="name" placeholder="Enter your full name" required defaultValue={user.user_metadata?.full_name || ''} className="h-12 rounded-xl bg-white/5 border-white/10 text-white" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="uppercase text-xs font-black tracking-widest text-slate-500">I am a...</Label>
+                        <Select name="role" required defaultValue="student">
+                          <SelectTrigger className="h-12 rounded-xl bg-white/5 border-white/10 text-white">
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl bg-slate-900 border-white/10 text-white">
+                            <SelectItem value="student">Student (Auto-Approved)</SelectItem>
+                            <SelectItem value="teacher">Teacher</SelectItem>
+                            <SelectItem value="admin">Administrator</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button type="submit" disabled={isLoading} className="w-full h-12 rounded-xl font-black text-lg bg-blue-600 hover:bg-blue-500 text-white">
+                        {isLoading ? <Loader2 className="animate-spin" /> : "Update & Re-apply"}
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </CardContent>
           </GlassCard>
         </div>
@@ -230,54 +293,54 @@ const Auth = () => {
                 <GlowButton type="submit" className="w-full h-14 rounded-2xl text-lg font-black" loading={isLoading}>Sign In</GlowButton>
               </form>
             </TabsContent>
-           <TabsContent value="signup" className="space-y-6">
-  <form onSubmit={handleSignup} className="space-y-5">
-    <div className="space-y-2">
-      <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Full Name</Label>
-      <Input value={signupName} onChange={(e) => setSignupName(e.target.value)} placeholder="Enter your full name" className="h-14 rounded-2xl px-6 font-medium" required />
-    </div>
-    <div className="space-y-2">
-      <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Email Address</Label>
-      <Input type="email" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} placeholder="name@school.edu" className="h-14 rounded-2xl px-6 font-medium" required />
-    </div>
-    <div className="space-y-2">
-      <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Password</Label>
-      {/* ADDED WRAPPER AND TOGGLE BUTTON BELOW */}
-      <div className="relative">
-        <Input 
-          type={showPassword ? "text" : "password"} 
-          value={signupPassword} 
-          onChange={(e) => setSignupPassword(e.target.value)} 
-          placeholder="Min. 6 characters" 
-          className="h-14 rounded-2xl px-6 font-medium" 
-          required 
-        />
-        <button 
-          type="button" 
-          onClick={() => setShowPassword(!showPassword)} 
-          className="absolute right-5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-        >
-          {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-        </button>
-      </div>
-    </div>
-    <div className="space-y-2">
-      <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">I am a...</Label>
-      <Select value={signupRole} onValueChange={(v) => setSignupRole(v as AppRole)}>
-        <SelectTrigger className="h-14 rounded-2xl px-6 text-base font-medium">
-          <SelectValue placeholder="Select your role" />
-        </SelectTrigger>
-        <SelectContent className="rounded-2xl">
-          <SelectItem value="student" className="h-12 rounded-xl">Student</SelectItem>
-          <SelectItem value="teacher" className="h-12 rounded-xl">Teacher</SelectItem>
-          <SelectItem value="admin" className="h-12 rounded-xl">Administrator</SelectItem>
-        </SelectContent>
-      </Select>
-      {signupRole !== 'student' && <p className="text-[10px] font-bold text-primary uppercase tracking-widest mt-2">* Requires approval</p>}
-    </div>
-    <GlowButton type="submit" className="w-full h-14 rounded-2xl text-lg font-black" loading={isLoading}>Create Account</GlowButton>
-  </form>
-</TabsContent>
+            <TabsContent value="signup" className="space-y-6">
+              <form onSubmit={handleSignup} className="space-y-5">
+                <div className="space-y-2">
+                  <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Full Name</Label>
+                  <Input value={signupName} onChange={(e) => setSignupName(e.target.value)} placeholder="Enter your full name" className="h-14 rounded-2xl px-6 font-medium" required />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Email Address</Label>
+                  <Input type="email" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} placeholder="name@school.edu" className="h-14 rounded-2xl px-6 font-medium" required />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Password</Label>
+                  {/* ADDED WRAPPER AND TOGGLE BUTTON BELOW */}
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      value={signupPassword}
+                      onChange={(e) => setSignupPassword(e.target.value)}
+                      placeholder="Min. 6 characters"
+                      className="h-14 rounded-2xl px-6 font-medium"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">I am a...</Label>
+                  <Select value={signupRole} onValueChange={(v) => setSignupRole(v as AppRole)}>
+                    <SelectTrigger className="h-14 rounded-2xl px-6 text-base font-medium">
+                      <SelectValue placeholder="Select your role" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl">
+                      <SelectItem value="student" className="h-12 rounded-xl">Student</SelectItem>
+                      <SelectItem value="teacher" className="h-12 rounded-xl">Teacher</SelectItem>
+                      <SelectItem value="admin" className="h-12 rounded-xl">Administrator</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {signupRole !== 'student' && <p className="text-[10px] font-bold text-primary uppercase tracking-widest mt-2">* Requires approval</p>}
+                </div>
+                <GlowButton type="submit" className="w-full h-14 rounded-2xl text-lg font-black" loading={isLoading}>Create Account</GlowButton>
+              </form>
+            </TabsContent>
           </Tabs>
         </motion.div>
       </div>
