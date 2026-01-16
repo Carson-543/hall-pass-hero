@@ -246,20 +246,54 @@ const StudentDashboard = () => {
     const finalDestination = selectedDestination === 'Other' ? customDestination : selectedDestination;
     if (!finalDestination) return;
 
-    const { error } = await supabase.from('passes').insert({
+    setRequestLoading(true);
+
+    // Optimistic Update
+    const selectedClass = enrolledClasses.find(c => c.id === selectedClassId);
+    if (selectedClass) {
+        const optimisticPass = {
+            id: 'temp-' + Date.now(),
+            student_id: user.id,
+            class_id: selectedClassId,
+            class_name: selectedClass.name,
+            destination: finalDestination,
+            status: 'pending',
+            requested_at: new Date().toISOString(),
+        };
+        setActivePass(optimisticPass);
+    }
+
+    const { data, error } = await supabase.from('passes').insert({
       student_id: user.id,
       class_id: selectedClassId,
       destination: finalDestination
-    });
+    }).select().single();
 
     if (error) {
       console.error("[StudentDashboard] Error requesting pass:", error);
+      toast({
+        title: "Error requesting pass",
+        description: "Please try again.",
+        variant: "destructive"
+      });
+      // Revert optimistic update
+      setActivePass(null);
+      setRequestLoading(false);
     } else {
       console.log(`[StudentDashboard] Pass requested to ${selectedDestination}`);
+      // The realtime subscription will likely pick this up, but we can also set it directly if we got data back
+       if (data && selectedClass) {
+          setActivePass({
+              ...data,
+              class_name: selectedClass.name,
+              is_queue_autonomous: selectedClass.is_queue_autonomous // Maintain this if available
+          });
+       }
+       // We keep requestLoading true until the UI transitions (or we could set false here safely)
+       setRequestLoading(false);
+       // fetchActivePass will double check everything
+       fetchActivePass();
     }
-
-    setRequestLoading(false);
-    fetchActivePass();
   };
 
   const handleCheckIn = async () => {
