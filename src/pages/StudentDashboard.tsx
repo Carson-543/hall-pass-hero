@@ -187,6 +187,12 @@ const StudentDashboard = () => {
               approved_at: newPass.approved_at,
               expected_return_at: newPass.expected_return_at
             } : null);
+
+            // Refetch quota if the pass was just approved (transition from pending -> approved)
+            // or if we just want to be safe that 'approved' counts against the limit
+            if (newPass.status === 'approved') {
+              refreshQuota();
+            }
           }
         })
       .subscribe((status) => {
@@ -251,16 +257,16 @@ const StudentDashboard = () => {
     // Optimistic Update
     const selectedClass = enrolledClasses.find(c => c.id === selectedClassId);
     if (selectedClass) {
-        const optimisticPass = {
-            id: 'temp-' + Date.now(),
-            student_id: user.id,
-            class_id: selectedClassId,
-            class_name: selectedClass.name,
-            destination: finalDestination,
-            status: 'pending',
-            requested_at: new Date().toISOString(),
-        };
-        setActivePass(optimisticPass);
+      const optimisticPass = {
+        id: 'temp-' + Date.now(),
+        student_id: user.id,
+        class_id: selectedClassId,
+        class_name: selectedClass.name,
+        destination: finalDestination,
+        status: 'pending',
+        requested_at: new Date().toISOString(),
+      };
+      setActivePass(optimisticPass);
     }
 
     const { data, error } = await supabase.from('passes').insert({
@@ -282,17 +288,17 @@ const StudentDashboard = () => {
     } else {
       console.log(`[StudentDashboard] Pass requested to ${selectedDestination}`);
       // The realtime subscription will likely pick this up, but we can also set it directly if we got data back
-       if (data && selectedClass) {
-          setActivePass({
-              ...data,
-              class_name: selectedClass.name,
-              is_queue_autonomous: selectedClass.is_queue_autonomous // Maintain this if available
-          });
-       }
-       // We keep requestLoading true until the UI transitions (or we could set false here safely)
-       setRequestLoading(false);
-       // fetchActivePass will double check everything
-       fetchActivePass();
+      if (data && selectedClass) {
+        setActivePass({
+          ...data,
+          class_name: selectedClass.name,
+          is_queue_autonomous: selectedClass.is_queue_autonomous // Maintain this if available
+        });
+      }
+      // We keep requestLoading true until the UI transitions (or we could set false here safely)
+      setRequestLoading(false);
+      // fetchActivePass will double check everything
+      fetchActivePass();
     }
   };
 
