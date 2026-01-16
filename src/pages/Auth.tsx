@@ -127,32 +127,30 @@ const Auth = () => {
                     <form onSubmit={async (e) => {
                       e.preventDefault();
                       const formData = new FormData(e.currentTarget);
-                      const newName = formData.get('name') as string;
                       const newRole = formData.get('role') as AppRole;
 
-                      if (!newName || !newRole) return;
+                      if (!newRole) return;
 
                       setIsLoading(true);
 
                       // 1. Update Role
                       await supabase.from('user_roles').update({ role: newRole }).eq('user_id', user.id);
 
-                      // 2. Upsert Profile (Restore it if deleted, update name)
-                      // If new role is student, auto-approve.
+                      // 2. Upsert Profile (Restore it, keep existing name)
+                      const nameToUse = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Unknown';
+                      const isNowApproved = newRole === 'student' ? true : null;
+
                       await supabase.from('profiles').upsert({
                         id: user.id,
                         email: user.email,
-                        full_name: newName,
-                        is_approved: newRole === 'student'
+                        full_name: nameToUse,
+                        is_approved: isNowApproved
                       });
 
                       toast({ title: "Application Updated", description: "Your role and details have been updated." });
                       window.location.reload();
                     }} className="space-y-5 pt-4">
-                      <div className="space-y-2">
-                        <Label className="uppercase text-xs font-black tracking-widest text-slate-500">Full Name</Label>
-                        <Input name="name" placeholder="Enter your full name" required defaultValue={user.user_metadata?.full_name || ''} className="h-12 rounded-xl bg-white/5 border-white/10 text-white" />
-                      </div>
+
                       <div className="space-y-2">
                         <Label className="uppercase text-xs font-black tracking-widest text-slate-500">I am a...</Label>
                         <Select name="role" required defaultValue="student">
