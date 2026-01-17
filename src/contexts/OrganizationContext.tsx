@@ -62,6 +62,7 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
 
     try {
+      setLoading(true);
       // Fetch membership
       const { data: membership } = await supabase
         .from('organization_memberships')
