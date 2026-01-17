@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Plus, Loader2, Snowflake, Bot, Trash2 } from 'lucide-react';
 import { AutoClearMenu } from '@/components/teacher/AutoClearMenu';
@@ -198,8 +199,8 @@ export const TeacherControls = ({
                         </Popover>
 
                         {/* Autonomous Queue Toggle */}
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
+                        <Popover>
+                            <PopoverTrigger asChild>
                                 <Button
                                     variant="outline"
                                     className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-48 rounded-full border-2 shadow-lg p-0 ${currentClass?.is_queue_autonomous ? 'bg-blue-600 border-blue-500 text-white hover:bg-blue-700' : 'bg-white/10 border-white/20 text-slate-400 hover:border-blue-400/50 hover:bg-white/15'}`}
@@ -211,65 +212,58 @@ export const TeacherControls = ({
                                         {currentClass?.is_queue_autonomous ? "Auto-Queue Active" : "Enable Auto-Queue"}
                                     </span>
                                 </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent className="rounded-[2rem] bg-slate-900 border-white/10 text-white shadow-2xl">
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle className="flex items-center gap-2 text-2xl font-black">
-                                        <Bot className="h-6 w-6 text-blue-500" />
-                                        {currentClass?.is_queue_autonomous ? "Disable Auto-Queue?" : "Enable Auto-Queue?"}
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription className="space-y-4 pt-2 text-slate-300 font-medium">
-                                        <p>
-                                            {currentClass?.is_queue_autonomous
-                                                ? "Turning this off will require you to manually approve every student request from now on. Existing approved passes will remain valid."
-                                                : "When enabled, the system will automatically approve student restroom requests if there is space available."}
-                                        </p>
-                                        {!currentClass?.is_queue_autonomous && (
-                                            <>
-                                                <div className="space-y-2 pt-2">
-                                                    <Label className="text-white font-bold">Max Concurrent Restroom Users</Label>
-                                                    <Input
-                                                        type="number"
-                                                        min="1"
-                                                        max="10"
-                                                        value={tempMaxConcurrent}
-                                                        onChange={(e) => setTempMaxConcurrent(e.target.value)}
-                                                        className="rounded-xl bg-white/5 border-white/10 text-white h-12"
-                                                    />
-                                                </div>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 rounded-[1.5rem] bg-slate-900 border-white/20 text-white shadow-2xl p-0 overflow-hidden" align="end">
+                                <div className="p-4 border-b border-white/10 bg-slate-900/50">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className={`p-2 rounded-xl border ${currentClass?.is_queue_autonomous ? 'bg-blue-500/20 border-blue-500/30' : 'bg-slate-800 border-white/10'}`}>
+                                            <Bot className={`w-5 h-5 ${currentClass?.is_queue_autonomous ? 'text-blue-500' : 'text-slate-400'}`} />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-black text-white text-sm uppercase tracking-wide">Auto-Queue</h4>
+                                            <p className="text-[10px] font-bold text-slate-400">
+                                                {currentClass?.is_queue_autonomous ? 'System is approving passes' : 'Manual approval only'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
 
-                                                <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-2xl text-xs space-y-2 mt-2">
-                                                    <p className="font-bold text-blue-400 uppercase tracking-wider">How it works:</p>
-                                                    <ul className="space-y-1.5 text-slate-300">
-                                                        <li className="flex gap-2">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1 shrink-0" />
-                                                            <span>If active passes {'<'} Limit, request is approved instantly.</span>
-                                                        </li>
-                                                        <li className="flex gap-2">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1 shrink-0" />
-                                                            <span>If full, student joins the queue as "Pending".</span>
-                                                        </li>
-                                                        <li className="flex gap-2">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1 shrink-0" />
-                                                            <span>When a student returns, the next person is automatically approved.</span>
-                                                        </li>
-                                                    </ul>
-                                                </div>
-                                            </>
-                                        )}
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter className="pt-4">
-                                    <AlertDialogCancel className="rounded-xl bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                        onClick={handleToggle}
-                                        className={`rounded-xl font-black px-6 h-11 ${currentClass?.is_queue_autonomous ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} text-white shadow-lg`}
-                                    >
-                                        {currentClass?.is_queue_autonomous ? "Disable Auto-Queue" : "Yes, Enable It"}
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
+                                <div className="p-4 space-y-4">
+                                    <div className="space-y-4">
+                                        <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                                            {currentClass?.is_queue_autonomous
+                                                ? "The system is automatically approving students when spots open up."
+                                                : "Enable this to let the system automatically approve restroom requests based on availability."}
+                                        </p>
+
+                                        {/* Max Concurrent Setting - Always show if enabled, or allows setup before enabling */}
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-bold uppercase text-slate-400">Max Concurrent Users</Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    type="number"
+                                                    min="1"
+                                                    max="10"
+                                                    value={tempMaxConcurrent}
+                                                    onChange={(e) => setTempMaxConcurrent(e.target.value)}
+                                                    className="rounded-xl bg-white/5 border-white/10 text-white placeholder:text-slate-500 h-10 font-bold"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <Button
+                                            onClick={handleToggle}
+                                            className={`w-full font-bold rounded-xl h-10 shadow-lg ${currentClass?.is_queue_autonomous
+                                                ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-500/20'
+                                                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20'
+                                                }`}
+                                        >
+                                            {currentClass?.is_queue_autonomous ? "Disable Auto-Queue" : "Enable Auto-Queue"}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
                     </div>
                 </div>
             )}
