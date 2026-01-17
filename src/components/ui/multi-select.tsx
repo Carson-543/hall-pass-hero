@@ -29,6 +29,7 @@ interface MultiSelectProps {
     onChange: (selected: string[]) => void
     placeholder?: string
     className?: string
+    maxIndicatorLabel?: string
 }
 
 export function MultiSelect({
@@ -91,7 +92,7 @@ export function MultiSelect({
                         ) : selected.length > 2 && (
                             <div className="flex items-center gap-1">
                                 <Badge variant="secondary" className="bg-blue-500/20 text-blue-300 border-blue-500/20">
-                                    {selected.length} selected
+                                    {maxIndicatorLabel || `${selected.length} selected`}
                                 </Badge>
                             </div>
                         )}
