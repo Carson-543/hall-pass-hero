@@ -96,28 +96,17 @@ export const StudentManagementDialog = ({
     if (!student || !targetClassId) return;
     setIsLoading(true);
 
-    // Delete from current class
-    const { error: deleteError } = await supabase
+    const { error } = await supabase
       .from('class_enrollments')
-      .delete()
+      .update({ class_id: targetClassId })
       .eq('student_id', student.id)
       .eq('class_id', currentClassId);
 
-    if (deleteError) {
-      toast({ title: 'Error', description: 'Failed to move student.', variant: 'destructive' });
-      setIsLoading(false);
-      return;
-    }
-
-    // Add to new class
-    const { error: insertError } = await supabase
-      .from('class_enrollments')
-      .insert({ student_id: student.id, class_id: targetClassId });
-
-    if (insertError) {
-      toast({ title: 'Error', description: 'Failed to add student to new class.', variant: 'destructive' });
+    if (error) {
+      console.error('Error switching class:', error);
+      toast({ title: 'Error', description: 'Failed to switch student class.', variant: 'destructive' });
     } else {
-      toast({ title: 'Student Moved' });
+      toast({ title: 'Student Moved', description: 'Class switched successfully.' });
       onUpdated();
       onOpenChange(false);
     }
