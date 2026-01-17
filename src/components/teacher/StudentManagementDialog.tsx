@@ -73,10 +73,13 @@ export const StudentManagementDialog = ({
     if (!student || !newName.trim()) return;
     setIsLoading(true);
 
-    const { error } = await supabase.rpc('update_student_name' as any, {
-      p_student_id: student.id,
-      p_new_name: newName.trim()
-    });
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        full_name: newName.trim(),
+        updated_at: new Date().toISOString()
+      } as any)
+      .eq('id', student.id);
 
     if (error) {
       console.error('Error updating name:', error);
