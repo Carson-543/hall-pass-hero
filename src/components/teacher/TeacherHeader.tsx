@@ -34,18 +34,14 @@ export const TeacherHeader = ({ signOut }: TeacherHeaderProps) => {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <AutoClearMenu organizationId={organizationId} teacherId={user?.id ?? null} />
-
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={signOut}
-          className="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/15 text-white shadow-sm"
-        >
-          <LogOut className="h-5 w-5" />
-        </Button>
-      </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={signOut}
+        className="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/15 text-white shadow-sm"
+      >
+        <LogOut className="h-5 w-5" />
+      </Button>
     </motion.header>
   );
 };

@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Plus, Loader2, Snowflake, Bot, Trash2 } from 'lucide-react';
+import { AutoClearMenu } from '@/components/teacher/AutoClearMenu';
 
 interface ClassInfo {
     id: string;
@@ -137,6 +138,9 @@ export const TeacherControls = ({
                     </div>
 
                     <div className="flex items-center gap-2 ml-auto">
+                        {/* Auto-Clear Queue */}
+                        <AutoClearMenu />
+
                         {/* Freeze Control */}
                         <Popover>
                             <PopoverTrigger asChild>

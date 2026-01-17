@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
-import { LogOut, Power, Check, X } from "lucide-react";
+import { Clock, Check, X, LogOut } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
 
 interface ClassInfo {
     id: string;
@@ -14,16 +16,15 @@ interface ClassInfo {
     auto_clear_queue: boolean;
 }
 
-interface AutoClearMenuProps {
-    organizationId: string | null;
-    teacherId: string | null;
-}
-
-export const AutoClearMenu = ({ organizationId, teacherId }: AutoClearMenuProps) => {
+export const AutoClearMenu = () => {
+    const { user } = useAuth();
+    const { organizationId } = useOrganization();
     const [classes, setClasses] = useState<ClassInfo[]>([]);
     const [loading, setLoading] = useState(true);
     const [open, setOpen] = useState(false);
     const { toast } = useToast();
+
+    const teacherId = user?.id;
 
     const fetchClasses = async () => {
         if (!teacherId) return;
@@ -56,7 +57,7 @@ export const AutoClearMenu = ({ organizationId, teacherId }: AutoClearMenuProps)
 
         const { error } = await supabase
             .from('classes')
-            .update({ auto_clear_queue: newValue })
+            .update({ auto_clear_queue: newValue } as any)
             .eq('id', classId);
 
         if (error) {
@@ -69,7 +70,7 @@ export const AutoClearMenu = ({ organizationId, teacherId }: AutoClearMenuProps)
     const handleAll = async (newValue: boolean) => {
         const { error } = await supabase
             .from('classes')
-            .update({ auto_clear_queue: newValue })
+            .update({ auto_clear_queue: newValue } as any)
             .eq('teacher_id', teacherId);
 
         if (error) {
@@ -87,23 +88,27 @@ export const AutoClearMenu = ({ organizationId, teacherId }: AutoClearMenuProps)
             <PopoverTrigger asChild>
                 <Button
                     variant="outline"
-                    className={`h-11 border-2 font-bold transition-all relative group overflow-hidden ${anyEnabled
+                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-48 rounded-full border-2 shadow-lg p-0 ${anyEnabled
                         ? "bg-amber-500/10 border-amber-500/50 text-amber-500 hover:bg-amber-500/20"
-                        : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white"
+                        : "bg-white/10 border-white/20 text-slate-400 hover:border-amber-500/50 hover:bg-white/15"
                         }`}
                 >
-                    <LogOut className={`w-5 h-5 mr-2 transition-transform group-hover:-translate-x-1 ${anyEnabled ? "animate-pulse" : ""}`} />
-                    Auto-Clear
-                    {anyEnabled && (
-                        <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
-                    )}
+                    <div className="absolute left-[-2px] top-[-2px] w-10 h-10 flex items-center justify-center pointer-events-none">
+                        <Clock className={`h-4 w-4 ${anyEnabled ? "animate-pulse text-amber-500" : ""}`} />
+                        {anyEnabled && (
+                            <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-amber-500 rounded-full shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+                        )}
+                    </div>
+                    <span className="ml-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[10px] font-black uppercase tracking-widest text-amber-500">
+                        Auto-Clear Queue
+                    </span>
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-0 rounded-2xl border-2 border-white/10 bg-slate-950 shadow-2xl overflow-hidden" align="end">
                 <div className="p-4 border-b border-white/10 bg-slate-900/50">
                     <div className="flex items-center gap-3 mb-2">
                         <div className={`p-2 rounded-xl border ${anyEnabled ? 'bg-amber-500/20 border-amber-500/30' : 'bg-slate-800 border-white/10'}`}>
-                            <LogOut className={`w-5 h-5 ${anyEnabled ? 'text-amber-500' : 'text-slate-400'}`} />
+                            <Clock className={`w-5 h-5 ${anyEnabled ? 'text-amber-500' : 'text-slate-400'}`} />
                         </div>
                         <div>
                             <h4 className="font-black text-white text-sm uppercase tracking-wide">Auto-Clear Queue</h4>

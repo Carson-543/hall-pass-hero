@@ -71,19 +71,35 @@ BEGIN
 END;
 $$;
 
--- Schedule the cron job using pg_cron in the extensions schema
--- Only schedule if it doesn't already exist to avoid duplicate errors
 DO $$
+DECLARE
+    cron_schema TEXT;
 BEGIN
-    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
-        -- Check if job exists (requires querying cron.job which might not be visible to all users, simply replacing if safe)
-        -- We'll just unschedule then schedule to be safe/idempotent
-        PERFORM extensions.cron.unschedule('check-period-ends');
+    -- Dynamically find which schema 'schedule' and 'unschedule' are in
+    -- (pg_cron usually installs in 'cron' or 'extensions' or 'public')
+    SELECT n.nspname INTO cron_schema
+    FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE p.proname = 'schedule'
+    AND n.nspname IN ('cron', 'extensions', 'public')
+    LIMIT 1;
+
+    IF cron_schema IS NOT NULL THEN
+        -- Run unschedule if job exists (idempotent)
+        -- We use EXECUTE to avoid parse errors if the function doesn't exist at compile time
+        BEGIN
+            EXECUTE format('SELECT %I.unschedule($1)', cron_schema) USING 'check-period-ends';
+        EXCEPTION WHEN OTHERS THEN
+            -- Ignore errors if job doesn't exist or other minor issues
+            NULL;
+        END;
+
+        -- Run schedule
+        EXECUTE format('SELECT %I.schedule($1, $2, $3)', cron_schema) 
+        USING 'check-period-ends', '* * * * *', 'SELECT public.clear_expired_queues()';
         
-        PERFORM extensions.cron.schedule(
-            'check-period-ends',
-            '* * * * *', -- Every minute
-            'SELECT public.clear_expired_queues()'
-        );
+        RAISE NOTICE 'Job scheduled using schema: %', cron_schema;
+    ELSE
+        RAISE WARNING 'pg_cron functions (schedule/unschedule) not found in expected schemas (cron, extensions, public).';
     END IF;
 END $$;
