@@ -68,8 +68,8 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
         <div
           key={period.id || `temp-${period.period_order}-${idx}`}
           className={`grid grid-cols-[1fr_auto_auto_40px] gap-4 items-center p-3 rounded-2xl border transition-all duration-300 ${period.is_passing_period
-              ? 'bg-blue-500/5 border-dashed border-blue-500/20 group hover:border-blue-500/40'
-              : 'bg-white/5 border-white/5 group hover:border-white/20 hover:bg-white/[0.07]'
+            ? 'bg-blue-500/5 border-dashed border-blue-500/20 group hover:border-blue-500/40'
+            : 'bg-white/5 border-white/5 group hover:border-white/20 hover:bg-white/[0.07]'
             }`}
         >
           <div className="flex items-center gap-3 px-1 min-w-0">
@@ -98,9 +98,9 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <span className="absolute -top-4 left-1 text-[8px] font-black text-slate-600 uppercase tracking-widest">Start</span>
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest ml-1">Start Time</span>
               <Input
                 type="time"
                 value={period.start_time}
@@ -108,8 +108,8 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
                 className="h-10 w-[100px] text-xs font-black bg-slate-900/50 border-white/10 focus:border-blue-500/50 rounded-xl text-white appearance-none"
               />
             </div>
-            <div className="relative">
-              <span className="absolute -top-4 left-1 text-[8px] font-black text-slate-600 uppercase tracking-widest">End</span>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest ml-1">End Time</span>
               <Input
                 type="time"
                 value={period.end_time}
