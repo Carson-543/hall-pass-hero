@@ -63,59 +63,89 @@ export const InlinePeriodTable = ({ periods, onChange }: InlinePeriodTableProps)
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {sortedPeriods.map((period, idx) => (
-        <div key={period.id || `temp-${period.period_order}-${idx}`} className={`grid grid-cols-[1fr_110px_110px_40px] gap-3 items-center p-2 rounded-lg border transition-all ${period.is_passing_period ? 'bg-muted/10 border-dashed' : 'bg-card'
-          }`}>
-          <div className="flex items-center gap-2 px-1">
-            {period.is_passing_period ? (
-              <>
-                <Clock className="h-3.5 w-3.5 text-orange-500 shrink-0" />
+        <div
+          key={period.id || `temp-${period.period_order}-${idx}`}
+          className={`grid grid-cols-[1fr_auto_auto_40px] gap-4 items-center p-3 rounded-2xl border transition-all duration-300 ${period.is_passing_period
+              ? 'bg-blue-500/5 border-dashed border-blue-500/20 group hover:border-blue-500/40'
+              : 'bg-white/5 border-white/5 group hover:border-white/20 hover:bg-white/[0.07]'
+            }`}
+        >
+          <div className="flex items-center gap-3 px-1 min-w-0">
+            <div className={`p-2 rounded-xl shrink-0 transition-colors ${period.is_passing_period ? 'bg-blue-500/10 text-blue-400' : 'bg-slate-500/10 text-slate-400'
+              }`}>
+              {period.is_passing_period ? (
+                <Clock className="h-4 w-4" />
+              ) : (
+                <BookOpen className="h-4 w-4" />
+              )}
+            </div>
+
+            <div className="flex-1 min-w-0">
+              {period.is_passing_period ? (
                 <Input
                   value={period.name}
                   onChange={(e) => handleFieldChange(idx, 'name', e.target.value)}
-                  className="h-8 text-xs bg-background focus-visible:ring-0 focus-visible:ring-offset-0"
+                  className="h-9 text-xs font-bold bg-slate-900/50 border-white/5 focus-visible:ring-blue-500/20 focus:border-blue-500/30 text-white placeholder:text-slate-600 rounded-xl"
                 />
-              </>
-            ) : (
-              <div className="flex items-center gap-2 h-8">
-                <BookOpen className="h-3.5 w-3.5 text-primary shrink-0" />
-                <span className="font-semibold text-xs">{period.name}</span>
-              </div>
-            )}
+              ) : (
+                <div className="flex flex-col">
+                  <span className="font-black text-xs text-white tracking-wide uppercase">{period.name}</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Class Period</span>
+                </div>
+              )}
+            </div>
           </div>
 
-          <Input
-            type="time"
-            value={period.start_time}
-            onChange={(e) => handleFieldChange(idx, 'start_time', e.target.value)}
-            className="h-8 text-xs px-2 focus-visible:ring-0 focus-visible:ring-offset-0"
-          />
-
-          <Input
-            type="time"
-            value={period.end_time}
-            onChange={(e) => handleFieldChange(idx, 'end_time', e.target.value)}
-            className="h-8 text-xs px-2 focus-visible:ring-0 focus-visible:ring-offset-0"
-          />
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <span className="absolute -top-4 left-1 text-[8px] font-black text-slate-600 uppercase tracking-widest">Start</span>
+              <Input
+                type="time"
+                value={period.start_time}
+                onChange={(e) => handleFieldChange(idx, 'start_time', e.target.value)}
+                className="h-10 w-[100px] text-xs font-black bg-slate-900/50 border-white/10 focus:border-blue-500/50 rounded-xl text-white appearance-none"
+              />
+            </div>
+            <div className="relative">
+              <span className="absolute -top-4 left-1 text-[8px] font-black text-slate-600 uppercase tracking-widest">End</span>
+              <Input
+                type="time"
+                value={period.end_time}
+                onChange={(e) => handleFieldChange(idx, 'end_time', e.target.value)}
+                className="h-10 w-[100px] text-xs font-black bg-slate-900/50 border-white/10 focus:border-blue-500/50 rounded-xl text-white appearance-none"
+              />
+            </div>
+          </div>
 
           <Button
             variant="ghost"
             size="icon"
             onClick={() => handleDelete(idx)}
-            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+            className="h-10 w-10 text-slate-600 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       ))}
 
-      <div className="flex gap-2 pt-1">
-        <Button variant="outline" size="sm" onClick={() => handleAddEntry('class')} className="flex-1 text-xs h-9">
-          <Plus className="h-3.5 w-3.5 mr-1" /> Add Period
+      <div className="flex gap-3 pt-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleAddEntry('class')}
+          className="flex-1 text-[10px] font-black uppercase tracking-widest h-11 rounded-2xl bg-white/5 border-white/10 hover:bg-blue-600 hover:border-blue-500 text-slate-400 hover:text-white transition-all shadow-lg"
+        >
+          <Plus className="h-3.5 w-3.5 mr-2" /> Add Period
         </Button>
-        <Button variant="outline" size="sm" onClick={() => handleAddEntry('structured')} className="flex-1 text-xs border-dashed h-9">
-          <Clock className="h-3.5 w-3.5 mr-1" /> Add Structured Time
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleAddEntry('structured')}
+          className="flex-1 text-[10px] font-black uppercase tracking-widest h-11 rounded-2xl bg-white/5 border-white/10 border-dashed hover:bg-slate-800 hover:border-white/20 text-slate-400 hover:text-white transition-all shadow-lg"
+        >
+          <Clock className="h-3.5 w-3.5 mr-2" /> Add Passing
         </Button>
       </div>
     </div>

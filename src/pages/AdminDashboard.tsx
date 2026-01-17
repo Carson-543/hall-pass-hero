@@ -956,29 +956,38 @@ const AdminDashboard = () => {
               setScheduleDialogOpen(open);
             }}
           >
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-slate-900 border-white/10 text-white rounded-3xl shadow-2xl">
-              <DialogHeader>
-                <DialogTitle className="text-2xl font-black tracking-tight">{editingSchedule ? 'Edit Bell Schedule' : 'Create New Bell Schedule'}</DialogTitle>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-slate-900/95 border-white/10 text-white rounded-[2rem] shadow-2xl backdrop-blur-xl">
+              <DialogHeader className="pb-4 border-b border-white/5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-2xl bg-blue-500/10 border border-blue-500/20">
+                    <Calendar className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-2xl font-black tracking-tighter text-white">{editingSchedule ? 'Edit Bell Schedule' : 'Create New Schedule'}</DialogTitle>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Configure timings and passing periods</p>
+                  </div>
+                </div>
               </DialogHeader>
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
+
+              <div className="space-y-8 py-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 rounded-2xl bg-white/5 border border-white/10 shadow-inner">
                   <div className="space-y-2">
-                    <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Schedule Name</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Schedule Name</Label>
                     <Input
                       value={newScheduleName}
                       onChange={(e) => setNewScheduleName(e.target.value)}
                       placeholder="e.g., Regular, Advisory, Assembly"
-                      className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 font-bold"
+                      className="h-12 bg-slate-900/50 border-white/10 text-white placeholder:text-slate-600 font-bold rounded-xl focus:border-blue-500/50"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Color Identifier</Label>
-                    <div className="flex gap-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Color Identifier</Label>
+                    <div className="flex items-center gap-3 h-12 px-1">
                       {SCHEDULE_COLORS.map(c => (
                         <button
                           key={c.value}
-                          className={`w-8 h-8 rounded-full border-2 transition-all ${newScheduleColor === c.value ? 'border-blue-500 scale-110 shadow-lg shadow-blue-500/20' : 'border-white/10'}`}
-                          style={{ backgroundColor: c.value }}
+                          className={`w-7 h-7 rounded-full border-2 transition-all duration-300 ${newScheduleColor === c.value ? 'border-white scale-110 shadow-lg' : 'border-transparent'}`}
+                          style={{ backgroundColor: c.value, boxShadow: newScheduleColor === c.value ? `0 0 15px ${c.value}40` : 'none' }}
                           onClick={() => setNewScheduleColor(c.value)}
                         />
                       ))}
@@ -986,18 +995,28 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2 p-4 bg-white/5 border border-white/10 rounded-2xl transition-colors hover:bg-white/10">
-                  <Checkbox
-                    id="isSchoolDay"
+                <div className="flex items-center justify-between p-5 rounded-2xl bg-white/5 border border-white/10 transition-all hover:bg-white/10 group cursor-pointer" onClick={() => setNewScheduleIsSchoolDay(!newScheduleIsSchoolDay)}>
+                  <div className="flex items-center gap-4">
+                    <div className={`p-2 rounded-xl transition-colors ${newScheduleIsSchoolDay ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                      <Calendar className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-black text-white text-sm">Active School Day</p>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Students can request passes on this day</p>
+                    </div>
+                  </div>
+                  <Switch
                     checked={newScheduleIsSchoolDay}
-                    onCheckedChange={(checked) => setNewScheduleIsSchoolDay(!!checked)}
-                    className="border-white/20 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                    onCheckedChange={setNewScheduleIsSchoolDay}
+                    className="data-[state=checked]:bg-blue-600"
                   />
-                  <Label htmlFor="isSchoolDay" className="font-bold text-sm text-slate-200">Students can request passes on this day</Label>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Period Timings</Label>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between px-1">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Period Timings</Label>
+                    <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Auto-indexed</span>
+                  </div>
                   <InlinePeriodTable
                     periods={periods}
                     onChange={(updated) => {
@@ -1006,11 +1025,25 @@ const AdminDashboard = () => {
                     }}
                   />
                 </div>
-                <DialogFooter className="gap-2">
-                  <Button variant="outline" onClick={() => setScheduleDialogOpen(false)} className="bg-transparent border-white/10 text-white hover:bg-white/5 font-bold rounded-xl">Cancel</Button>
-                  <Button onClick={handleSaveSchedule} className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 px-8">Save Schedule</Button>
-                </DialogFooter>
               </div>
+
+              <DialogFooter className="pt-2 border-t border-white/5 mt-4">
+                <div className="flex gap-3 w-full">
+                  <Button
+                    variant="outline"
+                    onClick={() => setScheduleDialogOpen(false)}
+                    className="flex-1 h-14 bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10 font-black rounded-2xl transition-all"
+                  >
+                    CANCEL
+                  </Button>
+                  <Button
+                    onClick={handleSaveSchedule}
+                    className="flex-[2] h-14 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-2xl shadow-xl shadow-blue-600/20 transition-all border-none"
+                  >
+                    SAVE SCHEDULE
+                  </Button>
+                </div>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         )}
