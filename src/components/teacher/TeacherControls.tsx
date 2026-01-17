@@ -53,10 +53,14 @@ const ClearQueueMenu = ({ onClear }: { onClear: (active: boolean, pending: boole
             <PopoverTrigger asChild>
                 <Button
                     variant="outline"
-                    className="h-10 w-10 p-0 rounded-full border-2 border-white/20 bg-white/10 hover:bg-white/15 hover:border-red-400/50 text-slate-400 hover:text-red-400 transition-all shadow-lg"
-                    title="Clear Queue"
+                    className="group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-44 rounded-full border-2 shadow-lg p-0 bg-white/10 border-white/20 text-slate-400 hover:text-red-400 hover:border-red-400/50 hover:bg-white/15"
                 >
-                    <Trash2 className="h-4 w-4" />
+                    <div className="absolute left-[-2px] top-[-2px] w-10 h-10 flex items-center justify-center pointer-events-none">
+                        <Trash2 className="h-4 w-4" />
+                    </div>
+                    <span className="ml-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[10px] font-black uppercase tracking-widest">
+                        Clear Queue
+                    </span>
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 rounded-[1.5rem] bg-slate-900 border-white/20 text-white shadow-2xl p-0 overflow-hidden" align="end">
@@ -229,14 +233,14 @@ export const TeacherControls = ({
                             <PopoverTrigger asChild>
                                 <Button
                                     variant={!!activeFreeze ? "destructive" : "outline"}
-                                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-44 rounded-full border-2 shadow-lg p-0 ${!!activeFreeze ? 'bg-red-600 border-red-500 text-white shadow-red-500/20' : 'bg-white/10 border-white/20 text-blue-400 hover:border-blue-400/50 hover:bg-white/15'}`}
+                                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-44 rounded-full border-2 shadow-lg p-0 ${!!activeFreeze ? 'bg-red-600 border-red-500 text-white shadow-red-500/20' : 'bg-white/10 border-white/20 text-slate-400 hover:text-blue-400 hover:border-blue-400/50 hover:bg-white/15'}`}
                                     disabled={isFreezeLoading}
                                 >
                                     <div className="absolute left-[-2px] top-[-2px] w-10 h-10 flex items-center justify-center pointer-events-none">
                                         {isFreezeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Snowflake className={`h-4 w-4 ${activeFreeze ? 'animate-pulse' : ''}`} />}
                                     </div>
                                     <span className="ml-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[10px] font-black uppercase tracking-widest">
-                                        {activeFreeze ? "Unfreeze Queue" : "Freeze Controls"}
+                                        {activeFreeze ? "Unfreeze Queue" : "Freeze Pass Queue"}
                                     </span>
                                 </Button>
                             </PopoverTrigger>
@@ -285,7 +289,7 @@ export const TeacherControls = ({
                             <PopoverTrigger asChild>
                                 <Button
                                     variant="outline"
-                                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-48 rounded-full border-2 shadow-lg p-0 ${currentClass?.is_queue_autonomous ? 'bg-blue-600 border-blue-500 text-white hover:bg-blue-700' : 'bg-white/10 border-white/20 text-slate-400 hover:border-blue-400/50 hover:bg-white/15'}`}
+                                    className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-44 rounded-full border-2 shadow-lg p-0 ${currentClass?.is_queue_autonomous ? 'bg-blue-600 border-blue-500 text-white hover:bg-blue-700' : 'bg-white/10 border-white/20 text-slate-400 hover:text-emerald-500 hover:border-emerald-500/50 hover:bg-white/15'}`}
                                 >
                                     <div className="absolute left-[-2px] top-[-2px] w-10 h-10 flex items-center justify-center pointer-events-none">
                                         <Bot className={`h-4 w-4 ${currentClass?.is_queue_autonomous ? 'text-white' : ''}`} />

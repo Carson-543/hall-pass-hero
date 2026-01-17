@@ -89,17 +89,17 @@ export const AutoClearMenu = () => {
                 <Button
                     variant="outline"
                     className={`group relative overflow-hidden transition-all duration-300 h-10 w-10 hover:w-48 rounded-full border-2 shadow-lg p-0 ${anyEnabled
-                        ? "bg-amber-500/10 border-amber-500/50 text-amber-500 hover:bg-amber-500/20"
-                        : "bg-white/10 border-white/20 text-slate-400 hover:border-amber-500/50 hover:bg-white/15"
+                        ? "bg-amber-600 border-amber-500 text-white shadow-amber-500/20"
+                        : "bg-white/10 border-white/20 text-slate-400 hover:text-amber-500 hover:border-amber-500/50 hover:bg-white/15"
                         }`}
                 >
                     <div className="absolute left-[-2px] top-[-2px] w-10 h-10 flex items-center justify-center pointer-events-none">
-                        <Clock className={`h-4 w-4 ${anyEnabled ? "animate-pulse text-amber-500" : ""}`} />
+                        <Clock className={`h-4 w-4 ${anyEnabled ? "animate-pulse" : ""}`} />
                         {anyEnabled && (
                             <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-amber-500 rounded-full shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
                         )}
                     </div>
-                    <span className="ml-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[10px] font-black uppercase tracking-widest text-amber-500">
+                    <span className="ml-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[10px] font-black uppercase tracking-widest">
                         Auto-Clear Queue
                     </span>
                 </Button>
