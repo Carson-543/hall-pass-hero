@@ -34,6 +34,7 @@ interface TeacherControlsProps {
     onToggleAutoQueue?: (newMaxConcurrent?: number) => void;
     maxConcurrent: number;
     onDeleteClass: (id: string) => void;
+    onClearQueue?: () => void;
 }
 
 export const TeacherControls = ({
@@ -52,7 +53,8 @@ export const TeacherControls = ({
     currentClass,
     onToggleAutoQueue,
     maxConcurrent,
-    onDeleteClass
+    onDeleteClass,
+    onClearQueue
 }: TeacherControlsProps) => {
     const [tempMaxConcurrent, setTempMaxConcurrent] = useState<string>('2');
 
@@ -139,6 +141,40 @@ export const TeacherControls = ({
                     </div>
 
                     <div className="flex items-center gap-2 ml-auto">
+                        {/* Clear Queue Button */}
+                        {onClearQueue && (
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        className="h-10 w-10 p-0 rounded-full border-2 border-white/20 bg-white/10 hover:bg-white/15 hover:border-red-400/50 text-slate-400 hover:text-red-400 transition-all shadow-lg"
+                                        title="Clear Queue Now"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent className="rounded-[2rem] bg-slate-900 border-white/10 text-white shadow-2xl">
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle className="text-2xl font-black">Clear Entire Queue?</AlertDialogTitle>
+                                        <AlertDialogDescription className="text-slate-300 font-medium pt-2">
+                                            This will <span className="text-red-400 font-bold">return all active passes</span> and <span className="text-red-400 font-bold">deny all pending requests</span> for this class immediately.
+                                            <br /><br />
+                                            This action cannot be undone.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter className="pt-4">
+                                        <AlertDialogCancel className="rounded-xl bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
+                                        <AlertDialogAction
+                                            onClick={onClearQueue}
+                                            className="rounded-xl bg-red-600 hover:bg-red-700 text-white font-black px-6"
+                                        >
+                                            Clear Queue
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        )}
+
                         {/* Auto-Clear Queue */}
                         <AutoClearMenu />
 
