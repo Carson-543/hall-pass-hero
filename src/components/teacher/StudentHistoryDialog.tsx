@@ -9,8 +9,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format, differenceInMinutes } from "date-fns";
 import { Clock, CheckCircle2, XCircle, LogOut, ArrowRight } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { GlassCard } from "@/components/ui/glass-card";
+import { MultiSelect, Option } from '@/components/ui/multi-select';
 
 interface Pass {
     id: string;
@@ -29,6 +28,14 @@ interface StudentHistoryDialogProps {
     studentName: string | null;
 }
 
+const STATUS_OPTIONS: Option[] = [
+    { label: 'Approved', value: 'approved' },
+    { label: 'Returned', value: 'returned' },
+    { label: 'Pending', value: 'pending' },
+    { label: 'Denied', value: 'denied' },
+    { label: 'Cancelled', value: 'cancelled' },
+];
+
 export const StudentHistoryDialog = ({
     open,
     onOpenChange,
@@ -36,22 +43,31 @@ export const StudentHistoryDialog = ({
     studentName
 }: StudentHistoryDialogProps) => {
     const [passes, setPasses] = useState<Pass[]>([]);
+    const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['approved', 'returned', 'pending', 'denied', 'cancelled']); // Default ALL
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (open && studentId) {
             fetchHistory();
         }
-    }, [open, studentId]);
+    }, [open, studentId, selectedStatuses]);
 
     const fetchHistory = async () => {
         setLoading(true);
+
+        if (selectedStatuses.length === 0) {
+            setPasses([]);
+            setLoading(false);
+            return;
+        }
+
         const { data, error } = await supabase
             .from('passes')
             .select('id, destination, status, requested_at, approved_at, returned_at, denied_at')
             .eq('student_id', studentId)
+            .in('status', selectedStatuses as any)
             .order('requested_at', { ascending: false })
-            .limit(10);
+            .limit(20);
 
         if (!error && data) {
             setPasses(data);
@@ -80,37 +96,46 @@ export const StudentHistoryDialog = ({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-xl rounded-[2.5rem] p-0 overflow-hidden border-2 border-white/10 bg-slate-950 shadow-2xl">
-                <div className="p-8 h-full relative overflow-hidden">
+                <div className="p-8 h-full relative overflow-hidden flex flex-col max-h-[85vh]">
                     {/* Decorative Background Gradient */}
                     <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 blur-[100px] rounded-full -mr-32 -mt-32 pointer-events-none" />
                     <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/5 blur-[80px] rounded-full -ml-32 -mb-32 pointer-events-none" />
 
-                    <DialogHeader className="mb-8 relative z-10">
+                    <DialogHeader className="mb-6 relative z-10 shrink-0">
                         <DialogTitle className="text-3xl font-black tracking-tighter flex items-center gap-4">
                             <div className="p-3 bg-blue-600/10 rounded-2xl border border-blue-500/20 shadow-xl shadow-blue-500/10">
                                 <Clock className="w-7 h-7 text-blue-500" />
                             </div>
                             <span className="text-white">
-                                Pass History: {studentName}
+                                {studentName}
                             </span>
                         </DialogTitle>
+                        <div className="mt-4">
+                            <MultiSelect
+                                options={STATUS_OPTIONS}
+                                selected={selectedStatuses}
+                                onChange={setSelectedStatuses}
+                                placeholder="Filter by Status"
+                                className="w-full bg-slate-900 border-white/10 text-white hover:bg-slate-800"
+                            />
+                        </div>
                     </DialogHeader>
 
                     {loading ? (
-                        <div className="flex flex-col items-center justify-center py-24 gap-6">
+                        <div className="flex flex-col items-center justify-center py-12 gap-6 grow">
                             <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-lg">
                                 <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-blue-500" />
                             </div>
-                            <p className="text-slate-400 font-extrabold tracking-widest uppercase text-xs animate-pulse">Scanning pass records...</p>
+                            <p className="text-slate-400 font-extrabold tracking-widest uppercase text-xs animate-pulse">Scanning records...</p>
                         </div>
                     ) : passes.length === 0 ? (
-                        <div className="text-center py-24 bg-white/[0.02] rounded-[2rem] border-2 border-dashed border-white/5">
+                        <div className="text-center py-12 bg-white/[0.02] rounded-[2rem] border-2 border-dashed border-white/5 grow flex flex-col items-center justify-center">
                             <Clock className="w-12 h-12 text-white/5 mx-auto mb-4" />
-                            <p className="text-slate-500 font-black uppercase tracking-widest text-sm">No pass history found</p>
+                            <p className="text-slate-500 font-black uppercase tracking-widest text-sm">No passes matches</p>
                         </div>
                     ) : (
-                        <ScrollArea className="h-[480px] pr-4 relative z-10">
-                            <div className="space-y-6">
+                        <ScrollArea className="h-full pr-4 relative z-10 grow -mr-4">
+                            <div className="space-y-6 pb-4 pr-4">
                                 {passes.map((pass) => (
                                     <div key={pass.id} className="relative pl-10 pb-2 last:pb-0">
                                         {/* Timeline Bar */}
@@ -118,8 +143,8 @@ export const StudentHistoryDialog = ({
 
                                         {/* Timeline Marker */}
                                         <div className={`absolute left-0 top-0 w-8 h-8 rounded-full border-4 border-slate-950 shadow-xl z-20 flex items-center justify-center ${pass.status === 'returned' ? 'bg-emerald-500 shadow-emerald-500/20' :
-                                                pass.status === 'denied' ? 'bg-red-500 shadow-red-500/20' :
-                                                    'bg-blue-600 shadow-blue-600/20'
+                                            pass.status === 'denied' ? 'bg-red-500 shadow-red-500/20' :
+                                                'bg-blue-600 shadow-blue-600/20'
                                             }`}>
                                             <div className="text-white scale-75">
                                                 {getStatusIcon(pass.status)}
@@ -139,8 +164,8 @@ export const StudentHistoryDialog = ({
                                                 </div>
                                                 <div className="flex flex-col items-end gap-2.5">
                                                     <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border-2 ${pass.status === 'returned' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
-                                                            pass.status === 'denied' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
-                                                                'bg-blue-600/10 text-blue-400 border-blue-500/20'
+                                                        pass.status === 'denied' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                                                            'bg-blue-600/10 text-blue-400 border-blue-500/20'
                                                         }`}>
                                                         {pass.status.replace('_', ' ')}
                                                     </span>

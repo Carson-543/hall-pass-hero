@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MultiSelect, Option } from '@/components/ui/multi-select';
 import { format } from 'date-fns';
 
 interface Pass {
@@ -15,10 +15,19 @@ interface Pass {
 
 type TimeFilter = 'this_week' | 'last_week' | 'this_month' | 'all';
 
+const STATUS_OPTIONS: Option[] = [
+  { label: 'Approved', value: 'approved' },
+  { label: 'Returned', value: 'returned' },
+  { label: 'Pending', value: 'pending' },
+  { label: 'Denied', value: 'denied' },
+  { label: 'Cancelled', value: 'cancelled' },
+];
+
 export const PassHistory = () => {
   const { user } = useAuth();
   const [passes, setPasses] = useState<Pass[]>([]);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('this_week');
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['approved', 'returned', 'pending', 'denied', 'cancelled']); // Default ALL
   const [loading, setLoading] = useState(true);
 
   const fetchPasses = async () => {
@@ -53,13 +62,21 @@ export const PassHistory = () => {
       }
     }
 
-    // Limit to 10 passes, select only needed columns
+    // Limit to 20 passes (increased for filtering), select only needed columns
+    // We only query IF we have selected statuses, otherwise return empty
+    if (selectedStatuses.length === 0) {
+      setPasses([]);
+      setLoading(false);
+      return;
+    }
+
     let query = supabase
       .from('passes')
       .select('id, destination, status, requested_at, class_id')
       .eq('student_id', user.id)
+      .in('status', selectedStatuses as any) // FILTER BY MULTIPLE STATUSES
       .order('requested_at', { ascending: false })
-      .limit(10);
+      .limit(20);
 
     if (startDate) {
       query = query.gte('requested_at', startDate.toISOString());
@@ -95,7 +112,7 @@ export const PassHistory = () => {
 
   useEffect(() => {
     fetchPasses();
-  }, [user, timeFilter]);
+  }, [user, timeFilter, selectedStatuses]); // Re-fetch when selectedStatuses changes
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -113,19 +130,32 @@ export const PassHistory = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">Pass History</h3>
-        <Select value={timeFilter} onValueChange={(v) => setTimeFilter(v as TimeFilter)}>
-          <SelectTrigger className="w-36 h-10 text-xs font-black bg-white/10 border-2 border-white/20 text-white rounded-xl focus:ring-blue-500 shadow-sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="bg-slate-900 border-2 border-white/20 text-white">
-            <SelectItem value="this_week" className="text-xs font-black focus:bg-blue-600">This Week</SelectItem>
-            <SelectItem value="last_week" className="text-xs font-black focus:bg-blue-600">Last Week</SelectItem>
-            <SelectItem value="this_month" className="text-xs font-black focus:bg-blue-600">This Month</SelectItem>
-            <SelectItem value="all" className="text-xs font-black focus:bg-blue-600">All Time</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">Pass History</h3>
+          <Select value={timeFilter} onValueChange={(v) => setTimeFilter(v as TimeFilter)}>
+            <SelectTrigger className="w-36 h-10 text-xs font-black bg-white/10 border-2 border-white/20 text-white rounded-xl focus:ring-blue-500 shadow-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-slate-900 border-2 border-white/20 text-white">
+              <SelectItem value="this_week" className="text-xs font-black focus:bg-blue-600">This Week</SelectItem>
+              <SelectItem value="last_week" className="text-xs font-black focus:bg-blue-600">Last Week</SelectItem>
+              <SelectItem value="this_month" className="text-xs font-black focus:bg-blue-600">This Month</SelectItem>
+              <SelectItem value="all" className="text-xs font-black focus:bg-blue-600">All Time</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Status Filter */}
+        <div className="w-full">
+          <MultiSelect
+            options={STATUS_OPTIONS}
+            selected={selectedStatuses}
+            onChange={setSelectedStatuses}
+            placeholder="Filter by Status"
+            className="w-full"
+          />
+        </div>
       </div>
 
       {loading ? (
@@ -137,7 +167,7 @@ export const PassHistory = () => {
       ) : passes.length === 0 ? (
         <div className="text-center py-8 bg-white/5 rounded-3xl border border-dashed border-white/10">
           <p className="text-sm text-slate-500 font-medium">
-            No passes found for this period.
+            No passes found matching your filters.
           </p>
         </div>
       ) : (
