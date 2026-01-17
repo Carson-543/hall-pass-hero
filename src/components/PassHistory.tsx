@@ -130,9 +130,20 @@ export const PassHistory = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">Pass History</h3>
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 w-full sm:w-auto text-left">Pass History</h3>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="w-40">
+            <MultiSelect
+              options={STATUS_OPTIONS}
+              selected={selectedStatuses}
+              onChange={setSelectedStatuses}
+              placeholder="Status"
+              className="w-full h-10 text-xs font-black bg-white/10 border-2 border-white/20 text-white rounded-xl shadow-sm min-h-10"
+              maxIndicatorLabel="Status"
+            />
+          </div>
           <Select value={timeFilter} onValueChange={(v) => setTimeFilter(v as TimeFilter)}>
             <SelectTrigger className="w-36 h-10 text-xs font-black bg-white/10 border-2 border-white/20 text-white rounded-xl focus:ring-blue-500 shadow-sm">
               <SelectValue />
@@ -144,17 +155,6 @@ export const PassHistory = () => {
               <SelectItem value="all" className="text-xs font-black focus:bg-blue-600">All Time</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-
-        {/* Status Filter */}
-        <div className="w-full">
-          <MultiSelect
-            options={STATUS_OPTIONS}
-            selected={selectedStatuses}
-            onChange={setSelectedStatuses}
-            placeholder="Filter by Status"
-            className="w-full"
-          />
         </div>
       </div>
 
