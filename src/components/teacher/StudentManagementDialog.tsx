@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UserMinus, ArrowRightLeft } from 'lucide-react';
+import { Loader2, UserMinus, ArrowRightLeft, Trash2 } from 'lucide-react';
 
 interface Student {
   id: string;
@@ -154,14 +154,14 @@ export const StudentManagementDialog = ({
 
 
             {otherClasses.length > 0 && (
-              <div className="space-y-2">
-                <Label>Move to another class</Label>
+              <div className="space-y-3 pt-2 border-t border-white/10">
+                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Move to another class</Label>
                 <div className="flex gap-2">
                   <Select value={targetClassId} onValueChange={setTargetClassId}>
-                    <SelectTrigger className="rounded-xl flex-1">
+                    <SelectTrigger className="rounded-xl flex-1 bg-white/5 border-white/10 font-bold">
                       <SelectValue placeholder="Select class" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-slate-900 border-white/10 text-white">
                       {otherClasses.map(c => (
                         <SelectItem key={c.id} value={c.id}>
                           Period {c.period_order}: {c.name}
@@ -172,7 +172,7 @@ export const StudentManagementDialog = ({
                   <Button
                     onClick={handleMove}
                     disabled={isLoading || !targetClassId}
-                    className="rounded-xl"
+                    className="rounded-xl bg-slate-800 hover:bg-slate-700"
                   >
                     {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : <ArrowRightLeft className="h-4 w-4" />}
                   </Button>
@@ -181,14 +181,14 @@ export const StudentManagementDialog = ({
             )}
           </div>
         )}
-        <DialogFooter>
+        <DialogFooter className="pt-2">
           <Button
             variant="destructive"
             onClick={handleRemove}
             disabled={isLoading}
-            className="rounded-xl w-full"
+            className="rounded-xl w-full font-bold h-12 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white border-2 border-red-500/20 transition-all"
           >
-            {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : <><UserMinus className="h-4 w-4 mr-2" /> Remove from Class</>}
+            {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : <><Trash2 className="h-4 w-4 mr-2" /> Remove from Class</>}
           </Button>
         </DialogFooter>
       </DialogContent>

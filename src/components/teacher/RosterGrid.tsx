@@ -1,6 +1,6 @@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Copy, History, UserCog } from 'lucide-react';
+import { Search, Copy, History, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Student {
@@ -79,6 +79,7 @@ export const RosterGrid = ({
                                 size="icon"
                                 variant="ghost"
                                 className="h-10 w-10 rounded-xl bg-white/5 text-slate-400 hover:bg-blue-600/20 hover:text-blue-400 border border-white/5 hover:border-blue-500/30 transition-all"
+                                title="View History"
                                 onClick={() => onViewHistory(student)}
                             >
                                 <History className="h-5 w-5" />
@@ -86,11 +87,20 @@ export const RosterGrid = ({
                             <Button
                                 size="icon"
                                 variant="ghost"
-                                className="h-10 w-10 rounded-xl bg-white/5 text-slate-400 hover:bg-blue-600/20 hover:text-blue-400 border border-white/5 hover:border-blue-500/30 transition-all"
-                                title="Manage Student"
+                                className="h-10 w-10 rounded-xl bg-white/5 text-slate-400 hover:bg-emerald-600/20 hover:text-emerald-400 border border-white/5 hover:border-emerald-500/30 transition-all"
+                                title="Edit Student Name"
                                 onClick={() => onManageStudent(student)}
                             >
-                                <UserCog className="h-5 w-5" />
+                                <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-10 w-10 rounded-xl bg-white/5 text-slate-400 hover:bg-red-600/20 hover:text-red-500 border border-white/5 hover:border-red-500/30 transition-all"
+                                title="Remove Student"
+                                onClick={() => onManageStudent(student)}
+                            >
+                                <Trash2 className="h-4 w-4" />
                             </Button>
                         </div>
                     </div>
