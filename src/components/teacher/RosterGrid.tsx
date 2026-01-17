@@ -74,33 +74,33 @@ export const RosterGrid = ({
                 {filteredStudents.map(student => (
                     <div key={student.id} className="bg-white/5 p-5 rounded-[1.5rem] shadow-xl border-2 border-white/5 flex items-center justify-between group hover:border-blue-500/30 transition-all duration-300">
                         <p className="font-black text-xl text-white tracking-tight">{student.name}</p>
-                        <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="flex gap-2">
                             <Button
-                                size="sm"
+                                size="icon"
                                 variant="ghost"
-                                className="h-9 px-3 rounded-xl bg-white/5 text-slate-400 hover:bg-blue-600/20 hover:text-blue-400 border border-white/5 hover:border-blue-500/30 transition-all flex items-center gap-2"
+                                className="h-10 w-10 rounded-xl bg-white/5 text-slate-400 hover:bg-blue-600/20 hover:text-blue-400 border border-white/5 hover:border-blue-500/30 transition-all"
+                                title="View History"
                                 onClick={() => onViewHistory(student)}
                             >
-                                <History className="h-4 w-4" />
-                                <span className="text-[10px] font-bold uppercase tracking-wider">History</span>
+                                <History className="h-5 w-5" />
                             </Button>
                             <Button
-                                size="sm"
+                                size="icon"
                                 variant="ghost"
-                                className="h-9 px-3 rounded-xl bg-white/5 text-slate-400 hover:bg-emerald-600/20 hover:text-emerald-400 border border-white/5 hover:border-emerald-500/30 transition-all flex items-center gap-2"
+                                className="h-10 w-10 rounded-xl bg-white/5 text-slate-400 hover:bg-emerald-600/20 hover:text-emerald-400 border border-white/5 hover:border-emerald-500/30 transition-all"
+                                title="Edit Student Name"
                                 onClick={() => onManageStudent(student)}
                             >
-                                <Pencil className="h-3.5 w-3.5" />
-                                <span className="text-[10px] font-bold uppercase tracking-wider">Edit</span>
+                                <Pencil className="h-4 w-4" />
                             </Button>
                             <Button
-                                size="sm"
+                                size="icon"
                                 variant="ghost"
-                                className="h-9 px-3 rounded-xl bg-white/5 text-slate-400 hover:bg-red-600/20 hover:text-red-500 border border-white/5 hover:border-red-500/30 transition-all flex items-center gap-2"
+                                className="h-10 w-10 rounded-xl bg-white/5 text-slate-400 hover:bg-red-600/20 hover:text-red-500 border border-white/5 hover:border-red-500/30 transition-all"
+                                title="Remove Student"
                                 onClick={() => onManageStudent(student)}
                             >
-                                <Trash2 className="h-3.5 w-3.5" />
-                                <span className="text-[10px] font-bold uppercase tracking-wider">Remove</span>
+                                <Trash2 className="h-4 w-4" />
                             </Button>
                         </div>
                     </div>
