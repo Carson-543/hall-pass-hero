@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -38,13 +39,15 @@ export const StudentManagementDialog = ({
 }: StudentManagementDialogProps) => {
   const { toast } = useToast();
   const [targetClassId, setTargetClassId] = useState('');
+  const [newName, setNewName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (open) {
+    if (open && student) {
       setTargetClassId('');
+      setNewName(student.name);
     }
-  }, [open]);
+  }, [open, student]);
 
   const handleRemove = async () => {
     if (!student) return;
@@ -60,6 +63,26 @@ export const StudentManagementDialog = ({
       toast({ title: 'Error', description: 'Failed to remove student.', variant: 'destructive' });
     } else {
       toast({ title: 'Student Removed' });
+      onUpdated();
+      onOpenChange(false);
+    }
+    setIsLoading(false);
+  };
+
+  const handleUpdateName = async () => {
+    if (!student || !newName.trim()) return;
+    setIsLoading(true);
+
+    const { error } = await supabase.rpc('update_student_name' as any, {
+      p_student_id: student.id,
+      p_new_name: newName.trim()
+    });
+
+    if (error) {
+      console.error('Error updating name:', error);
+      toast({ title: 'Error', description: 'Failed to update student name.', variant: 'destructive' });
+    } else {
+      toast({ title: 'Name Updated' });
       onUpdated();
       onOpenChange(false);
     }
@@ -108,9 +131,25 @@ export const StudentManagementDialog = ({
         </DialogHeader>
         {student && (
           <div className="space-y-4 py-4">
-            <div className="bg-muted rounded-xl p-4">
-              <p className="font-bold text-lg">{student.name}</p>
-              {/* Email hidden for privacy */}
+            <div className="bg-muted rounded-xl p-4 space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Full Name</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Student Name"
+                    className="rounded-xl border-white/10 bg-white/5 font-bold"
+                  />
+                  <Button
+                    onClick={handleUpdateName}
+                    disabled={isLoading || !newName.trim() || newName === student.name}
+                    className="rounded-xl bg-blue-600 hover:bg-blue-700 h-10 px-4"
+                  >
+                    {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : "Save"}
+                  </Button>
+                </div>
+              </div>
             </div>
 
 

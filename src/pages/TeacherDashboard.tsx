@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useCurrentPeriod } from '@/hooks/useCurrentPeriod';
 import { ClassManagementDialog } from '@/components/teacher/ClassManagementDialog';
 import { StudentHistoryDialog } from '@/components/teacher/StudentHistoryDialog';
+import { StudentManagementDialog } from '@/components/teacher/StudentManagementDialog';
 import { useOrganization } from '@/contexts/OrganizationContext';
 
 // Components
@@ -91,6 +92,8 @@ export const TeacherDashboard = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedStudentForHistory, setSelectedStudentForHistory] = useState<Student | null>(null);
+  const [manageDialogOpen, setManageDialogOpen] = useState(false);
+  const [selectedStudentForManagement, setSelectedStudentForManagement] = useState<Student | null>(null);
 
   // --- Sub Mode State ---
   const [isSubMode, setIsSubMode] = useState(false);
@@ -488,7 +491,7 @@ export const TeacherDashboard = () => {
                   searchQuery={searchQuery}
                   setSearchQuery={setSearchQuery}
                   onViewHistory={(s) => { setSelectedStudentForHistory(s); setHistoryDialogOpen(true); }}
-                  onRemoveStudent={() => { }}
+                  onManageStudent={(s) => { setSelectedStudentForManagement(s); setManageDialogOpen(true); }}
                 />
               </GlassCard>
             </StaggerItem>
@@ -510,6 +513,15 @@ export const TeacherDashboard = () => {
           onOpenChange={setHistoryDialogOpen}
           studentId={selectedStudentForHistory?.id || null}
           studentName={selectedStudentForHistory?.name || null}
+        />
+
+        <StudentManagementDialog
+          open={manageDialogOpen}
+          onOpenChange={setManageDialogOpen}
+          student={selectedStudentForManagement}
+          currentClassId={selectedClassId}
+          teacherClasses={classes}
+          onUpdated={() => fetchStudents()}
         />
 
 

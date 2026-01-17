@@ -1,6 +1,6 @@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Copy, History, UserMinus } from 'lucide-react';
+import { Search, Copy, History, UserCog } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Student {
@@ -15,7 +15,7 @@ interface RosterGridProps {
     searchQuery: string;
     setSearchQuery: (q: string) => void;
     onViewHistory: (student: Student) => void;
-    onRemoveStudent: (student: Student) => void;
+    onManageStudent: (student: Student) => void;
 }
 
 export const RosterGrid = ({
@@ -24,7 +24,7 @@ export const RosterGrid = ({
     searchQuery,
     setSearchQuery,
     onViewHistory,
-    onRemoveStudent
+    onManageStudent
 }: RosterGridProps) => {
     const { toast } = useToast();
     const filteredStudents = students.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -86,10 +86,11 @@ export const RosterGrid = ({
                             <Button
                                 size="icon"
                                 variant="ghost"
-                                className="h-10 w-10 rounded-xl bg-white/5 text-slate-400 hover:bg-red-600/20 hover:text-red-500 border border-white/5 hover:border-red-500/30 transition-all"
-                                onClick={() => onRemoveStudent(student)}
+                                className="h-10 w-10 rounded-xl bg-white/5 text-slate-400 hover:bg-blue-600/20 hover:text-blue-400 border border-white/5 hover:border-blue-500/30 transition-all"
+                                title="Manage Student"
+                                onClick={() => onManageStudent(student)}
                             >
-                                <UserMinus className="h-5 w-5" />
+                                <UserCog className="h-5 w-5" />
                             </Button>
                         </div>
                     </div>
