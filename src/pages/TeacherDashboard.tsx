@@ -438,14 +438,18 @@ export const TeacherDashboard = () => {
                     }
                   }
                 }}
-                onClearQueue={async () => {
+                onClearQueue={async (clearActive: boolean, clearPending: boolean) => {
                   if (!selectedClassId) return;
-                  const { error } = await supabase.rpc('clear_class_queue' as any, { p_class_id: selectedClassId });
+                  const { error } = await supabase.rpc('clear_class_queue' as any, {
+                    p_class_id: selectedClassId,
+                    p_clear_active: clearActive,
+                    p_clear_pending: clearPending
+                  });
                   if (error) {
                     console.error("Error clearing queue:", error);
                     toast({ title: "Error", description: "Failed to clear queue", variant: "destructive" });
                   } else {
-                    toast({ title: "Queue Cleared", description: "All active passes returned and requests denied." });
+                    toast({ title: "Queue Cleared", description: "Operation completed successfully." });
                     fetchPasses();
                   }
                 }}

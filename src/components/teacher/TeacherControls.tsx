@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Plus, Loader2, Snowflake, Bot, Trash2 } from 'lucide-react';
@@ -34,8 +35,82 @@ interface TeacherControlsProps {
     onToggleAutoQueue?: (newMaxConcurrent?: number) => void;
     maxConcurrent: number;
     onDeleteClass: (id: string) => void;
-    onClearQueue?: () => void;
+    onClearQueue?: (clearActive: boolean, clearPending: boolean) => void;
 }
+
+const ClearQueueMenu = ({ onClear }: { onClear: (active: boolean, pending: boolean) => void }) => {
+    const [clearActive, setClearActive] = useState(true);
+    const [clearPending, setClearPending] = useState(true);
+    const [open, setOpen] = useState(false);
+
+    const handleClear = () => {
+        onClear(clearActive, clearPending);
+        setOpen(false);
+    };
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button
+                    variant="outline"
+                    className="h-10 w-10 p-0 rounded-full border-2 border-white/20 bg-white/10 hover:bg-white/15 hover:border-red-400/50 text-slate-400 hover:text-red-400 transition-all shadow-lg"
+                    title="Clear Queue"
+                >
+                    <Trash2 className="h-4 w-4" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 rounded-[1.5rem] bg-slate-900 border-white/20 text-white shadow-2xl p-0 overflow-hidden" align="end">
+                <div className="p-4 border-b border-white/10 bg-slate-900/50">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 rounded-xl border bg-red-500/20 border-red-500/30">
+                            <Trash2 className="w-5 h-5 text-red-500" />
+                        </div>
+                        <div>
+                            <h4 className="font-black text-white text-sm uppercase tracking-wide">Clear Queue</h4>
+                            <p className="text-[10px] font-bold text-slate-400">Select items to remove</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-4 space-y-6">
+                    {/* Active Passes Toggle */}
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label className="text-sm font-bold text-white">Active Passes</Label>
+                            <p className="text-[10px] font-medium text-slate-400">Includes pending returns</p>
+                        </div>
+                        <Switch
+                            checked={clearActive}
+                            onCheckedChange={setClearActive}
+                            className="data-[state=checked]:bg-red-600"
+                        />
+                    </div>
+
+                    {/* Pending Requests Toggle */}
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label className="text-sm font-bold text-white">Pending Requests</Label>
+                            <p className="text-[10px] font-medium text-slate-400">Deny all waiting students</p>
+                        </div>
+                        <Switch
+                            checked={clearPending}
+                            onCheckedChange={setClearPending}
+                            className="data-[state=checked]:bg-red-600"
+                        />
+                    </div>
+
+                    <Button
+                        onClick={handleClear}
+                        disabled={!clearActive && !clearPending}
+                        className="w-full font-bold rounded-xl h-10 shadow-lg bg-red-600 hover:bg-red-700 text-white shadow-red-500/20"
+                    >
+                        Clear Selected
+                    </Button>
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+};
 
 export const TeacherControls = ({
     classes,
@@ -141,38 +216,9 @@ export const TeacherControls = ({
                     </div>
 
                     <div className="flex items-center gap-2 ml-auto">
-                        {/* Clear Queue Button */}
+                        {/* Clear Queue Popover */}
                         {onClearQueue && (
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        className="h-10 w-10 p-0 rounded-full border-2 border-white/20 bg-white/10 hover:bg-white/15 hover:border-red-400/50 text-slate-400 hover:text-red-400 transition-all shadow-lg"
-                                        title="Clear Queue Now"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent className="rounded-[2rem] bg-slate-900 border-white/10 text-white shadow-2xl">
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle className="text-2xl font-black">Clear Entire Queue?</AlertDialogTitle>
-                                        <AlertDialogDescription className="text-slate-300 font-medium pt-2">
-                                            This will <span className="text-red-400 font-bold">return all active passes</span> and <span className="text-red-400 font-bold">deny all pending requests</span> for this class immediately.
-                                            <br /><br />
-                                            This action cannot be undone.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter className="pt-4">
-                                        <AlertDialogCancel className="rounded-xl bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
-                                        <AlertDialogAction
-                                            onClick={onClearQueue}
-                                            className="rounded-xl bg-red-600 hover:bg-red-700 text-white font-black px-6"
-                                        >
-                                            Clear Queue
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
+                            <ClearQueueMenu onClear={onClearQueue} />
                         )}
 
                         {/* Auto-Clear Queue */}
