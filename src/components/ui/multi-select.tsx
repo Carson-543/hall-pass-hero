@@ -37,6 +37,7 @@ export function MultiSelect({
     onChange,
     placeholder = "Select options...",
     className,
+    maxIndicatorLabel,
 }: MultiSelectProps) {
     const [open, setOpen] = React.useState(false)
 
