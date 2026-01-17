@@ -1,12 +1,18 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
+import { AutoClearMenu } from '@/components/teacher/AutoClearMenu';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface TeacherHeaderProps {
   signOut: () => void;
 }
 
 export const TeacherHeader = ({ signOut }: TeacherHeaderProps) => {
+  const { user } = useAuth();
+  const { organizationId } = useOrganization();
+
   return (
     <motion.header
       className="flex items-center justify-between mb-8 pt-4 relative z-10"
@@ -27,14 +33,19 @@ export const TeacherHeader = ({ signOut }: TeacherHeaderProps) => {
           <p className="text-sm text-slate-300 font-extrabold tracking-wide uppercase">Manage passes & students</p>
         </div>
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={signOut}
-        className="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/15 text-white shadow-sm"
-      >
-        <LogOut className="h-5 w-5" />
-      </Button>
+
+      <div className="flex items-center gap-2">
+        <AutoClearMenu organizationId={organizationId} teacherId={user?.id ?? null} />
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={signOut}
+          className="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/15 text-white shadow-sm"
+        >
+          <LogOut className="h-5 w-5" />
+        </Button>
+      </div>
     </motion.header>
   );
 };

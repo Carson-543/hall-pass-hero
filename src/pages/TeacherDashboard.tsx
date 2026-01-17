@@ -19,6 +19,7 @@ import { RosterGrid } from '@/components/teacher/RosterGrid';
 import { GlassCard } from '@/components/ui/glass-card';
 import { PageTransition, StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
 import { FloatingPassButton } from '@/components/FloatingPassButton';
+import { AutoClearMenu } from '@/components/teacher/AutoClearMenu';
 
 // --- Interfaces ---
 interface Student {
