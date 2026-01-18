@@ -65,24 +65,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          // Defer Supabase calls with setTimeout
-          setTimeout(() => {
-            fetchUserData(session.user.id);
-          }, 0);
+          // Fetch user data before clearing loading state
+          fetchUserData(session.user.id).then(() => {
+            setLoading(false);
+          });
         } else {
           setRole(null);
           setIsApproved(false);
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchUserData(session.user.id);
+        await fetchUserData(session.user.id);
       }
       setLoading(false);
     });

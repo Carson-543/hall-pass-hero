@@ -36,14 +36,20 @@ ON DELETE CASCADE;
 
 -- Ensure RLS allows organization staff to see roles
 DROP POLICY IF EXISTS "Admin/Teacher can view organization roles" ON public.user_roles;
-CREATE POLICY "Admin/Teacher can view organization roles"
+DROP POLICY IF EXISTS "Users can view own role" ON public.user_roles;
+DROP POLICY IF EXISTS "Admins can view all roles" ON public.user_roles;
+DROP POLICY IF EXISTS "Anyone can view own role" ON public.user_roles;
+
+-- 1. Users can always view their own role (Critical for login)
+CREATE POLICY "Users can view own role"
 ON public.user_roles
 FOR SELECT
 TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.user_roles ur
-    WHERE ur.user_id = auth.uid() 
-    AND ur.role IN ('teacher', 'admin')
-  )
-);
+USING (user_id = auth.uid());
+
+-- 2. Admins can view all roles (Uses SECURITY DEFINER has_role to avoid recursion)
+CREATE POLICY "Admins can view all roles"
+ON public.user_roles
+FOR SELECT
+TO authenticated
+USING (public.has_role(auth.uid(), 'admin'));
