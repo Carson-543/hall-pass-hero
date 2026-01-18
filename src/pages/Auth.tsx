@@ -178,7 +178,9 @@ const Auth = () => {
     }
 
     // STEP C: Approved and Has Org -> Redirect to Dashboard
-    return <Navigate to={`/${role}`} replace />;
+    if (role) {
+      return <Navigate to={`/${role}`} replace />;
+    }
   }
 
   // 3. UNAUTHENTICATED STATE (Login / Signup Forms)
