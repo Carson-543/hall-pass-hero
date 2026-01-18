@@ -27,7 +27,7 @@ BEGIN
   ELSIF p_type = 'period' THEN
     RETURN QUERY
     SELECT 
-      c.period_order::text as label,
+      'Period ' || c.period_order::text as label,
       COUNT(*) as count
     FROM public.passes p
     JOIN public.classes c ON p.class_id = c.id

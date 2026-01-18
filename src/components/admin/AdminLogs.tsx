@@ -187,7 +187,7 @@ export const AdminLogs = () => {
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">Pass History & Compliance</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" className="h-12 bg-white/5 border-white/5 text-slate-400 hover:text-white hover:bg-emerald-600/20 hover:border-emerald-500/30 rounded-xl font-black px-6 gap-2 transition-all">
+                    <Button variant="outline" className="h-12 bg-white/5 border-white/5 text-slate-400 hover:text-white hover:bg-white/10 hover:border-white/20 rounded-xl font-black px-6 gap-2 transition-all">
                         <Download className="h-4 w-4" /> EXPORT CSV
                     </Button>
                 </div>

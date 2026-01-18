@@ -453,8 +453,8 @@ export const AdminStudents = () => {
                                     <Button
                                         onClick={() => toggleEnrollment(cls.id, cls.is_enrolled)}
                                         className={`h-9 px-4 rounded-lg font-black text-[10px] tracking-widest border transition-all ${cls.is_enrolled
-                                                ? 'bg-red-600/10 border-red-500/20 text-red-400 hover:bg-red-600/20'
-                                                : 'bg-emerald-600/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-600/20'
+                                            ? 'bg-red-600/10 border-red-500/20 text-red-400 hover:bg-red-600/20'
+                                            : 'bg-emerald-600/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-600/20'
                                             }`}
                                     >
                                         {cls.is_enrolled ? 'UNENROLL' : 'ENROLL'}
