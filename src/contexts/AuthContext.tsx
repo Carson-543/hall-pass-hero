@@ -69,31 +69,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          // Fetch user data before clearing loading state
-          fetchUserData(session.user.id).then(() => {
-            setLoading(false);
-          });
+          // Defer Supabase calls with setTimeout
+          setTimeout(() => {
+            fetchUserData(session.user.id);
+          }, 0);
         } else {
           setRole(null);
           setIsApproved(false);
-          setLoading(false);
         }
+        setLoading(false);
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      try {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await fetchUserData(session.user.id);
-        }
-      } catch (err) {
-        console.error("❌ AuthContext: Session init error:", err);
-      } finally {
-        setLoading(false);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchUserData(session.user.id);
       }
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
