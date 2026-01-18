@@ -20,7 +20,7 @@ import { InlinePeriodTable } from '@/components/admin/InlinePeriodTable';
 
 import { DeletionRequestsList } from '@/components/admin/DeletionRequestsList';
 import { SubManagementDialog } from '@/components/admin/SubManagementDialog';
-import { LogOut, Check, X, Calendar, Clock, Plus, Trash2, Users, Edit, Settings, UserCheck, Building2, ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
+import { LogOut, Check, X, Calendar, Clock, Plus, Trash2, Users, Edit, Settings, UserCheck, Building2, ChevronLeft, ChevronRight, UserPlus, Archive, ArchiveRestore } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassCard } from '@/components/ui/glass-card';
 import { PageTransition, StaggerContainer, StaggerItem } from '@/components/ui/page-transition';
@@ -48,6 +48,7 @@ interface Schedule {
   name: string;
   is_school_day: boolean;
   color: string | null;
+  is_archived: boolean;
 }
 
 interface Period {
@@ -92,6 +93,7 @@ const AdminDashboard = () => {
   const [bulkScheduleId, setBulkScheduleId] = useState<string>('');
   const [subDialogDate, setSubDialogDate] = useState<Date | null>(null);
   const [subDialogOpen, setSubDialogOpen] = useState(false);
+  const [showArchivedSchedules, setShowArchivedSchedules] = useState(false);
 
 
   // Organization Settings
@@ -130,7 +132,10 @@ const AdminDashboard = () => {
     if (!organizationId) return;
     const { data } = await supabase.from('schedules').select('*').eq('organization_id', organizationId).order('name');
     if (data) {
-      setSchedules(data);
+      setSchedules((data as any[]).map(s => ({
+        ...s,
+        is_archived: !!s.is_archived
+      })));
     }
   };
 
@@ -477,11 +482,23 @@ const AdminDashboard = () => {
     if (error) {
       console.error("❌ Deletion error:", error);
       toast({ title: 'Error', description: 'Failed to delete schedule.', variant: 'destructive' });
+    }
+  };
+
+  const handleToggleArchive = async (schedule: Schedule) => {
+    const { error } = await supabase
+      .from('schedules')
+      .update({ is_archived: !schedule.is_archived } as any)
+      .eq('id', schedule.id);
+
+    if (error) {
+      toast({ title: 'Error', description: 'Failed to update schedule status.', variant: 'destructive' });
     } else {
-      console.log("✅ Schedule and related data deleted.");
-      toast({ title: 'Schedule Deleted' });
+      toast({
+        title: schedule.is_archived ? 'Schedule Restored' : 'Schedule Archived',
+        description: schedule.is_archived ? `${schedule.name} is now active.` : `${schedule.name} has been moved to archives.`
+      });
       fetchSchedules();
-      fetchScheduleAssignments();
     }
   };
 
@@ -710,7 +727,7 @@ const AdminDashboard = () => {
                                     <SelectValue placeholder="Assign Schedule..." />
                                   </SelectTrigger>
                                   <SelectContent className="bg-slate-900 border-white/10 text-white rounded-xl">
-                                    {schedules.map(s => (
+                                    {schedules.filter(s => !s.is_archived).map(s => (
                                       <SelectItem key={s.id} value={s.id} className="focus:bg-blue-600 focus:text-white font-bold py-2.5">
                                         <div className="flex items-center gap-2">
                                           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: s.color || '#6B7280' }} />
@@ -804,22 +821,41 @@ const AdminDashboard = () => {
                     {/* Right Column: Legend & Tools */}
                     <div className="lg:col-span-4 space-y-6">
                       <GlassCard className="bg-slate-900/60 border-2 border-white/10 shadow-xl overflow-hidden p-0">
-                        <div className="p-4 border-b border-white/10 bg-white/5">
-                          <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Schedule Types</h3>
+                        <div className="p-4 border-b border-white/10 bg-white/5 flex items-center justify-between">
+                          <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Schedule Types</h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowArchivedSchedules(!showArchivedSchedules)}
+                            className={`h-7 px-2 rounded-lg text-[10px] font-black uppercase transition-all ${showArchivedSchedules ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' : 'text-slate-500 hover:text-slate-300'}`}
+                          >
+                            {showArchivedSchedules ? 'Showing Archived' : 'Show Archived'}
+                          </Button>
                         </div>
                         <div className="p-4 space-y-3">
-                          {schedules.map(s => (
-                            <div key={s.id} className="flex items-center justify-between group p-3 rounded-2xl hover:bg-white/10 transition-all border border-transparent hover:border-white/5">
-                              <div className="flex items-center gap-3">
-                                <div className="w-4 h-4 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.2)]" style={{ backgroundColor: s.color || '#6B7280' }} />
-                                <span className="font-black text-sm text-white">{s.name}</span>
+                          {schedules
+                            .filter(s => showArchivedSchedules ? true : !s.is_archived)
+                            .map(s => (
+                              <div key={s.id} className={`flex items-center justify-between group p-3 rounded-2xl hover:bg-white/10 transition-all border border-transparent hover:border-white/5 ${s.is_archived ? 'opacity-50 grayscale' : ''}`}>
+                                <div className="flex items-center gap-3">
+                                  <div className="w-4 h-4 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.2)]" style={{ backgroundColor: s.color || '#6B7280' }} />
+                                  <span className="font-black text-sm text-white">{s.name}</span>
+                                </div>
+                                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 rounded-lg hover:bg-slate-600/20 text-slate-400"
+                                    title={s.is_archived ? "Restore Schedule" : "Archive Schedule"}
+                                    onClick={() => handleToggleArchive(s)}
+                                  >
+                                    {s.is_archived ? <ArchiveRestore className="h-4 w-4 text-emerald-400" /> : <Archive className="h-4 w-4" />}
+                                  </Button>
+                                  <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-blue-600/20 text-blue-400" onClick={() => openEditSchedule(s)}><Edit className="h-4 w-4" /></Button>
+                                  <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-red-600/20 text-red-400" onClick={() => handleDeleteSchedule(s.id)}><Trash2 className="h-4 w-4" /></Button>
+                                </div>
                               </div>
-                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-blue-600/20 text-blue-400" onClick={() => openEditSchedule(s)}><Edit className="h-4 w-4" /></Button>
-                                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-red-600/20 text-red-400" onClick={() => handleDeleteSchedule(s.id)}><Trash2 className="h-4 w-4" /></Button>
-                              </div>
-                            </div>
-                          ))}
+                            ))}
                           <Button variant="outline" className="w-full border-2 border-dashed border-white/10 bg-transparent hover:bg-white/5 hover:border-blue-500/30 text-slate-400 hover:text-white font-black h-12 rounded-2xl transition-all" onClick={openNewSchedule}>
                             <Plus className="h-4 w-4 mr-2" /> Create New Schedule
                           </Button>
