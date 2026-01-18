@@ -48,12 +48,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (roleData) {
         setRole(roleData.role as AppRole);
+        console.log("✅ AuthContext: Role loaded:", roleData.role);
+      } else {
+        console.warn("⚠️ AuthContext: No role found for user.");
       }
       if (profileData) {
         setIsApproved(profileData.is_approved);
+        console.log("✅ AuthContext: Approval status loaded:", profileData.is_approved);
       }
-    } catch {
-      // Authentication error - fail silently for security
+    } catch (e) {
+      console.error("❌ AuthContext: Error fetching user data:", e);
     }
   };
 
