@@ -83,9 +83,9 @@ const Auth = () => {
       );
     }
 
-    // STEP B: If organization is selected but user is NOT approved
+    // STEP B: If organization is selected but user is NOT approved OR role is missing
     // (We bypass this for students if your system auto-approves them)
-    if (!isApproved && role !== 'student') {
+    if ((!isApproved || !role) && role !== 'student') {
       return (
         <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
           <GlassCard className="w-full max-w-md border-primary/20 shadow-2xl shadow-primary/10">
@@ -185,14 +185,20 @@ const Auth = () => {
     // STEP D: Authenticated but Role/Profile hasn't loaded yet
     return (
       <div className="h-screen w-full flex bg-slate-950 items-center justify-center">
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-6">
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
           >
-            <Loader2 className="w-8 h-8 text-primary mx-auto" />
+            <Loader2 className="w-10 h-10 text-primary mx-auto" />
           </motion.div>
-          <p className="text-slate-400 font-medium">Setting up your account...</p>
+          <div className="space-y-2">
+            <p className="text-white text-xl font-black">Setting up your account...</p>
+            <p className="text-slate-400 font-medium max-w-xs mx-auto">This usually takes a few seconds. If you're stuck, try signing out and back in.</p>
+          </div>
+          <Button variant="ghost" className="text-slate-500 hover:text-white" onClick={signOut}>
+            Sign Out
+          </Button>
         </div>
       </div>
     );
