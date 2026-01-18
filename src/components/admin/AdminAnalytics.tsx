@@ -180,8 +180,16 @@ export const AdminAnalytics = () => {
                                     tick={{ fill: '#64748b', fontSize: 10, fontWeight: 800 }}
                                 />
                                 <Tooltip
-                                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontWeight: '800' }}
-                                    cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                                    contentStyle={{
+                                        backgroundColor: '#0f172a',
+                                        border: '1px solid rgba(255,255,255,0.2)',
+                                        borderRadius: '12px',
+                                        fontWeight: '900',
+                                        color: '#fff',
+                                        boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5)'
+                                    }}
+                                    itemStyle={{ color: '#3b82f6' }}
+                                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                                 />
                                 <Bar dataKey="count" fill="url(#barGradient)" radius={[6, 6, 0, 0]} barSize={chartType === 'daily' ? 12 : 40} />
                             </BarChart>

@@ -4,8 +4,12 @@ RETURNS TABLE (
     other_student_id UUID,
     other_student_name TEXT,
     overlap_count BIGINT,
-    overlap_percentage FLOAT
-) AS $$
+    overlap_percentage DOUBLE PRECISION
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
     total_student_passes BIGINT;
 BEGIN
@@ -15,10 +19,10 @@ BEGIN
     JOIN public.classes c ON p.class_id = c.id
     WHERE p.student_id = p_student_id
       AND c.organization_id = p_org_id
-      AND p.approved_at >= (NOW() - (p_days || ' days')::INTERVAL)
+      AND p.approved_at >= (NOW() - (p_days * interval '1 day'))
       AND p.status = 'returned';
 
-    IF total_student_passes = 0 THEN
+    IF total_student_passes = 0 OR total_student_passes IS NULL THEN
         RETURN;
     END IF;
 
@@ -29,11 +33,11 @@ BEGIN
         JOIN public.classes c ON p.class_id = c.id
         WHERE p.student_id = p_student_id
           AND c.organization_id = p_org_id
-          AND p.approved_at >= (NOW() - (p_days || ' days')::INTERVAL)
+          AND p.approved_at >= (NOW() - (p_days * interval '1 day'))
           AND p.status = 'returned'
           AND p.returned_at IS NOT NULL
     ),
-    overlaps AS (
+    overlap_events AS (
         SELECT op.student_id AS other_id, COUNT(sp.id) as overlap_num
         FROM student_passes sp
         JOIN public.passes op ON op.student_id != p_student_id
@@ -45,12 +49,12 @@ BEGIN
         GROUP BY op.student_id
     )
     SELECT 
-        o.other_id,
+        oe.other_id,
         prof.full_name,
-        o.overlap_num,
-        (o.overlap_num::FLOAT / total_student_passes::FLOAT) * 100
-    FROM overlaps o
-    JOIN public.profiles prof ON o.other_id = prof.id
-    ORDER BY o.overlap_num DESC;
+        oe.overlap_num,
+        (oe.overlap_num::DOUBLE PRECISION / total_student_passes::DOUBLE PRECISION) * 100.0
+    FROM overlap_events oe
+    JOIN public.profiles prof ON oe.other_id = prof.id
+    ORDER BY oe.overlap_num DESC;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
